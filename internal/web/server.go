@@ -305,7 +305,9 @@ func shortAge(d time.Duration) string {
 func (s *Server) nodeBlock() nodeBlock {
 	now := s.now()
 	st, _ := s.store.Status()
-	f, _ := s.store.Freshness(now)
+	// Link truth lives in the status snapshot: a stream of events alone proves KAM's ring, not
+	// that the modem and duty cycle are current (MON-DS-13 per snapshot, MON-DS-17).
+	f, _ := s.store.SnapshotFreshness("status", now)
 	nb := nodeBlock{Name: "KAM", LinkText: "Waiting for KAM", Radio: "—"}
 	if s.demo {
 		nb.Mode = "DEMO · GENERATED DATA"

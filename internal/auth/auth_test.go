@@ -78,6 +78,10 @@ func TestIsLocal(t *testing.T) {
 		{"loopback behind a proxy (X-Forwarded-For)", "127.0.0.1:5000", [2]string{"X-Forwarded-For", "203.0.113.9"}, false},
 		{"loopback behind a proxy (X-Real-IP)", "127.0.0.1:5000", [2]string{"X-Real-Ip", "203.0.113.9"}, false},
 		{"loopback behind a proxy (Forwarded)", "127.0.0.1:5000", [2]string{"Forwarded", "for=203.0.113.9"}, false},
+		{"empty header value still counts as present (MON-AX-9)", "127.0.0.1:5000", [2]string{"X-Forwarded-For", ""}, false},
+		{"empty X-Real-IP still counts as present", "127.0.0.1:5000", [2]string{"X-Real-Ip", ""}, false},
+		{"empty Forwarded still counts as present", "127.0.0.1:5000", [2]string{"Forwarded", ""}, false},
+		{"unknown other header is not a proxy header", "127.0.0.1:5000", [2]string{"X-Proxy-Custom", ""}, true},
 		{"garbage", "not-an-address", [2]string{}, false},
 	}
 	for _, c := range cases {

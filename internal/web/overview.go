@@ -52,7 +52,7 @@ type roomRow struct {
 }
 
 type automationData struct {
-	Line, Queue, LastRun, Note string
+	Line, Queue, LastRun, Note, Age string
 }
 
 type overviewData struct {
@@ -70,6 +70,7 @@ type overviewData struct {
 	Recent            []packetRow
 	Rooms             []roomRow
 	RoomsNote         string
+	RoomsAge          string
 	ClientsNote       string
 	Automation        automationData
 }
@@ -116,12 +117,12 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 	}
 
 	data.Metrics = []metric{
-		{Label: "Observed packet airtime", Value: fmt.Sprintf("%.1f", w.AirtimePercent), Unit: "%", Caption: "Received + transmitted packets"},
+		{Label: "Observed packet airtime", Value: fmt.Sprintf("%.1f", w.AirtimePercent), Unit: "%", Caption: airtimeCaption(w)},
 		dutyMetric(status, haveStatus),
 		{Label: "Packets observed", Value: thousands(w.RX + w.TX), Caption: fmt.Sprintf("%s RX / %s TX · %s repeats", thousands(w.RX), thousands(w.TX), thousands(w.Repeats))},
-		{Label: "Room posts · last hour", Value: thousands(hour.Posts), Caption: "Accepted posts, all rooms"},
+		postsMetric(hour.Posts, s.store, status, haveStatus),
 	}
-	if haveStatus && status.Rooms.Enabled {
+	if haveStatus && status.Rooms.Enabled && s.store.RoomEventsSeen() {
 		data.Metrics[3].Unit = fmt.Sprintf("/ %d rooms", status.Rooms.Count)
 	}
 
@@ -154,6 +155,7 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 	if haveStatus && !status.Now.IsZero() {
 		kamNow = status.Now
 	}
+	_, roomsAt := s.store.SnapshotFreshness("rooms", now)
 	for _, room := range rooms {
 		if !room.Enabled {
 			continue
@@ -162,10 +164,13 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 		if room.LastActivityAt != nil {
 			activity = "Last activity " + ago(now.Sub(*room.LastActivityAt))
 		}
-		posts := hour.PostsByRoom[room.Name] + hour.PostsByRoom[room.ID]
+		posts := ""
+		if s.store.RoomEventsSeen() {
+			posts = fmt.Sprintf("%s posts last hour", thousands(hour.PostsByRoom[room.Name]+hour.PostsByRoom[room.ID]))
+		}
 		data.Rooms = append(data.Rooms, roomRow{
 			Name: room.Name, Activity: activity, Remembered: room.ClientsRemembered,
-			Posts: fmt.Sprintf("%s posts last hour", thousands(posts)),
+			Posts: posts,
 			// Admin only: the two newest clients with the activity indicator (MON-OV-9).
 			Clients: view.RecentClients(role, clients[room.ID], kamNow),
 		})
@@ -178,10 +183,20 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 	default:
 		data.RoomsNote = "No rooms yet."
 	}
+	// Keep the room snapshot visible as old instead of letting the reader assume it is current.
+	if roomsF, _ := s.store.SnapshotFreshness("rooms", now); roomsF != store.Fresh {
+		switch roomsF {
+		case store.Stale:
+			data.RoomsAge = fmt.Sprintf("Rooms from %s · KAM slow to answer.", roomsAt.Local().Format("15:04:05"))
+		default:
+			data.RoomsAge = fmt.Sprintf("Rooms from %s · KAM not answering.", roomsAt.Local().Format("15:04:05"))
+		}
+	}
 	if len(data.Rooms) > 0 && role != config.RoleAdmin {
 		data.ClientsNote = "Client activity and posts are visible to the administrator."
 	}
 	st := status.Automation
+	statusFresh, statusAtTS := s.store.SnapshotFreshness("status", now)
 	switch {
 	case !haveStatus:
 		data.Automation.Note = "Waiting for KAM."
@@ -192,8 +207,30 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 		data.Automation.Queue = fmt.Sprintf("Queue depth %s · dropped %s", thousands(st.QueueDepth), thousands(int(st.EventsDropped)))
 		// The time of the last run comes from GET /scripts (MON-OV-10); until KAM ships it (phase 5)
 		// the block shows only the counts.
+		if statusFresh != store.Fresh {
+			data.Automation.Age = fmt.Sprintf("Counts from %s.", statusAtTS.Local().Format("15:04:05"))
+		}
 	}
 	return data
+}
+
+// airtimeCaption keeps the “Received + transmitted packets” line and says when measurements are
+// missing (MON-DS: unknown airtime is not silence on the channel).
+func airtimeCaption(w store.Window) string {
+	caption := "Received + transmitted packets"
+	if w.AirtimeUnknown > 0 {
+		caption += fmt.Sprintf(" · %s without measured airtime, so the percentage is too low", thousands(w.AirtimeUnknown))
+	}
+	return caption
+}
+
+// postsMetric shows “—” while the KAM sends no room-post events: a measured zero would claim the
+// rooms were silent, which the store cannot prove (MON-OV-8, KAM phase 1 has only rx and tx).
+func postsMetric(posts int, st *store.Store, status kam.Status, haveStatus bool) metric {
+	if !st.RoomEventsSeen() {
+		return metric{Label: "Room posts · last hour", Value: "—", Caption: "Unavailable: this KAM sends no room-post events yet"}
+	}
+	return metric{Label: "Room posts · last hour", Value: thousands(posts), Caption: "Accepted posts, all rooms"}
 }
 
 func packetRowFor(role config.Role, allow []string, ev kam.Event) packetRow {

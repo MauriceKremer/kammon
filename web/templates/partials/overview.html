@@ -1,6 +1,7 @@
 {{define "overview-live"}}<div id="overview-live" hx-get="/ui/overview?range={{.Range}}" hx-trigger="every 2s" hx-swap="outerHTML" hx-target="this">
-  <div class="heading">
+        <div class="heading">
     <span class="segmented" role="group" aria-label="Time range">{{range .Ranges}}<a href="/?range={{.Key}}" hx-get="/ui/overview?range={{.Key}}" hx-target="#overview-live" hx-swap="outerHTML" hx-push-url="/?range={{.Key}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}</a>{{end}}</span>
+    <button type="button" id="pause" aria-pressed="false" title="Pause live refresh"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#pause"></use></svg>Pause</button>
   </div>
 
   <div class="metrics">
@@ -47,17 +48,18 @@
 
       <section class="section" aria-labelledby="rooms-title">
         <h2 id="rooms-title">Rooms</h2>
-        {{range .Rooms}}<div class="room-line"><h3>{{.Name}}</h3><p>{{.Activity}} · {{.Posts}}</p><p>{{.Remembered}} remembered</p>
+        {{range .Rooms}}<div class="room-line"><h3>{{.Name}}</h3><p>{{.Activity}}{{if .Posts}} · {{.Posts}}{{end}}</p><p>{{.Remembered}} remembered</p>
           {{if .Clients}}<ul class="clients" aria-label="Two newest clients (administrator only)">{{range .Clients}}<li><span class="ind {{.Ind.Class}}" title="{{.Ind.Title}}"></span><span class="label">{{.Label}}</span>{{with .Ind.Text}} <span class="small muted">{{.}}</span>{{end}}</li>{{end}}</ul>{{end}}
         </div>
         {{else}}<p class="small muted">{{.RoomsNote}}</p>{{end}}
         {{if .ClientsNote}}<p class="small muted">{{.ClientsNote}}</p>{{end}}
+        {{if .RoomsAge}}<p class="small warn">{{.RoomsAge}}</p>{{end}}
       </section>
 
       <section class="section" aria-labelledby="automation-title">
         <h2 id="automation-title">Automation</h2>
         {{if .Automation.Line}}<p class="metric-value">{{.Automation.Line}}</p>
-        <p class="small muted">{{.Automation.Queue}}{{with .Automation.LastRun}} · last run {{.}}{{end}}</p>
+        <p class="small muted">{{.Automation.Queue}}{{with .Automation.LastRun}} · last run {{.}}{{end}}{{if .Automation.Age}} · {{.Automation.Age}}{{end}}</p>
         {{else}}<p class="small muted">{{.Automation.Note}}</p>{{end}}
       </section>
     </div>

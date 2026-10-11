@@ -98,11 +98,12 @@ func (s *Sessions) Delete(id string) {
 	s.mu.Unlock()
 }
 
-// IsLocal reports whether a request comes from this computer: a loopback connection address and no proxy header.
-// A reverse proxy on the same computer therefore cannot give web visitors admin power (MON-AX-9).
+// IsLocal reports whether a request comes from this computer: a loopback connection address and no
+// proxy header at all. Any forwarding header — including one with an empty value — means a proxy is
+// in the path, and a present-but-empty header must not be mistaken for “no header” (MON-AX-9).
 func IsLocal(r *http.Request) bool {
-	for _, h := range []string{"X-Forwarded-For", "X-Real-Ip", "Forwarded"} {
-		if r.Header.Get(h) != "" {
+	for _, h := range []string{"X-Forwarded-For", "X-Real-IP", "Forwarded"} {
+		if _, present := r.Header[http.CanonicalHeaderKey(h)]; present {
 			return false
 		}
 	}

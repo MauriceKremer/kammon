@@ -1,6 +1,7 @@
 package web
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -362,5 +363,83 @@ func TestAssetsAreVendoredAndServed(t *testing.T) {
 	}
 	if status, _, _ := get(t, c, h.ts.URL+"/static/fonts/syncopate-5.3.0-latin-700-normal.woff2"); status != 200 {
 		t.Errorf("font status %d", status)
+	}
+}
+
+// Without room-post events (KAM phase 1) the counts must not be a measured zero (MON-OV-8,
+// honest labels); packets without measured airtime say so in the caption (MON-OV-2).
+func TestOverviewUnavailableCountsSaySo(t *testing.T) {
+	// New store without the room-post event from the scaffold feed.
+	st := store.New()
+	events := []kam.Event{
+		{Seq: 1, At: t0.Add(-40 * time.Second), Kind: kam.KindRX, PayloadType: "GRP_TXT", Channel: "#public", Name: "OpenSender", AirtimeMS: ptr(300)},
+		{Seq: 2, At: t0.Add(-30 * time.Second), Kind: kam.KindRX, PayloadType: "TRACE"},
+	}
+	st.ApplyEvents(kam.EventsResponse{Epoch: "e1", FirstSeq: 1, LastSeq: 2, Events: events}, t0)
+	status := kam.Status{Epoch: "e1", Now: t0, NodeName: "kam"}
+	status.Rooms.Enabled, status.Rooms.Count = true, 1
+	st.SetStatus(status, t0)
+	st.SetRooms([]kam.Room{{ID: "lobby", Name: "Emmen local", Enabled: true, ClientsRemembered: 3}}, nil, t0)
+
+	srv, err := New(Deps{Config: config.Demo(), Store: st, Now: func() time.Time { return t0 }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+	// The two servers do not share sessions, so log in on this one.
+	jar, _ := cookiejar.New(nil)
+	vlogin := &http.Client{Jar: jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, err := vlogin.PostForm(ts.URL+"/login", url.Values{"name": {"admin"}, "password": {"admin"}})
+	if err != nil || resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("fresh server login: %v %v", err, resp.StatusCode)
+	}
+	_, body, _ := get(t, vlogin, ts.URL+"/")
+	for _, want := range []string{"Unavailable: this KAM sends no room-post events yet", "1 without measured airtime, so the percentage is too low"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("overview is missing %q", want)
+		}
+	}
+}
+
+// The pause control from MON-OV-11 with its icon and title, wired to the script.
+func TestOverviewPauseControl(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer", "viewer")
+	_, body, _ := get(t, c, h.ts.URL+"/ui/overview?range=15m", "HX-Request", "true")
+	for _, want := range []string{
+		`id="pause"`, `aria-pressed="false"`, "Pause live refresh", `href="/static/icons.svg#pause"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("overview partial is missing %q", want)
+		}
+	}
+	_, body, _ = get(t, c, h.ts.URL+"/")
+	if !strings.Contains(body, `src="/static/overview.js"`) {
+		t.Error("the page loads the pause script")
+	}
+}
+
+// Old room and status snapshots announce their age on the page instead of looking current (MON-DS-13).
+func TestOverviewMarksOldSnapshots(t *testing.T) {
+	h := newHarness(t)
+	// The event stream keeps answering while the status and room snapshots fall behind: the
+	// overall answer (the stale bar) stays quiet, the per-snapshot blocks say how old they are.
+	now := t0.Add(3 * time.Minute)
+	*h.now = now
+	h.st.ApplyEvents(kam.EventsResponse{Epoch: "e1", FirstSeq: 10, LastSeq: 10, Events: []kam.Event{{Seq: 10, At: now.Add(-time.Second), Kind: kam.KindRX, PayloadType: "TRACE"}}}, now)
+	h.st.SetStatus(kam.Status{Epoch: "e1", Now: t0, NodeName: "kam"}, t0)
+	h.st.SetRooms([]kam.Room{{ID: "lobby", Name: "Emmen local", Enabled: true, ClientsRemembered: 9}}, nil, t0)
+
+	c := h.login(t, "viewer", "viewer")
+	_, body, _ := get(t, c, h.ts.URL+"/")
+	if !strings.Contains(body, fmt.Sprintf("Rooms from %s · KAM not answering.", t0.Local().Format("15:04:05"))) {
+		t.Errorf("old room snapshot says so: %s", body)
+	}
+	if !strings.Contains(body, "KAM not answering") || !strings.Contains(body, `class="dot down"`) {
+		t.Errorf("node block judges the status snapshot: %s", body)
+	}
+	if strings.Contains(body, "has not answered") {
+		t.Error("the event stream still answers, so the page-wide bar stays hidden")
 	}
 }

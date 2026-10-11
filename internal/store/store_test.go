@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -218,5 +219,137 @@ func TestClockOffsetFromStatus(t *testing.T) {
 	s.SetStatus(kam.Status{Epoch: "e1"}, t0)
 	if got := s.ClockOffset(); got != 0 {
 		t.Fatalf("offset without a KAM now = %v, want 0", got)
+	}
+}
+
+// MON-DS-18: events dated in the future (clock skew) must not grow the bucket map past 1440.
+func TestFutureEventsStayOutOfBuckets(t *testing.T) {
+	s := New()
+	future := rx(1, t0.Add(3*time.Hour), "GRP_TXT", 100)
+	s.ApplyEvents(reply("e1", 1, false, future, rx(2, t0.Add(-time.Minute), "GRP_TXT", 100)), t0)
+
+	s.mu.RLock()
+	n := len(s.buckets)
+	s.mu.RUnlock()
+	if n != 1 {
+		t.Fatalf("buckets = %d, want only the normal minute (got future bucket)", n)
+	}
+	if got := s.Recent(2); len(got) != 2 || got[0].Seq != 2 || got[1].Seq != 1 {
+		t.Fatalf("the ring keeps the skewed event too, recent = %+v", got)
+	}
+	w := s.Window(t0, 15*time.Minute)
+	if w.RX != 1 || w.AirtimeMS[ClassGroupText] != 100 {
+		t.Fatalf("window = %+v", w)
+	}
+	// A later poll on its own clock still cleans up; the bucket map stays bounded.
+	s.ApplyEvents(reply("e1", 2, false, rx(3, t0.Add(30*time.Minute).Add(-time.Minute), "GRP_TXT", 100)), t0.Add(30*time.Minute))
+	s.mu.RLock()
+	n = len(s.buckets)
+	s.mu.RUnlock()
+	if n != 2 {
+		t.Fatalf("buckets after skew = %d", n)
+	}
+}
+
+// MON-DS-18: room snapshot limits are hard: 4 rooms, 100 clients each.
+func TestRoomSnapshotLimits(t *testing.T) {
+	s := New()
+	rooms := make([]kam.Room, 6)
+	clients := map[string][]kam.RoomClient{}
+	for i := range rooms {
+		id := fmt.Sprintf("r%d", i)
+		rooms[i].ID, rooms[i].Name, rooms[i].Enabled = id, id, true
+		list := make([]kam.RoomClient, 150)
+		for j := range list {
+			list[j].PublicKey = fmt.Sprintf("%s-c%d", id, j)
+		}
+		clients[id] = list
+	}
+	clients["ghost"] = []kam.RoomClient{{PublicKey: "x"}}
+	s.SetRooms(rooms, clients, t0)
+
+	stored, storedClients := s.Rooms()
+	if len(stored) != MaxRooms {
+		t.Fatalf("rooms = %d, want %d", len(stored), MaxRooms)
+	}
+	if got := storedClients["r0"]; len(got) != MaxClientsPerRoom {
+		t.Fatalf("clients in r0 = %d, want %d", len(got), MaxClientsPerRoom)
+	}
+	if got := storedClients["ghost"]; got != nil {
+		t.Fatalf("clients for a room that KAM no longer lists = %v", got)
+	}
+	if len(storedClients) != MaxRooms {
+		t.Fatalf("client lists = %d, want %d", len(storedClients), MaxRooms)
+	}
+}
+
+// MON-DS-13 per snapshot: events keep flowing while status is silent, and the two judgements
+// stay separate.
+func TestSnapshotFreshnessIsPerJob(t *testing.T) {
+	s := New()
+	s.ApplyEvents(reply("e1", 1, false, rx(1, t0.Add(-time.Minute), "GRP_TXT", 100)), t0)
+	if f, _ := s.SnapshotFreshness("status", t0); f != Down {
+		t.Fatalf("no status answers yet, status freshness = %v", f)
+	}
+	s.SetStatus(kam.Status{Epoch: "e1", Now: t0}, t0)
+	if f, _ := s.SnapshotFreshness("status", t0); f != Fresh {
+		t.Fatalf("status freshness = %v, want fresh", f)
+	}
+	// Forty seconds later the events stream is stale and the status snapshot is newer but stale too.
+	now := t0.Add(40 * time.Second)
+	if f, _ := s.SnapshotFreshness("events", now); f != Stale {
+		t.Fatalf("events freshness = %v, want stale", f)
+	}
+	if f, _ := s.SnapshotFreshness("status", now); f != Stale {
+		t.Fatalf("status freshness = %v, want stale", f)
+	}
+	// The overall answer (for the stale bar) takes the newest of all jobs.
+	if f, _ := s.Freshness(now); f != Stale {
+		t.Fatalf("overall freshness = %v, want stale", f)
+	}
+}
+
+// MON-DS: rolling windows count every bucket that overlaps the range, so a packet inside the
+// last hour survives a range boundary that falls mid-minute.
+func TestWindowIncludesBoundaryMinute(t *testing.T) {
+	s := New()
+	now := t0.Add(30 * time.Second) // 15:00:30, the boundary falls mid-minute
+	s.ApplyEvents(reply("e1", 1, false, rx(1, now.Add(-time.Hour+time.Second), "GRP_TXT", 100)), now)
+	w := s.Window(now, time.Hour)
+	if w.RX != 1 || w.Count[ClassGroupText] != 1 {
+		t.Fatalf("boundary packet lost: %+v", w)
+	}
+	// A bucket entirely outside the range still stays out.
+	s.ApplyEvents(reply("e1", 2, false, rx(2, now.Add(-2*time.Hour-2*time.Second), "GRP_TXT", 50)), now)
+	if w := s.Window(now, time.Hour); w.RX != 1 {
+		t.Fatalf("a packet outside the range sneaked in: %+v", w)
+	}
+}
+
+// MON-DS: packets without measured airtime are counted instead of being silent weight.
+func TestAirtimeUnknownIsTrackedAndWindowed(t *testing.T) {
+	s := New()
+	s.ApplyEvents(reply("e1", 1, false,
+		kam.Event{Seq: 1, At: t0.Add(-time.Minute), Kind: kam.KindRX, PayloadType: "TRACE"},
+		rx(2, t0.Add(-time.Minute), "GRP_TXT", 200),
+	), t0)
+	if got := s.Window(t0, 15*time.Minute).AirtimeUnknown; got != 1 {
+		t.Fatalf("AirtimeUnknown = %d, want 1", got)
+	}
+}
+
+// KAM before the room phase sends no room events; the Overview must not show a measured zero.
+func TestRoomEventsSeen(t *testing.T) {
+	s := New()
+	if s.RoomEventsSeen() {
+		t.Fatal("before any events, room events are unseen")
+	}
+	s.ApplyEvents(reply("e1", 1, false, rx(1, t0, "GRP_TXT", 100)), t0)
+	if s.RoomEventsSeen() {
+		t.Fatal("rx and tx events are not room events")
+	}
+	s.ApplyEvents(reply("e1", 2, false, kam.Event{Seq: 2, At: t0, Kind: kam.KindRoom, Room: "lobby", Event: "post"}), t0)
+	if !s.RoomEventsSeen() {
+		t.Fatal("a room event marks the store")
 	}
 }

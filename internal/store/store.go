@@ -14,16 +14,23 @@ const (
 	MaxMarks      = 50
 	FreshFor      = 10 * time.Second
 	StaleFor      = 2 * time.Minute
+
+	// Hard limits from docs/requirements/DataStore.md §3 (MON-DS-18).
+	MaxRooms              = 4
+	MaxClientsPerRoom     = 100
+	MaxRoomNamesPerBucket = 64
 )
 
 // Bucket is one minute of events summed per packet class.
 type Bucket struct {
-	Count       [ClassCount]int
-	AirtimeMS   [ClassCount]int64
-	RX, TX      int
-	Repeats     int
-	Posts       int
-	PostsByRoom map[string]int // bounded: at most 64 rooms per bucket
+	Count     [ClassCount]int
+	AirtimeMS [ClassCount]int64
+	RX, TX    int
+	Repeats   int
+	Posts     int
+	// AirtimeUnknown counts packets whose airtime was not measured (MON-DS: honest percentage).
+	AirtimeUnknown int
+	PostsByRoom    map[string]int // bounded by MaxRoomNamesPerBucket (MON-DS-18)
 }
 
 // Mark labels a place in the history where something happened.
@@ -58,15 +65,17 @@ type Store struct {
 	marks        []Mark
 	historyStart time.Time
 
-	status      kam.Status
-	statusAt    time.Time
-	clockOffset time.Duration
-	eventsAt    time.Time
-	channels    []kam.Channel
-	rooms       []kam.Room
-	clients     map[string][]kam.RoomClient
-	roomsAt     time.Time
-	notServed   map[string]time.Time
+	status         kam.Status
+	statusAt       time.Time
+	clockOffset    time.Duration
+	eventsAt       time.Time
+	channelsAt     time.Time
+	roomEventsSeen bool
+	channels       []kam.Channel
+	rooms          []kam.Room
+	clients        map[string][]kam.RoomClient
+	roomsAt        time.Time
+	notServed      map[string]time.Time
 }
 
 func New() *Store {
@@ -104,6 +113,7 @@ func (s *Store) ApplyEvents(resp kam.EventsResponse, now time.Time) {
 	}
 
 	oldest := now.Add(-BucketCount*time.Minute).Unix() / 60
+	latest := now.Unix() / 60
 	for _, ev := range resp.Events {
 		if ev.Seq <= s.cursor {
 			continue
@@ -117,7 +127,12 @@ func (s *Store) ApplyEvents(resp kam.EventsResponse, now time.Time) {
 		if s.count == 1 && ev.At.Before(s.historyStart) {
 			s.historyStart = ev.At
 		}
-		if m := ev.At.Unix() / 60; m >= oldest {
+		if ev.Kind == kam.KindRoom {
+			s.roomEventsSeen = true
+		}
+		// Hard bucket bounds (MON-DS-18): a clock-skewed or future-dated event stays in the ring,
+		// but never grows the bucket map beyond the last 1440 minutes.
+		if m := ev.At.Unix() / 60; m >= oldest && m <= latest {
 			s.add(m, ev)
 		}
 	}
@@ -141,6 +156,10 @@ func (s *Store) add(minute int64, ev kam.Event) {
 		b.Count[c]++
 		if ev.AirtimeMS != nil {
 			b.AirtimeMS[c] += int64(*ev.AirtimeMS)
+		} else {
+			// The percentage only counts measured airtime; missing measurements are tracked so the
+			// metric can say the percentage is too low instead of quietly calling them silent.
+			b.AirtimeUnknown++
 		}
 		if ev.Kind == kam.KindRX {
 			b.RX++
@@ -155,7 +174,7 @@ func (s *Store) add(minute int64, ev kam.Event) {
 			b.Posts++
 			// Per-room posts for the Overview room lines (MON-OV-8). Capped so a stream of unknown
 			// room names cannot grow one bucket without bound.
-			if ev.Room != "" && len(b.PostsByRoom) < 64 {
+			if ev.Room != "" && len(b.PostsByRoom) < MaxRoomNamesPerBucket {
 				if b.PostsByRoom == nil {
 					b.PostsByRoom = map[string]int{}
 				}
@@ -191,16 +210,39 @@ func (s *Store) ClockOffset() time.Duration {
 	return s.clockOffset
 }
 
-func (s *Store) SetChannels(ch []kam.Channel) {
+func (s *Store) SetChannels(ch []kam.Channel, now time.Time) {
 	s.mu.Lock()
 	s.channels = append([]kam.Channel(nil), ch...)
+	s.channelsAt = now
 	s.mu.Unlock()
 }
 
 func (s *Store) SetRooms(rooms []kam.Room, clients map[string][]kam.RoomClient, now time.Time) {
 	s.mu.Lock()
+	// Hard limits from docs/requirements/DataStore.md §3 (MON-DS-18): 4 rooms, 100 clients each.
+	// Keep the first entries as they come from KAM; drop the rest.
+	if len(rooms) > MaxRooms {
+		rooms = rooms[:MaxRooms]
+	}
 	s.rooms = append([]kam.Room(nil), rooms...)
-	s.clients = clients
+	known := map[string]bool{}
+	for _, room := range s.rooms {
+		known[room.ID] = true
+	}
+	for id, list := range clients {
+		if !known[id] {
+			continue
+		}
+		if len(list) > MaxClientsPerRoom {
+			list = list[:MaxClientsPerRoom]
+		}
+		s.clients[id] = append([]kam.RoomClient(nil), list...)
+	}
+	for id := range s.clients {
+		if !known[id] {
+			delete(s.clients, id)
+		}
+	}
 	s.roomsAt = now
 	s.mu.Unlock()
 }
@@ -219,7 +261,8 @@ func (s *Store) NotServed(name string, now time.Time) bool {
 	return now.Before(s.notServed[name])
 }
 
-// Freshness reports how recently KAM answered, and when (MON-DS-13).
+// Freshness reports how recently KAM answered anything at all; the bar at the top of the page
+// uses it (MON-DS-13). For one snapshot, use SnapshotFreshness.
 func (s *Store) Freshness(now time.Time) (Freshness, time.Time) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -227,6 +270,17 @@ func (s *Store) Freshness(now time.Time) (Freshness, time.Time) {
 	if s.statusAt.After(last) {
 		last = s.statusAt
 	}
+	if s.roomsAt.After(last) {
+		last = s.roomsAt
+	}
+	if s.channelsAt.After(last) {
+		last = s.channelsAt
+	}
+	return freshnessOf(last, now)
+}
+
+// freshnessOf applies the MON-DS-13 rule: fresh under 10 s, stale 10 s to 2 min, down beyond that.
+func freshnessOf(last, now time.Time) (Freshness, time.Time) {
 	switch age := now.Sub(last); {
 	case last.IsZero() || age >= StaleFor:
 		return Down, last
@@ -235,6 +289,36 @@ func (s *Store) Freshness(now time.Time) (Freshness, time.Time) {
 	default:
 		return Fresh, last
 	}
+}
+
+// SnapshotFreshness reports how recently one named snapshot was answered (MON-DS-13). Names are
+// the poller jobs: "events", "status", "channels", "rooms". Successful event polling says
+// nothing about the status or room snapshots: they are judged separately.
+func (s *Store) SnapshotFreshness(name string, now time.Time) (Freshness, time.Time) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var last time.Time
+	switch name {
+	case "events":
+		last = s.eventsAt
+	case "status":
+		last = s.statusAt
+	case "channels":
+		last = s.channelsAt
+	case "rooms":
+		last = s.roomsAt
+	default:
+		return Down, time.Time{}
+	}
+	return freshnessOf(last, now)
+}
+
+// RoomEventsSeen reports whether the event ring has ever held a room event. KAM before the room
+// phase sends none: counts of room posts would then be a measured zero, not a fact about rooms.
+func (s *Store) RoomEventsSeen() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.roomEventsSeen
 }
 
 func (s *Store) Status() (kam.Status, time.Time) {
@@ -295,14 +379,17 @@ type WindowMark struct {
 
 // Window is the data for the Overview over one time range (docs/requirements/Overview.md §3.2).
 type Window struct {
-	From, To       time.Time
-	Slots          []Slot
-	SlotWidth      time.Duration
-	Count          [ClassCount]int
-	AirtimeMS      [ClassCount]int64
-	RX, TX         int
-	Repeats        int
-	Posts          int
+	From, To  time.Time
+	Slots     []Slot
+	SlotWidth time.Duration
+	Count     [ClassCount]int
+	AirtimeMS [ClassCount]int64
+	RX, TX    int
+	Repeats   int
+	Posts     int
+	// AirtimeUnknown counts packets in the range whose airtime was not measured. The airtime
+	// percentage excludes them, so the caption must say they exist instead of showing silence.
+	AirtimeUnknown int
 	TotalAirtimeMS int64
 	// PostsByRoom are the accepted posts per room name or id over the window (MON-OV-8).
 	PostsByRoom    map[string]int
@@ -333,10 +420,15 @@ func (s *Store) Window(now time.Time, d time.Duration) Window {
 	slotSec := int64(w.SlotWidth / time.Second)
 	for minute, b := range s.buckets {
 		start := minute * 60
-		if start < w.From.Unix() || start >= w.To.Unix() {
+		// Every minute that overlaps [From, To] counts (MON-DS: rolling windows). A boundary minute
+		// counts wholly into the first/last bar, at most one minute outside the exact range.
+		if start+60 <= w.From.Unix() || start >= w.To.Unix() {
 			continue
 		}
 		idx := int((start - w.From.Unix()) / slotSec)
+		if idx < 0 {
+			idx = 0
+		}
 		if idx >= n {
 			idx = n - 1
 		}
@@ -351,6 +443,7 @@ func (s *Store) Window(now time.Time, d time.Duration) Window {
 		w.TX += b.TX
 		w.Repeats += b.Repeats
 		w.Posts += b.Posts
+		w.AirtimeUnknown += b.AirtimeUnknown
 		for name, n := range b.PostsByRoom {
 			w.PostsByRoom[name] += n
 		}

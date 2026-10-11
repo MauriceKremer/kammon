@@ -135,7 +135,7 @@ func (p *Poller) Channels(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	p.Store.SetChannels(channels)
+	p.Store.SetChannels(channels, p.Now())
 	return nil
 }
 
