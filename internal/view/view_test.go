@@ -43,18 +43,18 @@ func TestCanReadChannelText(t *testing.T) {
 func TestPacketLabelHidesSendersFromViewers(t *testing.T) {
 	allow := []string{"#public"}
 	hidden := kam.Event{Kind: kam.KindRX, PayloadType: "GRP_TXT", Channel: "#emmen", Name: "PA3M"}
-	if got := PacketLabel(config.RoleViewer, allow, hidden); strings.Contains(got, "PA3M") || !strings.Contains(got, "#emmen") {
+	if got := PacketLabel(config.RoleViewer, allow, hidden, nil); strings.Contains(got, "PA3M") || !strings.Contains(got, "#emmen") {
 		t.Errorf("viewer label = %q", got)
 	}
-	if got := PacketLabel(config.RoleAdmin, allow, hidden); got != "PA3M → #emmen" {
+	if got := PacketLabel(config.RoleAdmin, allow, hidden, nil); got != "PA3M → #emmen" {
 		t.Errorf("admin label = %q", got)
 	}
 	open := kam.Event{Kind: kam.KindRX, PayloadType: "GRP_TXT", Channel: "#public", Name: "Scout"}
-	if got := PacketLabel(config.RoleViewer, allow, open); got != "Scout → #public" {
+	if got := PacketLabel(config.RoleViewer, allow, open, nil); got != "Scout → #public" {
 		t.Errorf("allow-listed label = %q", got)
 	}
 	advert := kam.Event{Kind: kam.KindRX, PayloadType: "ADVERT", Name: "Canal relay"}
-	if got := PacketLabel(config.RoleViewer, allow, advert); got != "Canal relay" {
+	if got := PacketLabel(config.RoleViewer, allow, advert, nil); got != "Canal relay" {
 		t.Errorf("advert names are public: %q", got)
 	}
 }
@@ -65,12 +65,12 @@ func TestPacketLabelOtherKinds(t *testing.T) {
 		"→ lobby (probable)": {Kind: kam.KindRX, PayloadType: "REQ", Room: "lobby"},
 		"REQ → 8e":           {Kind: kam.KindRX, PayloadType: "REQ", DestHash: "8e"},
 		"TRACE":              {Kind: kam.KindRX, PayloadType: "TRACE"},
-		"KAM → room lobby":   {Kind: kam.KindTX, Origin: "room", Room: "lobby"},
+		"KAM → lobby":        {Kind: kam.KindTX, Origin: "room", Room: "lobby"},
 		"Unnamed advert":     {Kind: kam.KindRX, PayloadType: "ADVERT"},
 		"KAM":                {Kind: kam.KindTX, Origin: "automation"},
 	}
 	for want, ev := range cases {
-		if got := PacketLabel(config.RoleAdmin, nil, ev); got != want {
+		if got := PacketLabel(config.RoleAdmin, nil, ev, nil); got != want {
 			t.Errorf("got %q, want %q", got, want)
 		}
 	}
@@ -126,5 +126,30 @@ func TestRecentClientsVisibility(t *testing.T) {
 	}
 	if got[0].Ind.Class != "fresh" {
 		t.Errorf("first indicator fresh, got %v", got[0].Ind)
+	}
+}
+
+// Events carry room ids; the label resolves them against the room snapshot (Traffic.md §3.1).
+func TestPacketLabelResolvesRoomNames(t *testing.T) {
+	resolver := func(id string) string {
+		if id == "lobby" {
+			return "Emmen local"
+		}
+		return "" // an unknown id keeps its id, a zero room keeps the dash
+	}
+	rx := kam.Event{Kind: kam.KindRX, PayloadType: "REQ", Room: "lobby"}
+	if got := PacketLabel(config.RoleViewer, nil, rx, resolver); got != "→ Emmen local (probable)" {
+		t.Errorf("rx room event = %q", got)
+	}
+	tx := kam.Event{Kind: kam.KindTX, Origin: "room", Room: "lobby"}
+	if got := PacketLabel(config.RoleAdmin, nil, tx, resolver); got != "KAM → Emmen local" {
+		t.Errorf("tx room event = %q", got)
+	}
+	if got := PacketLabel(config.RoleAdmin, nil, rx, nil); got != "→ lobby (probable)" {
+		t.Errorf("without a resolver the id stands in: %q", got)
+	}
+	unknown := kam.Event{Kind: kam.KindRX, PayloadType: "REQ", Room: "ghost"}
+	if got := PacketLabel(config.RoleAdmin, nil, unknown, resolver); got != "→ ghost (probable)" {
+		t.Errorf("an unknown room keeps its id: %q", got)
 	}
 }

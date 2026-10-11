@@ -415,7 +415,7 @@ func TestOverviewPauseControl(t *testing.T) {
 		}
 	}
 	_, body, _ = get(t, c, h.ts.URL+"/")
-	if !strings.Contains(body, `src="/static/overview.js"`) {
+	if !strings.Contains(body, `src="/static/live.js"`) {
 		t.Error("the page loads the pause script")
 	}
 }
@@ -461,5 +461,134 @@ func TestOverviewMarksOldEventFeed(t *testing.T) {
 	_, body, _ = get(t, c, h.ts.URL+"/")
 	if strings.Contains(body, "has not answered") {
 		t.Error("KAM answered, so the page-wide bar stays hidden")
+	}
+}
+
+// MON-TR-1..4: the Traffic page builds from the ring alone, rows newest first, with the summary,
+// history note and the footnote.
+func TestTrafficPageBasics(t *testing.T) {
+	h := newHarness(t)
+	viewer := h.login(t, "viewer", "viewer")
+	_, body, _ := get(t, viewer, h.ts.URL+"/traffic")
+	for _, want := range []string{
+		`id="traffic-live"`, `hx-trigger="every 2s"`, `hx-get="/ui/traffic?"`,
+		"OpenSender", "Sender hidden → #emmen", "KAM → Emmen local",
+		"Export CSV", `href="/traffic.csv?"`,
+		"History starts at " + t0.Add(-50*time.Second).Local().Format("15:04") + ".",
+		"Observed packets only. Unattributed or undecryptable payloads keep their visible packet type.",
+		"matching · 3 RX · 1 TX",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("traffic page is missing %q", want)
+		}
+	}
+}
+
+// MON-TR-5, 6, 8: filters combine with AND, live in the URL, and dashes stand for missing values.
+func TestTrafficFilters(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer", "viewer")
+	_, body, _ := get(t, c, h.ts.URL+"/traffic?type=GRP_TXT&dir=rx")
+	if !strings.Contains(body, "Sender hidden → #emmen") || !strings.Contains(body, "OpenSender → #public") {
+		t.Error("both group-text rows match type and direction (MON-TR-5)")
+	}
+	if strings.Contains(body, "Canal relay") || strings.Contains(body, "KAM → Emmen local") {
+		t.Error("the other packet types stayed out")
+	}
+	_, body, _ = get(t, c, h.ts.URL+"/traffic?text=public&dir=rx")
+	if !strings.Contains(body, "OpenSender → #public") || strings.Contains(body, "Sender hidden") {
+		t.Error("text and direction select together")
+	}
+	_, body, _ = get(t, c, h.ts.URL+"/traffic?text=public&dir=tx")
+	if !strings.Contains(body, "No packets match this filter.") {
+		t.Error("an unmatchable filter says so")
+	}
+}
+
+// MON-TR-5, §6: a viewer cannot find a hidden sender by searching, in the page or in the CSV.
+func TestTrafficTextFilterNeverMatchesHiddenFields(t *testing.T) {
+	h := newHarness(t)
+	viewer := h.login(t, "viewer", "viewer")
+	admin := h.login(t, "admin", "admin")
+	for _, target := range []string{"/traffic?text=secret", "/traffic.csv?text=secret"} {
+		_, body, _ := get(t, viewer, h.ts.URL+target)
+		if strings.Contains(body, "SecretSender") {
+			t.Errorf("%s: the viewer found a hidden sender", target)
+		}
+		_, body, _ = get(t, admin, h.ts.URL+target)
+		if !strings.Contains(body, "SecretSender") {
+			t.Errorf("%s: the admin filtered on the visible sender", target)
+		}
+	}
+}
+
+// MON-TR-10, 11: CSV with the right columns, escaping and the formula guard.
+func TestTrafficCSV(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer", "viewer")
+	_, body, header := get(t, c, h.ts.URL+"/traffic.csv")
+	if !strings.HasPrefix(header.Get("Content-Type"), "text/csv") {
+		t.Errorf("content type %q", header.Get("Content-Type"))
+	}
+	if !strings.Contains(header.Get("Content-Disposition"), "attachment; filename=\"kammon-traffic-") {
+		t.Errorf("file name %q", header.Get("Content-Disposition"))
+	}
+	lines := strings.Split(strings.TrimSpace(body), "\n")
+	if strings.Contains(lines[0], "Source / destination") == false {
+		t.Errorf("csv header = %q", lines[0])
+	}
+	if len(lines) != 5 { // four packet events, no room event
+		t.Fatalf("csv rows = %d, body = %q", len(lines), body)
+	}
+	for _, line := range lines {
+		for _, cell := range strings.Split(line, ",") {
+			if len(cell) > 0 && (cell[0] == '=' || cell[0] == '@') {
+				t.Errorf("an unguarded formula slipped into %q", line)
+			}
+		}
+	}
+	// A plain label survives as it is; csv quotes only when a field needs it.
+	if !strings.Contains(body, "Canal relay") {
+		t.Errorf("escaping for a name with a space: %q", body)
+	}
+}
+
+// MON-TR-2, 12: 100 rows first, "Show 100 more" up to the ring, then the history note.
+func TestTrafficPaging(t *testing.T) {
+	h := newHarness(t)
+	base := t0.Add(-10 * time.Minute)
+	var events []kam.Event
+	for i := 0; i < 150; i++ {
+		events = append(events, kam.Event{Seq: uint64(i + 1), At: base.Add(time.Duration(i) * time.Second), Kind: kam.KindRX, PayloadType: "TRACE"})
+	}
+	h.st.ApplyEvents(kam.EventsResponse{Epoch: "e1", FirstSeq: 1, LastSeq: 150, Events: events}, t0)
+
+	c := h.login(t, "viewer", "viewer")
+	_, body, _ := get(t, c, h.ts.URL+"/traffic")
+	firstCount := strings.Count(body, "mon\">15")
+	if !strings.Contains(body, "Show 100 more") {
+		t.Fatalf("the paging control is missing (rows=%d)", firstCount)
+	}
+	_, body, _ = get(t, c, h.ts.URL+"/ui/traffic?skip=100", "HX-Request", "true")
+	if strings.Contains(body, "Show 100 more") {
+		t.Error("no page after the last one")
+	}
+	if !strings.Contains(body, "History starts at "+base.Local().Format("15:04")) {
+		t.Errorf("history note on the last page: %s", body)
+	}
+}
+
+// MON-TR-11: a value that a spreadsheet would parse as a formula gets a leading apostrophe.
+func TestTrafficCSVFormulaGuard(t *testing.T) {
+	h := newHarness(t)
+	events := []kam.Event{
+		{Seq: 10, At: t0.Add(-time.Minute), Kind: kam.KindRX, PayloadType: "ADVERT", Name: "=EVIL"},
+		{Seq: 11, At: t0.Add(-time.Minute + time.Second), Kind: kam.KindRX, PayloadType: "ADVERT", Name: "+RADIO"},
+	}
+	h.st.ApplyEvents(kam.EventsResponse{Epoch: "e1", FirstSeq: 1, LastSeq: 2, Events: events}, t0)
+	c := h.login(t, "viewer", "viewer")
+	_, body, _ := get(t, c, h.ts.URL+"/traffic.csv?type=ADVERT")
+	if !strings.Contains(body, "'=EVIL") || !strings.Contains(body, "'+RADIO") {
+		t.Errorf("formula values must carry the apostrophe guard: %q", body)
 	}
 }

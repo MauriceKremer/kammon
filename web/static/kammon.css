@@ -148,6 +148,14 @@ th:first-child, td:first-child { padding-left: 0; }
 .tag { padding: 3px 6px; border-radius: 3px; font: 11px var(--font-code); color: var(--signal); background: color-mix(in srgb, var(--signal) 9%, var(--bg-0)); }
 .tag.advert { color: var(--warning); background: color-mix(in srgb, var(--warning) 9%, var(--bg-0)); }
 .tag.ack { color: var(--success); background: color-mix(in srgb, var(--success) 9%, var(--bg-0)); }
+.tag.repeat { color: var(--text-secondary); background: var(--bg-2); }
+
+/* Traffic filter bar (MON-TR-5): the controls in one row, wrap on narrow screens. */
+.filters { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
+.filters form { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; flex: 1 1 auto; }
+.filters input[type="search"] { min-width: 260px; flex: 1 1 240px; }
+.filters .check { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--text-secondary); }
+.filters .check input { width: auto; }
 .room-line { padding: 12px 0; border-bottom: 1px solid var(--border-subtle); }
 .room-line:first-child { padding-top: 0; }
 .room-line p { font-size: 13px; color: var(--text-muted); }

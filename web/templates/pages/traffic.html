@@ -1,0 +1,38 @@
+{{define "content"}}{{template "traffic-page" .Content}}{{end}}
+
+{{define "traffic-page"}}
+<div class="filters">
+  <form id="traffic-filter" hx-get="/ui/traffic" hx-push-url="true" hx-target="#traffic-live" hx-swap="outerHTML" role="search" aria-label="Traffic filters">
+    <input type="search" name="text" value="{{.Text}}" placeholder="Filter source or destination" aria-label="Filter by source or destination">
+    <select name="type" aria-label="Packet type">
+      <option value="">All types</option>
+      {{range .TypeOptions}}<option value="{{.}}"{{if eq . $.Type}} selected{{end}}>{{.}}</option>{{end}}
+    </select>
+    <select name="dir" aria-label="Direction">
+      <option value="">RX + TX</option>
+      <option value="rx"{{if eq .Direction "rx"}} selected{{end}}>RX</option>
+      <option value="tx"{{if eq .Direction "tx"}} selected{{end}}>TX</option>
+    </select>
+    <label class="check"><input type="checkbox" name="hide" value="1"{{if .HideRepeats}} checked{{end}}> Hide repeats</label>
+  </form>
+  <a class="button" href="{{.CSVURL}}">Export CSV</a>
+  <button type="button" id="pause" aria-pressed="false" title="Pause live refresh"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#pause"></use></svg>Pause</button>
+</div>
+{{template "traffic-live" .}}
+<p class="small muted">Observed packets only. Unattributed or undecryptable payloads keep their visible packet type.</p>
+{{end}}
+
+{{define "traffic-live"}}
+<div id="traffic-live" hx-get="{{.LiveURL}}" hx-trigger="every 2s" hx-swap="outerHTML">
+  <p class="small muted">{{.Summary}}{{range .Types}} · {{.Name}} {{.Count}} ({{.Percent}}){{end}}</p>
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Time</th><th>Dir</th><th>Type</th><th>Source / destination</th><th>Route</th><th>SNR</th><th>RSSI</th><th>Est. airtime</th></tr></thead>
+      <tbody>{{range .Rows}}<tr><td class="mono muted">{{.Time}}</td><td>{{.Dir}}{{if .Repeat}} <span class="tag repeat">repeat</span>{{end}}</td><td><span class="tag {{.TypeClass}}">{{.Type}}</span></td><td>{{.Label}}</td><td class="mono">{{.Route}}</td><td class="mono">{{.SNR}}</td><td class="mono">{{.RSSI}}</td><td class="mono">{{.Airtime}}</td></tr>
+      {{else}}<tr><td colspan="8" class="muted">No packets match this filter.</td></tr>{{end}}</tbody>
+    </table>
+  </div>
+  {{if .HistoryNote}}<p class="small muted">{{.HistoryNote}}</p>{{end}}
+  {{if .MoreURL}}<button type="button" class="text-button" hx-get="{{.MoreURL}}" hx-target="#traffic-live" hx-swap="outerHTML">Show 100 more</button>{{end}}
+</div>
+{{end}}

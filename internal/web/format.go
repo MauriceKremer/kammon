@@ -61,3 +61,11 @@ func thousands(n int) string {
 	}
 	return out.String()
 }
+
+// orDash renders an empty string as a dash (MON-TR-8).
+func orDash(s string) string {
+	if s == "" {
+		return "—"
+	}
+	return s
+}

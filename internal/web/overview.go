@@ -157,7 +157,7 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 		if ev.Kind != kam.KindRX && ev.Kind != kam.KindTX {
 			continue
 		}
-		data.Recent = append(data.Recent, packetRowFor(role, allow, ev))
+		data.Recent = append(data.Recent, s.packetRowFor(role, allow, ev))
 	}
 
 	rooms, clients := s.store.Rooms()
@@ -244,11 +244,22 @@ func postsMetric(posts int, st *store.Store, status kam.Status, haveStatus bool)
 	return metric{Label: "Room posts · last hour", Value: thousands(posts), Caption: "Accepted posts, all rooms"}
 }
 
-func packetRowFor(role config.Role, allow []string, ev kam.Event) packetRow {
+// Room display names come from the room snapshot; the store, not view, holds it.
+func (s *Server) roomNames() func(id string) string {
+	rooms, _ := s.store.Rooms()
+	names := make(map[string]string, len(rooms))
+	for _, room := range rooms {
+		names[room.ID] = room.Name
+		names[room.Name] = room.Name // events may carry either the id or the name
+	}
+	return func(id string) string { return names[id] }
+}
+
+func (s *Server) packetRowFor(role config.Role, allow []string, ev kam.Event) packetRow {
 	row := packetRow{
 		Time:  ev.At.Local().Format("15:04:05"),
 		Type:  ev.PayloadType,
-		Label: view.PacketLabel(role, allow, ev),
+		Label: view.PacketLabel(role, allow, ev, s.roomNames()),
 		SNR:   "—",
 	}
 	switch ev.PayloadType {

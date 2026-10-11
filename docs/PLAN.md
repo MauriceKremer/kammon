@@ -26,7 +26,7 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 
 ## Slice 2: Traffic
 
-- [ ] Filtered table from the event ring, paging, pause, CSV export (MON-TR-1..13)
+- [x] Filtered table from the event ring, paging, pause, CSV export (MON-TR-1..13)
 
 ## Slice 3: Channels and Rooms (needs KAM API phase 2)
 

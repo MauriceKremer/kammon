@@ -115,12 +115,22 @@ func CanReadChannelText(role config.Role, allow []string, channel string) bool {
 
 // PacketLabel is the source or destination text of a packet event (docs/requirements/Traffic.md §3.1).
 // Sender names on channels a viewer may not read are replaced, and never appear in the page.
-func PacketLabel(role config.Role, allow []string, ev kam.Event) string {
+// Events carry room ids, not room names; the caller supplies a resolver against the room snapshot.
+func PacketLabel(role config.Role, allow []string, ev kam.Event, roomName func(id string) string) string {
+	resolve := func(room string) string {
+		if room == "" {
+			return "—"
+		}
+		if roomName != nil && roomName(room) != "" {
+			return roomName(room)
+		}
+		return room
+	}
 	switch {
 	case ev.Kind == kam.KindTX:
 		switch ev.Origin {
 		case "room":
-			return "KAM → room " + orDash(ev.Room)
+			return "KAM → " + resolve(ev.Room)
 		case "advert":
 			return "KAM advert"
 		default:
@@ -142,7 +152,7 @@ func PacketLabel(role config.Role, allow []string, ev kam.Event) string {
 		}
 		return "Sender hidden → " + ev.Channel
 	case ev.Room != "":
-		return "→ " + ev.Room + " (probable)"
+		return "→ " + resolve(ev.Room) + " (probable)"
 	case ev.DestHash != "":
 		return ev.PayloadType + " → " + ev.DestHash
 	default:

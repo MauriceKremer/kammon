@@ -542,3 +542,21 @@ func (s *Store) HistoryStart() time.Time {
 	defer s.mu.RUnlock()
 	return s.historyStart
 }
+
+// OldestEventAt is the oldest timestamp the event ring keeps, zero when it is empty; the Traffic
+// page uses it for "History starts at HH:MM" (MON-TR-12).
+func (s *Store) OldestEventAt() time.Time {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.count == 0 {
+		return time.Time{}
+	}
+	oldest := time.Time{}
+	for i := 0; i < s.count; i++ {
+		at := s.ring[(s.next-1-i+len(s.ring))%len(s.ring)].At
+		if oldest.IsZero() || at.Before(oldest) {
+			oldest = at
+		}
+	}
+	return oldest
+}

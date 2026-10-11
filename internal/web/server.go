@@ -68,7 +68,7 @@ func New(d Deps) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, name := range []string{"overview", "placeholder", "login"} {
+	for _, name := range []string{"overview", "placeholder", "login", "traffic"} {
 		clone, err := base.Clone()
 		if err != nil {
 			return nil, err
@@ -93,9 +93,14 @@ func (s *Server) routes() []route {
 		{"POST /logout", viewer, s.logout},
 		{"GET /{$}", viewer, s.overviewPage},
 		{"GET /ui/overview", viewer, s.overviewPartial},
+		{"GET /traffic", viewer, s.trafficPage},
+		{"GET /ui/traffic", viewer, s.trafficPartial},
+		{"GET /traffic.csv", viewer, s.csvPage},
 	}
+	// Placeholder routes for the pages that are not built yet. Built pages register their own
+	// routes above; the overview and traffic pages take themselves out of this loop.
 	for _, p := range view.Pages(config.RoleAdmin) {
-		if p.Key == "overview" {
+		if p.Key == "overview" || p.Key == "traffic" {
 			continue
 		}
 		level := viewer
@@ -375,7 +380,6 @@ func (s *Server) overviewPartial(w http.ResponseWriter, r *http.Request) {
 }
 
 var placeholders = map[string]placeholderData{
-	"traffic":     {Text: "A live table of every packet heard or sent, with filters and CSV export.", Slice: "slice 2", Doc: "docs/requirements/Traffic.md"},
 	"channels":    {Text: "Channel activity and decoded messages.", Slice: "slice 3", Doc: "docs/requirements/Channels.md"},
 	"rooms":       {Text: "Room activity, remembered clients and posts.", Slice: "slice 3", Doc: "docs/requirements/Rooms.md"},
 	"accounts":    {Text: "Room roles for the administrator.", Slice: "slice 6", Doc: "docs/requirements/RoomAccounts.md"},
