@@ -250,6 +250,7 @@ type staleBar struct {
 
 type nodeBlock struct {
 	Name, LinkText, LinkClass, Radio, Uptime, Mode string
+	KamTime, ClockNote                             string
 }
 
 type placeholderData struct{ Text, Slice, Doc string }
@@ -325,7 +326,26 @@ func (s *Server) nodeBlock() nodeBlock {
 	}
 	nb.Radio = fmt.Sprintf("%.3f MHz · SF%d / BW%d", float64(st.Radio.FrequencyHz)/1e6, st.Radio.SpreadingFactor, st.Radio.BandwidthHz/1000)
 	nb.Uptime = uptime(st.Now.Sub(st.StartedAt))
+	// KAM time on every screen: our clock corrected by the measured offset (MON-DS-15).
+	if !st.Now.IsZero() {
+		off := s.store.ClockOffset()
+		nb.KamTime = now.Add(off).Local().Format("15:04:05")
+		if a := absDuration(off); a > 2*time.Second {
+			direction := "behind"
+			if off > 0 {
+				direction = "ahead of"
+			}
+			nb.ClockNote = fmt.Sprintf("KAM clock %s %s this computer", shortAge(a), direction)
+		}
+	}
 	return nb
+}
+
+func absDuration(d time.Duration) time.Duration {
+	if d < 0 {
+		return -d
+	}
+	return d
 }
 
 func (s *Server) overviewPage(w http.ResponseWriter, r *http.Request) {

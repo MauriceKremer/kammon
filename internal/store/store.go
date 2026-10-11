@@ -58,14 +58,15 @@ type Store struct {
 	marks        []Mark
 	historyStart time.Time
 
-	status    kam.Status
-	statusAt  time.Time
-	eventsAt  time.Time
-	channels  []kam.Channel
-	rooms     []kam.Room
-	clients   map[string][]kam.RoomClient
-	roomsAt   time.Time
-	notServed map[string]time.Time
+	status      kam.Status
+	statusAt    time.Time
+	clockOffset time.Duration
+	eventsAt    time.Time
+	channels    []kam.Channel
+	rooms       []kam.Room
+	clients     map[string][]kam.RoomClient
+	roomsAt     time.Time
+	notServed   map[string]time.Time
 }
 
 func New() *Store {
@@ -174,7 +175,20 @@ func (s *Store) addMark(m Mark) {
 func (s *Store) SetStatus(st kam.Status, now time.Time) {
 	s.mu.Lock()
 	s.status, s.statusAt = st, now
+	// KAM's clock minus our own, for MON-DS-15. Zero time means KAM left "now" out; treat as no offset.
+	if st.Now.IsZero() {
+		s.clockOffset = 0
+	} else {
+		s.clockOffset = st.Now.Sub(now)
+	}
 	s.mu.Unlock()
+}
+
+// ClockOffset is KAM's now minus KAMmon's own clock from the newest status answer (MON-DS-15).
+func (s *Store) ClockOffset() time.Duration {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.clockOffset
 }
 
 func (s *Store) SetChannels(ch []kam.Channel) {

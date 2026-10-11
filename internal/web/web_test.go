@@ -312,3 +312,26 @@ func TestOverviewRoomsClientsAndAutomation(t *testing.T) {
 		t.Error("the viewer gets the admin-only note (MON-RM-12 wording)")
 	}
 }
+
+// MON-DS-15: the sidebar shows KAM time corrected by the measured offset, and notes a big one.
+func TestNodeBlockShowsKamTime(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer", "viewer")
+	_, body, _ := get(t, c, h.ts.URL+"/")
+	want := "KAM time " + h.now.Local().Format("15:04:05")
+	if !strings.Contains(body, want) {
+		t.Fatal("the sidebar shows KAM time: " + want)
+	}
+	if strings.Contains(body, "KAM clock") {
+		t.Fatal("a small offset gets no note")
+	}
+
+	// A skewed KAM clock is visible in words, not only in a number.
+	st, then := h.st.Status()
+	st.Now = then.Add(-75 * time.Second)
+	h.st.SetStatus(st, then)
+	_, body, _ = get(t, c, h.ts.URL+"/")
+	if !strings.Contains(body, "KAM clock 1 min behind this computer") {
+		t.Errorf("clock note missing: %s", body)
+	}
+}

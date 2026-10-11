@@ -202,3 +202,21 @@ func TestWindowMarksOnTheAxis(t *testing.T) {
 		t.Fatalf("marks before the range must stay out: %v", older)
 	}
 }
+
+// MON-DS-15: the store remembers KAM's clock offset from the newest status answer.
+func TestClockOffsetFromStatus(t *testing.T) {
+	s := New()
+	s.SetStatus(kam.Status{Epoch: "e1", Now: t0.Add(5 * time.Second)}, t0)
+	if got := s.ClockOffset(); got != 5*time.Second {
+		t.Fatalf("offset = %v, want 5 s", got)
+	}
+	s.SetStatus(kam.Status{Epoch: "e1", Now: t0.Add(-90 * time.Second)}, t0)
+	if got := s.ClockOffset(); got != -90*time.Second {
+		t.Fatalf("offset = %v, want -90 s", got)
+	}
+	// KAM without a now is not a 60-year-old clock (MON-DS-15).
+	s.SetStatus(kam.Status{Epoch: "e1"}, t0)
+	if got := s.ClockOffset(); got != 0 {
+		t.Fatalf("offset without a KAM now = %v, want 0", got)
+	}
+}
