@@ -177,3 +177,28 @@ func TestNotServedExpires(t *testing.T) {
 		t.Fatal("not-served window is wrong")
 	}
 }
+
+func TestWindowMarksOnTheAxis(t *testing.T) {
+	s := New()
+	s.ApplyEvents(reply("e1", 1, false, rx(1, t0.Add(-20*time.Minute), "GRP_TXT", 100)), t0.Add(-20*time.Minute))
+	s.ApplyEvents(reply("e2", 2, false), t0.Add(-10*time.Minute))                      // restart mark (MON-OV-5)
+	s.ApplyEvents(reply("e3", 20, false), t0.Add(-9*time.Minute-500*time.Millisecond)) // restart again, same bar
+	// First data of the new epoch arrives with a reset header, but the restart mark already covers it:
+	s.ApplyEvents(reply("e3", 30, true, rx(30, t0.Add(-9*time.Minute), "GRP_TXT", 100)), t0.Add(-9*time.Minute))
+	// Same epoch later with a reset header: events were missed (MON-DS-10).
+	s.ApplyEvents(reply("e3", 40, true, rx(40, t0.Add(-8*time.Minute), "GRP_TXT", 100)), t0.Add(-8*time.Minute)) // gap mark
+
+	w := s.Window(t0, 15*time.Minute)
+	want := []WindowMark{{Slot: 5, Kind: "restart"}, {Slot: 7, Kind: "gap"}}
+	if len(w.Marks) != len(want) {
+		t.Fatalf("marks = %v, want %v", w.Marks, want)
+	}
+	for i, m := range want {
+		if w.Marks[i] != m {
+			t.Fatalf("marks[%d] = %v, want %v", i, w.Marks[i], m)
+		}
+	}
+	if older := s.Window(t0, 5*time.Minute).Marks; len(older) != 0 {
+		t.Fatalf("marks before the range must stay out: %v", older)
+	}
+}

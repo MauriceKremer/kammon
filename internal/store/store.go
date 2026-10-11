@@ -264,6 +264,12 @@ type Slot struct {
 	Count     [ClassCount]int
 }
 
+// WindowMark is a gap or KAM-restart mark for the chart axis (MON-OV-5).
+type WindowMark struct {
+	Slot int    // the bar the mark sits on
+	Kind string // "restart" or "gap"
+}
+
 // Window is the data for the Overview over one time range (docs/requirements/Overview.md §3.2).
 type Window struct {
 	From, To       time.Time
@@ -279,6 +285,8 @@ type Window struct {
 	PeakPercent    float64
 	// HistoryStart is set when the store holds less than the range asked for (MON-OV-5).
 	HistoryStart time.Time
+	// Marks are the restart and gap marks inside the range, deduplicated per bar.
+	Marks []WindowMark
 }
 
 // Window sums the buckets in [now-d, now). At most 60 slots: 15m gives 15 one-minute slots, 1h 60, 24h 60 of 24 minutes.
@@ -331,6 +339,21 @@ func (s *Store) Window(now time.Time, d time.Duration) Window {
 	}
 	if !s.historyStart.IsZero() && s.historyStart.After(w.From) {
 		w.HistoryStart = s.historyStart
+	}
+	seen := map[WindowMark]bool{}
+	for _, m := range s.marks {
+		if m.At.Before(w.From) || !m.At.Before(w.To) {
+			continue
+		}
+		idx := int(m.At.Sub(w.From) / w.SlotWidth)
+		if idx >= n {
+			idx = n - 1
+		}
+		mk := WindowMark{Slot: idx, Kind: m.Kind}
+		if !seen[mk] {
+			seen[mk] = true
+			w.Marks = append(w.Marks, mk)
+		}
 	}
 	return w
 }

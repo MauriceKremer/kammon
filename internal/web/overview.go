@@ -80,7 +80,7 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 		Range: opt.Key, RangeLabel: opt.Label, Chart: chart,
 		AxisTop:  fmt.Sprintf("%.1f%%", axisTop),
 		SlotText: fmt.Sprintf("%d bars of %s", len(w.Slots), slotWidthText(w.SlotWidth)),
-		ChartAlt: fmt.Sprintf("Observed packet airtime over the last %s: average %.1f%%, busiest bar %.1f%%.", opt.Label, w.AirtimePercent, w.PeakPercent),
+		ChartAlt: fmt.Sprintf("Observed packet airtime over the last %s: average %.1f%%, busiest bar %.1f%%. %d marks.", opt.Label, w.AirtimePercent, w.PeakPercent, len(w.Marks)),
 	}
 	for _, r := range ranges {
 		data.Ranges = append(data.Ranges, rangeLink{Key: r.Key, Label: r.Label, Active: r.Key == opt.Key})

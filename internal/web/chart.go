@@ -50,6 +50,16 @@ func chartSVG(w store.Window) (chartMarkup, float64) {
 				class.Key(), float64(i)*barWidth+0.5, y, max(barWidth-1, 1), h)
 		}
 	}
+	// Gap and restart marks sit on the axis (MON-OV-5). A restart is a filled triangle, a gap an open
+	// one, so the meaning survives without colour; both are also said in words below the chart.
+	for _, m := range w.Marks {
+		class := "mark-restart"
+		if m.Kind == "gap" {
+			class = "mark-gap"
+		}
+		x := (float64(m.Slot) + 0.5) * width / float64(n)
+		fmt.Fprintf(&b, `<path class="%s" d="M%.1f 3 L%.1f 13 L%.1f 13 Z"/>`, class, x, x-5, x+5)
+	}
 	b.WriteString(`</svg>`)
 	return chartMarkup(b.String()), axisMS / slotMS * 100
 }
