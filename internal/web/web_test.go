@@ -41,6 +41,7 @@ func newHarness(t *testing.T) *harness {
 	status.Radio = kam.Radio{FrequencyHz: 868_000_000, BandwidthHz: 125_000, SpreadingFactor: 8, CodingRate: 5}
 	status.DutyCycle.ConfiguredPercent, status.DutyCycle.UsedMS, status.DutyCycle.WindowS = 1.0, 21600, 3600
 	status.Rooms.Enabled, status.Rooms.Count = true, 1
+	status.Automation.Enabled, status.Automation.ScriptsEnabled, status.Automation.QueueDepth = true, 2, 1
 	st.SetStatus(status, t0)
 	st.SetRooms([]kam.Room{{ID: "lobby", Name: "Emmen local", Enabled: true, ClientsRemembered: 9, LastActivityAt: ptr(t0.Add(-12 * time.Second))}}, nil, t0)
 
@@ -277,5 +278,37 @@ func TestEveryRouteStatesItsAccessLevel(t *testing.T) {
 		if r.handler == nil {
 			t.Errorf("%s has no handler", r.pattern)
 		}
+	}
+}
+
+// Admin sees the two newest clients per room with the activity indicator and the automation
+// counts; a viewer sees neither (MON-OV-9, MON-OV-10).
+func TestOverviewRoomsClientsAndAutomation(t *testing.T) {
+	h := newHarness(t)
+	now := *h.now
+	clients := map[string][]kam.RoomClient{"lobby": {
+		{PublicKey: "key-mid", LastActivityAt: ptr(now.Add(-30 * time.Minute))},
+		{PublicKey: "key-new", LastActivityAt: ptr(now.Add(-12 * time.Second)), Label: ptr("Maurice")},
+		{PublicKey: "key-old", LastActivityAt: ptr(now.Add(-48 * time.Hour))},
+	}}
+	h.st.SetRooms([]kam.Room{{ID: "lobby", Name: "Emmen local", Enabled: true, ClientsRemembered: 9, LastActivityAt: ptr(now.Add(-12 * time.Second))}}, clients, now)
+
+	_, body, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
+	for _, want := range []string{"Maurice", "key-mid", "ind fresh", "2 scripts ready", "Queue depth 1 · dropped 0", "1 posts last hour"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("admin overview is missing %q", want)
+		}
+	}
+	if strings.Contains(body, "key-old") {
+		t.Error("only the two newest clients per room belong on the page (MON-OV-9)")
+	}
+
+	viewer := h.login(t, "viewer", "viewer")
+	_, body, _ = get(t, viewer, h.ts.URL+"/")
+	if strings.Contains(body, "Maurice") || strings.Contains(body, "key-mid") {
+		t.Error("a viewer must not receive client names or keys (MON-OV-9)")
+	}
+	if !strings.Contains(body, "Client activity and posts are visible to the administrator.") {
+		t.Error("the viewer gets the admin-only note (MON-RM-12 wording)")
 	}
 }

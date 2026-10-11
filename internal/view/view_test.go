@@ -3,10 +3,15 @@ package view
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"kammon.bytecoder.nl/internal/config"
 	"kammon.bytecoder.nl/internal/kam"
 )
+
+var t0 = time.Date(2026, 10, 11, 15, 0, 0, 0, time.UTC)
+
+func ptr[T any](v T) *T { return &v }
 
 func TestPagesHideAccountsFromViewers(t *testing.T) {
 	has := func(role config.Role, key string) bool {
@@ -68,5 +73,58 @@ func TestPacketLabelOtherKinds(t *testing.T) {
 		if got := PacketLabel(config.RoleAdmin, nil, ev); got != want {
 			t.Errorf("got %q, want %q", got, want)
 		}
+	}
+}
+
+// Indicator boundaries from Rooms.md §3.1 (MON-RM-4, MON-OV-9).
+func TestActivityIndicatorBoundaries(t *testing.T) {
+	now := t0
+	cases := []struct {
+		name  string
+		at    *time.Time
+		class string
+	}{
+		{"under 5 minutes", ptr(now.Add(-2 * time.Second)), "fresh"},
+		{"exactly 299 s", ptr(now.Add(-299 * time.Second)), "fresh"},
+		{"exactly 300 s", ptr(now.Add(-300 * time.Second)), "recent"},
+		{"exactly 3599 s", ptr(now.Add(-3599 * time.Second)), "recent"},
+		{"exactly 3600 s", ptr(now.Add(-3600 * time.Second)), "older"},
+		{"exactly 86400 s", ptr(now.Add(-86400 * time.Second)), "older"},
+		{"over 24 hours", ptr(now.Add(-86401 * time.Second)), "stale"},
+	}
+	for _, c := range cases {
+		ind := Activity(now, c.at)
+		if ind.Class != c.class {
+			t.Errorf("%s: got %q, want %q", c.name, ind.Class, c.class)
+		}
+	}
+	if ind := Activity(now, nil); ind.Class != "unknown" || ind.Text != "Unknown" {
+		t.Errorf("a client without a time is Unknown, got %v", ind)
+	}
+	if ind := Activity(now, ptr(now.Add(-100*time.Hour))); ind.Text != "Stale Node" {
+		t.Errorf("over 24 hours says Stale Node, got %v", ind)
+	}
+}
+
+// A viewer gets no client rows and never a key (MON-OV-9, MON-RM-12).
+func TestRecentClientsVisibility(t *testing.T) {
+	clients := []kam.RoomClient{
+		{PublicKey: "key-old", Label: ptr("Old"), LastActivityAt: ptr(t0.Add(-48 * time.Hour))},
+		{PublicKey: "key-new", Label: ptr("New"), LastActivityAt: ptr(t0.Add(-time.Minute))},
+		{PublicKey: "key-none"},
+		{PublicKey: "key-mid", LastActivityAt: ptr(t0.Add(-30 * time.Minute))},
+	}
+	if got := RecentClients(config.RoleViewer, clients, t0); len(got) != 0 {
+		t.Fatalf("a viewer gets no client rows, got %v", got)
+	}
+	got := RecentClients(config.RoleAdmin, clients, t0)
+	if len(got) != 2 {
+		t.Fatalf("two newest clients, got %d: %v", len(got), got)
+	}
+	if got[0].Label != "New" || got[1].Label != "key-mid" {
+		t.Errorf("second row falls back to the key when the label is absent, got %v", got)
+	}
+	if got[0].Ind.Class != "fresh" {
+		t.Errorf("first indicator fresh, got %v", got[0].Ind)
 	}
 }

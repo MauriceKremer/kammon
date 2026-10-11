@@ -19,8 +19,8 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 
 ## Slice 1: Overview complete
 
-- [ ] Range switch keeps its own URL; chart marks for gaps and KAM restarts (MON-OV-5)
-- [ ] Rooms block, automation block, duty-cycle warning (MON-OV-8..10, 12)
+- [x] Range switch keeps its own URL; chart marks for gaps and KAM restarts (MON-OV-5)
+- [x] Rooms block, automation block, duty-cycle warning (MON-OV-8..10, 12)
 - [ ] Stale-data bar polish and link state in the sidebar (MON-DS-13..17)
 - [ ] Fonts and icon sprite embedded (no CDN)
 

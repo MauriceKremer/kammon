@@ -47,8 +47,18 @@
 
       <section class="section" aria-labelledby="rooms-title">
         <h2 id="rooms-title">Rooms</h2>
-        {{range .Rooms}}<div class="room-line"><h3>{{.Name}}</h3><p>{{.Activity}}</p><p>{{.Remembered}} remembered</p></div>
+        {{range .Rooms}}<div class="room-line"><h3>{{.Name}}</h3><p>{{.Activity}} · {{.Posts}}</p><p>{{.Remembered}} remembered</p>
+          {{if .Clients}}<ul class="clients" aria-label="Two newest clients (administrator only)">{{range .Clients}}<li><span class="ind {{.Ind.Class}}" title="{{.Ind.Title}}"></span><span class="label">{{.Label}}</span>{{with .Ind.Text}} <span class="small muted">{{.}}</span>{{end}}</li>{{end}}</ul>{{end}}
+        </div>
         {{else}}<p class="small muted">{{.RoomsNote}}</p>{{end}}
+        {{if .ClientsNote}}<p class="small muted">{{.ClientsNote}}</p>{{end}}
+      </section>
+
+      <section class="section" aria-labelledby="automation-title">
+        <h2 id="automation-title">Automation</h2>
+        {{if .Automation.Line}}<p class="metric-value">{{.Automation.Line}}</p>
+        <p class="small muted">{{.Automation.Queue}}{{with .Automation.LastRun}} · last run {{.}}{{end}}</p>
+        {{else}}<p class="small muted">{{.Automation.Note}}</p>{{end}}
       </section>
     </div>
   </div>

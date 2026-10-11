@@ -5,10 +5,71 @@ package view
 import (
 	"fmt"
 	"slices"
+	"time"
 
 	"kammon.bytecoder.nl/internal/config"
 	"kammon.bytecoder.nl/internal/kam"
 )
+
+// Indicator is the activity indicator of a room client (Rooms.md §3.1). Colour comes from the CSS
+// class, the shape belongs to the class too, and Title and Text carry the words (MON-RM-7).
+type Indicator struct{ Class, Title, Text string }
+
+// Activity picks the indicator state for a last-heard time, computed from KAM's clock (MON-RM-4, 5).
+func Activity(now time.Time, at *time.Time) Indicator {
+	if at == nil {
+		return Indicator{Class: "unknown", Title: "Unknown: no time is recorded.", Text: "Unknown"}
+	}
+	switch age := now.Sub(*at); {
+	case age < 5*time.Minute:
+		return Indicator{Class: "fresh", Title: "Heard under 5 minutes ago."}
+	case age < time.Hour:
+		return Indicator{Class: "recent", Title: "Heard 5 to 60 minutes ago."}
+	case age <= 24*time.Hour:
+		return Indicator{Class: "older", Title: "Heard 1 to 24 hours ago."}
+	default:
+		return Indicator{Class: "stale", Title: "Stale Node: silent for over 24 hours.", Text: "Stale Node"}
+	}
+}
+
+// ClientRow is what a role may see of a room client's activity (MON-OV-9, MON-RM-8).
+type ClientRow struct {
+	Label string
+	Ind   Indicator
+}
+
+// RecentClients are the two most recently active clients, newest first, unknown times last. A viewer
+// gets no rows, because client names and keys are admin-only (MON-RM-12).
+func RecentClients(role config.Role, clients []kam.RoomClient, nowKAM time.Time) []ClientRow {
+	if role != config.RoleAdmin {
+		return nil
+	}
+	sorted := append([]kam.RoomClient(nil), clients...)
+	slices.SortFunc(sorted, func(a, b kam.RoomClient) int {
+		switch {
+		case a.LastActivityAt == nil && b.LastActivityAt == nil:
+			return 0
+		case a.LastActivityAt == nil:
+			return 1
+		case b.LastActivityAt == nil:
+			return -1
+		default:
+			return b.LastActivityAt.Compare(*a.LastActivityAt)
+		}
+	})
+	if len(sorted) > 2 {
+		sorted = sorted[:2]
+	}
+	rows := make([]ClientRow, 0, len(sorted))
+	for _, c := range sorted {
+		label := c.PublicKey
+		if c.Label != nil && *c.Label != "" {
+			label = *c.Label
+		}
+		rows = append(rows, ClientRow{Label: label, Ind: Activity(nowKAM, c.LastActivityAt)})
+	}
+	return rows
+}
 
 // Page is one entry of the sidebar.
 type Page struct {

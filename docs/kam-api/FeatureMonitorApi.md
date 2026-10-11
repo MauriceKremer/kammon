@@ -1,12 +1,28 @@
 # Feature: Monitor API for KAMmon
 
-**Status:** Requirements clarified for phased implementation (2026-10-11). Nothing in this document is implemented.
+**Status:** Phase 1 implemented (2026-10-11): loopback `/v1/status`, `/v1/events`, bounded event ring, RX/TX observation and focused automated tests. Phases 2-5 remain planned. Real-radio capture and hardware timing verification remain pending.
 **Scope:** The REST interface KAM offers on the local device so KAMmon, a separate web monitor running on the same computer, can read live radio, channel, room and script data, manage room clients, and change the KISS modem radio settings.
 **Written from:** KAMmon's point of view. The feature needs are in `tmp/KAMmon_Req_*.md`; the UI is shown in `tmp/kammon-prototype.html`. KAMmon is a separate Go project and never opens KAM's SQLite file.
 
 ## 1. Summary
 
-KAM already has a Local Management API on `127.0.0.1:8765` that manages Starlark scripts. KAMmon needs more: a live view of the radio, the channels, the rooms and the modem. KAM has no stream of "what was just heard" today. It stores adverts and group texts in SQLite, keeps room client activity only in memory, and logs every other packet type to the console.
+### Phase 1 Delivery
+
+Only `GET /v1/status` and `GET /v1/events` are available on the monitoring listener.
+RX observations include duplicate and unhandled packets with nullable RxMeta;
+TX observations capture submission settings/time and completion or abandonment.
+Existing room address hashes provide probable attribution; collisions remain null.
+Room TX records retain their producer/id through the scheduler. Legacy group-text
+callers without producer metadata use `origin: "other"`, not a guessed automation identity.
+Status reports existing runtime counters and cached startup identity. Optional
+identity and disabled automation measurements may be null. Room-post/script-event
+streams and the remaining resource endpoints are not part of this delivery.
+
+Tests are in `internal/monitor/api_test.go`, `internal/kiss/monitor_test.go`,
+`internal/models/monitor_test.go` and `internal/node/monitor_test.go`. No new
+dependency, client registry, event database or event-processing worker is added.
+
+KAM has a Local Management API on `127.0.0.1:8765` that manages Starlark scripts. Phase 1 adds status and recent RX/TX events on port 8766. Later phases provide channel/room resources and modem control. Existing adverts and group texts remain in SQLite, and room client activity follows the existing room-service rules; the monitoring ring is not a persistent packet archive.
 
 This plan adds one small package, `internal/monitor`, with three parts:
 
@@ -521,7 +537,7 @@ IDs are stable. "From" lists the KAMmon feature document that needs the item (`t
 
 | Phase | Content | Unlocks | Done when |
 |---|---|---|---|
-| 1 | `internal/monitor` package, listener, `/v1/status`, event ring, `rx` and `tx` events, `epoch` | Overview, Traffic, DataStore | KAMmon draws airtime and the packet mix from a real radio; restarting either side recovers |
+| 1 (implemented; hardware verification pending) | `internal/monitor` package, listener, `/v1/status`, event ring, `rx` and `tx` events, `epoch`/`next_after` | Overview, Traffic, DataStore | Automated transport/HTTP/cursor/lifecycle tests pass; real-radio acceptance remains pending |
 | 2 | Channels endpoints; room list, clients, posts, `room` events, per-room counters, persisted `last_heard_at` | Channels, Rooms | Counts match the SQLite tables |
 | 3 | Modem snapshot, query and `PUT /v1/modem/radio` with save | KissModem | A change survives a KAM restart and a simulated modem reset |
 | 4 | Client removal endpoint; protocol roles remain read-only | RoomAccounts | Removal cannot resurrect a client via batch persistence; existing room-login tests remain unchanged |

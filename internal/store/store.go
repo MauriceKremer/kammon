@@ -18,11 +18,12 @@ const (
 
 // Bucket is one minute of events summed per packet class.
 type Bucket struct {
-	Count     [ClassCount]int
-	AirtimeMS [ClassCount]int64
-	RX, TX    int
-	Repeats   int
-	Posts     int
+	Count       [ClassCount]int
+	AirtimeMS   [ClassCount]int64
+	RX, TX      int
+	Repeats     int
+	Posts       int
+	PostsByRoom map[string]int // bounded: at most 64 rooms per bucket
 }
 
 // Mark labels a place in the history where something happened.
@@ -151,6 +152,14 @@ func (s *Store) add(minute int64, ev kam.Event) {
 	case kam.KindRoom:
 		if ev.Event == "post" {
 			b.Posts++
+			// Per-room posts for the Overview room lines (MON-OV-8). Capped so a stream of unknown
+			// room names cannot grow one bucket without bound.
+			if ev.Room != "" && len(b.PostsByRoom) < 64 {
+				if b.PostsByRoom == nil {
+					b.PostsByRoom = map[string]int{}
+				}
+				b.PostsByRoom[ev.Room]++
+			}
 		}
 	}
 }
@@ -281,6 +290,8 @@ type Window struct {
 	Repeats        int
 	Posts          int
 	TotalAirtimeMS int64
+	// PostsByRoom are the accepted posts per room name or id over the window (MON-OV-8).
+	PostsByRoom    map[string]int
 	AirtimePercent float64
 	PeakPercent    float64
 	// HistoryStart is set when the store holds less than the range asked for (MON-OV-5).
@@ -301,7 +312,7 @@ func (s *Store) Window(now time.Time, d time.Duration) Window {
 	if n < 1 {
 		n = 1
 	}
-	w := Window{From: now.Add(-d), To: now, SlotWidth: d / time.Duration(n), Slots: make([]Slot, n)}
+	w := Window{From: now.Add(-d), To: now, SlotWidth: d / time.Duration(n), Slots: make([]Slot, n), PostsByRoom: map[string]int{}}
 	for i := range w.Slots {
 		w.Slots[i].Start = w.From.Add(time.Duration(i) * w.SlotWidth)
 	}
@@ -326,6 +337,9 @@ func (s *Store) Window(now time.Time, d time.Duration) Window {
 		w.TX += b.TX
 		w.Repeats += b.Repeats
 		w.Posts += b.Posts
+		for name, n := range b.PostsByRoom {
+			w.PostsByRoom[name] += n
+		}
 	}
 	w.AirtimePercent = percent(w.TotalAirtimeMS, d)
 	for _, sl := range w.Slots {

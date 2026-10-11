@@ -47,6 +47,12 @@ type packetRow struct{ Time, Type, TypeClass, Label, SNR string }
 type roomRow struct {
 	Name, Activity string
 	Remembered     int
+	Posts          string
+	Clients        []view.ClientRow
+}
+
+type automationData struct {
+	Line, Queue, LastRun, Note string
 }
 
 type overviewData struct {
@@ -64,6 +70,8 @@ type overviewData struct {
 	Recent            []packetRow
 	Rooms             []roomRow
 	RoomsNote         string
+	ClientsNote       string
+	Automation        automationData
 }
 
 // overview builds the Overview from the store alone (MON-OV-1).
@@ -140,7 +148,12 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 		data.Recent = append(data.Recent, packetRowFor(role, allow, ev))
 	}
 
-	rooms, _ := s.store.Rooms()
+	rooms, clients := s.store.Rooms()
+	// The activity indicator is computed from KAM's clock (MON-RM-4); fall back to the local one.
+	kamNow := now
+	if haveStatus && !status.Now.IsZero() {
+		kamNow = status.Now
+	}
 	for _, room := range rooms {
 		if !room.Enabled {
 			continue
@@ -149,7 +162,13 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 		if room.LastActivityAt != nil {
 			activity = "Last activity " + ago(now.Sub(*room.LastActivityAt))
 		}
-		data.Rooms = append(data.Rooms, roomRow{Name: room.Name, Activity: activity, Remembered: room.ClientsRemembered})
+		posts := hour.PostsByRoom[room.Name] + hour.PostsByRoom[room.ID]
+		data.Rooms = append(data.Rooms, roomRow{
+			Name: room.Name, Activity: activity, Remembered: room.ClientsRemembered,
+			Posts: fmt.Sprintf("%s posts last hour", thousands(posts)),
+			// Admin only: the two newest clients with the activity indicator (MON-OV-9).
+			Clients: view.RecentClients(role, clients[room.ID], kamNow),
+		})
 	}
 	switch {
 	case s.store.NotServed("rooms", now):
@@ -158,6 +177,21 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 		data.RoomsNote = "Rooms are not enabled."
 	default:
 		data.RoomsNote = "No rooms yet."
+	}
+	if len(data.Rooms) > 0 && role != config.RoleAdmin {
+		data.ClientsNote = "Client activity and posts are visible to the administrator."
+	}
+	st := status.Automation
+	switch {
+	case !haveStatus:
+		data.Automation.Note = "Waiting for KAM."
+	case !st.Enabled:
+		data.Automation.Note = "Automation is off."
+	default:
+		data.Automation.Line = fmt.Sprintf("%s scripts ready", thousands(st.ScriptsEnabled))
+		data.Automation.Queue = fmt.Sprintf("Queue depth %s · dropped %s", thousands(st.QueueDepth), thousands(int(st.EventsDropped)))
+		// The time of the last run comes from GET /scripts (MON-OV-10); until KAM ships it (phase 5)
+		// the block shows only the counts.
 	}
 	return data
 }
