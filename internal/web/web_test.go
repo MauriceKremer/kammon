@@ -13,6 +13,7 @@ import (
 	"kammon.bytecoder.nl/internal/config"
 	"kammon.bytecoder.nl/internal/kam"
 	"kammon.bytecoder.nl/internal/store"
+	webassets "kammon.bytecoder.nl/web"
 )
 
 var t0 = time.Date(2026, 10, 11, 15, 0, 0, 0, time.UTC)
@@ -333,5 +334,33 @@ func TestNodeBlockShowsKamTime(t *testing.T) {
 	_, body, _ = get(t, c, h.ts.URL+"/")
 	if !strings.Contains(body, "KAM clock 1 min behind this computer") {
 		t.Errorf("clock note missing: %s", body)
+	}
+}
+
+// Fonts and the icon sprite are self-hosted: no CDN reference anywhere in the assets (slice 1).
+func TestAssetsAreVendoredAndServed(t *testing.T) {
+	h := newHarness(t)
+	res, err := webassets.FS.ReadFile("static/icons.svg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(res), `<symbol id="sun"`) {
+		t.Error("the sprite misses its icons")
+	}
+	for _, woff2 := range []string{"hanken-grotesk-5.3.0-latin-wght-normal.woff2", "syncopate-5.3.0-latin-700-normal.woff2"} {
+		buf, err := webassets.FS.ReadFile("static/fonts/" + woff2)
+		if err != nil {
+			t.Fatalf("%s: %v", woff2, err)
+		}
+		if string(buf[:4]) != "wOF2" {
+			t.Errorf("%s is not woff2", woff2)
+		}
+	}
+	c := h.login(t, "viewer", "viewer")
+	if status, _, _ := get(t, c, h.ts.URL+"/static/icons.svg"); status != 200 {
+		t.Errorf("sprite status %d", status)
+	}
+	if status, _, _ := get(t, c, h.ts.URL+"/static/fonts/syncopate-5.3.0-latin-700-normal.woff2"); status != 200 {
+		t.Errorf("font status %d", status)
 	}
 }

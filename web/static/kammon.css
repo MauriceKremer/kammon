@@ -8,6 +8,33 @@
   --font-heading: "Syncopate", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-code: "Roboto Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
+
+/* Self-hosted fonts, latin subset, vendored in web/static/fonts (no CDN). Hanken Grotesk is a
+   variable font: one file covers the weights 400 to 700. Fontsource 5.3.0, OFL licence. */
+@font-face {
+  font-family: "Hanken Grotesk";
+  src: url("/static/fonts/hanken-grotesk-5.3.0-latin-wght-normal.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Roboto Mono";
+  src: url("/static/fonts/roboto-mono-5.3.0-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Roboto Mono";
+  src: url("/static/fonts/roboto-mono-5.3.0-latin-500-normal.woff2") format("woff2");
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Syncopate";
+  src: url("/static/fonts/syncopate-5.3.0-latin-700-normal.woff2") format("woff2");
+  font-weight: 700;
+  font-display: swap;
+}
 :root[data-theme="light"] {
   color-scheme: light;
   --bg-0: #ffffff; --bg-1: #f8fafc; --bg-2: #f1f5f9; --bg-3: #e2e8f0;
@@ -33,6 +60,9 @@ body {
 }
 a { color: var(--signal); }
 :focus-visible { outline: 3px solid var(--signal); outline-offset: 3px; }
+
+/* Icons come from the vendored sprite (web/static/icons.md), drawn in the current text colour. */
+.icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 .skip-link { position: fixed; top: 8px; left: 8px; padding: 8px 16px; transform: translateY(-160%); background: var(--bg-2); color: var(--text-primary); border-radius: 6px; z-index: 10; }
 .skip-link:focus { transform: none; }
 

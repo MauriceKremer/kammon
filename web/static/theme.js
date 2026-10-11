@@ -7,7 +7,13 @@
     return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   }
   function label(theme) {
-    button.textContent = theme === "light" ? "Dark mode" : "Light mode";
+    // Icon from the vendored sprite (web/static/icons.md); the text stays the accessible name.
+    var icon = '<svg class="icon" aria-hidden="true"><use href="/static/icons.svg#' +
+      (theme === "light" ? "moon" : "sun") + '"></use></svg>';
+    var text = theme === "light" ? "Dark mode" : "Light mode";
+    if (button.innerHTML !== icon + text) {
+      button.innerHTML = icon + text;
+    }
     button.setAttribute("aria-pressed", String(theme === "light"));
   }
   label(current());
