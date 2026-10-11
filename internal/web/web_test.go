@@ -443,3 +443,23 @@ func TestOverviewMarksOldSnapshots(t *testing.T) {
 		t.Error("the event stream still answers, so the page-wide bar stays hidden")
 	}
 }
+
+// A stalled event stream warns by the metric strip even when KAM answers status and rooms
+// (MON-DS-13 per snapshot). The room block announces its age in the same situation.
+func TestOverviewMarksOldEventFeed(t *testing.T) {
+	h := newHarness(t)
+	*h.now = t0.Add(90 * time.Second)
+	h.st.SetStatus(kam.Status{Epoch: "e1", Now: t0, NodeName: "kam"}, *h.now)
+	c := h.login(t, "viewer", "viewer")
+	_, body, _ := get(t, c, h.ts.URL+"/")
+	if !strings.Contains(body, fmt.Sprintf("Packets from %s · KAM slow to answer.", t0.Local().Format("15:04:05"))) {
+		t.Error("the event feed says how old its data is")
+	}
+	if !strings.Contains(body, fmt.Sprintf("Rooms from %s · KAM slow to answer.", t0.Local().Format("15:04:05"))) {
+		t.Error("the room snapshot says how old its data is")
+	}
+	_, body, _ = get(t, c, h.ts.URL+"/")
+	if strings.Contains(body, "has not answered") {
+		t.Error("KAM answered, so the page-wide bar stays hidden")
+	}
+}

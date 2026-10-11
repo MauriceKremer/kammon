@@ -4,6 +4,7 @@
     <button type="button" id="pause" aria-pressed="false" title="Pause live refresh"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#pause"></use></svg>Pause</button>
   </div>
 
+  {{if .EventsAge}}<p class="small warn">{{.EventsAge}}</p>{{end}}
   <div class="metrics">
     {{range .Metrics}}<div class="metric">
       <p class="metric-label">{{.Label}}</p>

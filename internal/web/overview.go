@@ -71,6 +71,7 @@ type overviewData struct {
 	Rooms             []roomRow
 	RoomsNote         string
 	RoomsAge          string
+	EventsAge         string
 	ClientsNote       string
 	Automation        automationData
 }
@@ -84,12 +85,22 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 	status, _ := s.store.Status()
 	haveStatus := status.Epoch != ""
 
+	// The event stream answers separately from the status and room jobs (MON-DS-13): say its age
+	// instead of letting the metrics, chart and recent table look current while they are not.
 	chart, axisTop := chartSVG(w)
 	data := overviewData{
 		Range: opt.Key, RangeLabel: opt.Label, Chart: chart,
 		AxisTop:  fmt.Sprintf("%.1f%%", axisTop),
 		SlotText: fmt.Sprintf("%d bars of %s", len(w.Slots), slotWidthText(w.SlotWidth)),
 		ChartAlt: fmt.Sprintf("Observed packet airtime over the last %s: average %.1f%%, busiest bar %.1f%%. %d marks.", opt.Label, w.AirtimePercent, w.PeakPercent, len(w.Marks)),
+	}
+	if evF, evAt := s.store.SnapshotFreshness("events", now); evF != store.Fresh && !evAt.IsZero() {
+		switch evF {
+		case store.Stale:
+			data.EventsAge = fmt.Sprintf("Packets from %s · KAM slow to answer.", evAt.Local().Format("15:04:05"))
+		default:
+			data.EventsAge = fmt.Sprintf("Packets from %s · KAM not answering.", evAt.Local().Format("15:04:05"))
+		}
 	}
 	for _, r := range ranges {
 		data.Ranges = append(data.Ranges, rangeLink{Key: r.Key, Label: r.Label, Active: r.Key == opt.Key})

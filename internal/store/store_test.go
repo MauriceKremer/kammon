@@ -103,8 +103,11 @@ func TestWindowArithmeticAndSlots(t *testing.T) {
 	s.ApplyEvents(reply("e1", 1, false, events...), t0)
 
 	w := s.Window(t0, time.Hour)
-	if len(w.Slots) != 60 || w.TotalAirtimeMS != 36000 || w.AirtimePercent < 0.99 || w.AirtimePercent > 1.01 {
-		t.Fatalf("1h window: slots=%d airtime=%d percent=%.3f", len(w.Slots), w.TotalAirtimeMS, w.AirtimePercent)
+	// Minute alignment: with KAMmon at 15:00:00 the window covers 14:01:00 to 15:01:00 on KAM's
+	// clock, so the event at 14:00 (a full minute before the window) is not in it. 11 of 12
+	// minutes carry 3000 ms: 33000/3600000 = 0.9166 percent.
+	if len(w.Slots) != 60 || w.TotalAirtimeMS != 33000 || w.AirtimePercent < 0.913 || w.AirtimePercent > 0.920 {
+		t.Fatalf("1h window: slots=%d airtime=%d percent=%.4f", len(w.Slots), w.TotalAirtimeMS, w.AirtimePercent)
 	}
 	if got := len(s.Window(t0, 15*time.Minute).Slots); got != 15 {
 		t.Fatalf("15m slots = %d", got)
@@ -190,7 +193,7 @@ func TestWindowMarksOnTheAxis(t *testing.T) {
 	s.ApplyEvents(reply("e3", 40, true, rx(40, t0.Add(-8*time.Minute), "GRP_TXT", 100)), t0.Add(-8*time.Minute)) // gap mark
 
 	w := s.Window(t0, 15*time.Minute)
-	want := []WindowMark{{Slot: 5, Kind: "restart"}, {Slot: 7, Kind: "gap"}}
+	want := []WindowMark{{Slot: 4, Kind: "restart"}, {Slot: 6, Kind: "gap"}}
 	if len(w.Marks) != len(want) {
 		t.Fatalf("marks = %v, want %v", w.Marks, want)
 	}
@@ -311,18 +314,19 @@ func TestSnapshotFreshnessIsPerJob(t *testing.T) {
 
 // MON-DS: rolling windows count every bucket that overlaps the range, so a packet inside the
 // last hour survives a range boundary that falls mid-minute.
-func TestWindowIncludesBoundaryMinute(t *testing.T) {
+func TestWindowMinuteAligned(t *testing.T) {
 	s := New()
-	now := t0.Add(30 * time.Second) // 15:00:30, the boundary falls mid-minute
-	s.ApplyEvents(reply("e1", 1, false, rx(1, now.Add(-time.Hour+time.Second), "GRP_TXT", 100)), now)
+	now := t0.Add(30 * time.Second) // 15:00:30: the window becomes 14:01:00 to 15:01:00
+	s.ApplyEvents(reply("e1", 1, false,
+		rx(1, now.Add(-time.Hour), "GRP_TXT", 100),                // 14:00:30, one minute before the window
+		rx(2, now.Add(-time.Hour+61*time.Second), "GRP_TXT", 200), // 14:01:31, the first minute in it
+	), now)
 	w := s.Window(now, time.Hour)
-	if w.RX != 1 || w.Count[ClassGroupText] != 1 {
-		t.Fatalf("boundary packet lost: %+v", w)
+	if w.From.Format("15:04") != "14:01" || w.To.Format("15:04") != "15:01" {
+		t.Fatalf("window edges = %v .. %v, want 14:01 .. 15:01", w.From, w.To)
 	}
-	// A bucket entirely outside the range still stays out.
-	s.ApplyEvents(reply("e1", 2, false, rx(2, now.Add(-2*time.Hour-2*time.Second), "GRP_TXT", 50)), now)
-	if w := s.Window(now, time.Hour); w.RX != 1 {
-		t.Fatalf("a packet outside the range sneaked in: %+v", w)
+	if w.Slots[0].AirtimeMS[ClassGroupText] != 200 {
+		t.Fatalf("the first bar holds exactly its minute, not the boundary minute: %+v", w.Slots[0])
 	}
 }
 
@@ -351,5 +355,92 @@ func TestRoomEventsSeen(t *testing.T) {
 	s.ApplyEvents(reply("e1", 2, false, kam.Event{Seq: 2, At: t0, Kind: kam.KindRoom, Room: "lobby", Event: "post"}), t0)
 	if !s.RoomEventsSeen() {
 		t.Fatal("a room event marks the store")
+	}
+}
+
+// MON-DS-18: hard cap of exactly 1440 minute buckets.
+func TestBucketCapIsExact(t *testing.T) {
+	s := New()
+	base := t0.Add(-2 * time.Hour)
+	for i := 0; i < 1445; i++ {
+		at := base.Add(time.Duration(i) * time.Minute)
+		s.ApplyEvents(reply("e1", uint64(i+1), false, rx(uint64(i+1), at, "TRACE", 1)), at)
+	}
+	s.mu.RLock()
+	n := len(s.buckets)
+	s.mu.RUnlock()
+	if n != BucketCount {
+		t.Fatalf("bucket map holds %d, want the documented hard limit %d", n, BucketCount)
+	}
+}
+
+// MON-DS-18: when KAMmon's clock turns out to be behind KAM's, the buckets that were future
+// minutes go instead of lingering for hours.
+func TestBucketsPrunedWhenClockMovesBack(t *testing.T) {
+	s := New()
+	ahead := t0.Add(30 * time.Minute)
+	s.ApplyEvents(reply("e1", 1, false, rx(1, ahead, "TRACE", 100)), ahead)
+	if s.Window(ahead, time.Hour).RX != 1 {
+		t.Fatal("the forward clock bucketed the event")
+	}
+	s.ApplyEvents(reply("e1", 2, false), t0)
+	s.mu.RLock()
+	n := len(s.buckets)
+	s.mu.RUnlock()
+	if n != 0 {
+		t.Fatalf("buckets = %d, the minute in KAM's future went", n)
+	}
+}
+
+// MON-OV-5: history starts at the oldest timestamp the store keeps, whatever the sequence order.
+func TestHistoryStartTracksOlderEvents(t *testing.T) {
+	s := New()
+	s.ApplyEvents(reply("e1", 1, false, rx(1, t0, "TRACE", 1)), t0)
+	s.ApplyEvents(reply("e1", 2, false, rx(2, t0.Add(-30*time.Minute), "TRACE", 1)), t0)
+	if got := s.HistoryStart(); !got.Equal(t0.Add(-30 * time.Minute)) {
+		t.Fatalf("history starts at %v, want the older timestamp", got)
+	}
+}
+
+// The ring wraps at 4096 events; history then starts at the oldest kept one.
+func TestHistoryStartAfterRingWrap(t *testing.T) {
+	s := New()
+	events := make([]kam.Event, 0, EventRingSize+1)
+	for i := 0; i <= EventRingSize; i++ {
+		events = append(events, rx(uint64(i+1), t0.Add(time.Duration(i)*time.Second), "TRACE", 1))
+	}
+	s.ApplyEvents(reply("e1", 1, false, events...), t0)
+	if got := s.HistoryStart(); !got.Equal(t0.Add(time.Second)) {
+		t.Fatalf("after the wrap history starts at %v, want the oldest kept event", got)
+	}
+}
+
+// Room-event availability is per KAM run (MON-OV-8): until the new KAM sends its own room event,
+// the answer is "Unavailable", not a measured zero.
+func TestRoomEventsSeenPerEpoch(t *testing.T) {
+	s := New()
+	s.ApplyEvents(reply("e1", 1, false, kam.Event{Seq: 1, At: t0, Kind: kam.KindRoom, Room: "r", Event: "post"}), t0)
+	if !s.RoomEventsSeen() {
+		t.Fatal("the room event marks availability")
+	}
+	s.ApplyEvents(reply("e2", 5, false, rx(5, t0, "GRP_TXT", 1)), t0)
+	if s.RoomEventsSeen() {
+		t.Fatal("after a KAM restart the new room availability is its own")
+	}
+}
+
+// One consistent KAM clock: with KAM 35 minutes ahead of KAMmon its events still reach the window,
+// because the window is drawn on KAM's clock (MON-DS-10, MON-DS-15).
+func TestKAMAheadOfKAMmonKeepsEvents(t *testing.T) {
+	s := New()
+	kamAhead := t0.Add(35 * time.Minute)
+	s.SetStatus(kam.Status{Epoch: "e1", Now: kamAhead}, t0)
+	s.ApplyEvents(reply("e1", 1, false, rx(1, kamAhead, "GRP_TXT", 100)), t0)
+	w := s.Window(t0, time.Hour)
+	if w.From.Format("15:04") != "14:36" || w.To.Format("15:04") != "15:36" {
+		t.Fatalf("window = %v .. %v, want 14:36 .. 15:36 on KAM's clock", w.From, w.To)
+	}
+	if w.RX != 1 || w.AirtimeMS[ClassGroupText] != 100 {
+		t.Fatalf("the ahead-KAM event is in the chart: %+v", w)
 	}
 }

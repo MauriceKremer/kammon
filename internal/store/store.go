@@ -94,6 +94,11 @@ func (s *Store) Cursor() (epoch string, after uint64) {
 	return s.epoch, s.cursor
 }
 
+// kamNow is KAM's clock at the moment KAMmon's clock says now. Must hold s.mu.
+func (s *Store) kamNow(now time.Time) time.Time {
+	return now.Add(s.clockOffset)
+}
+
 // ApplyEvents adds a reply from GET /v1/events (MON-DS-7..12). KAMmon keeps its buckets across a KAM
 // restart or a gap and adds a mark so the screen can say so.
 func (s *Store) ApplyEvents(resp kam.EventsResponse, now time.Time) {
@@ -105,15 +110,22 @@ func (s *Store) ApplyEvents(resp kam.EventsResponse, now time.Time) {
 		s.epoch = resp.Epoch
 		s.historyStart = now
 	case resp.Epoch != s.epoch:
-		s.addMark(Mark{At: now, Kind: "restart", Note: "KAM restarted"})
+		s.addMark(Mark{At: s.kamNow(now), Kind: "restart", Note: "KAM restarted"})
 		s.epoch = resp.Epoch
 		s.cursor = 0
+		// Availability is per KAM run: until the new KAM sends a room event, the truth is
+		// "this KAM sends no room events yet", not a measured zero.
+		s.roomEventsSeen = false
 	case resp.Reset && s.cursor > 0:
-		s.addMark(Mark{At: now, Kind: "gap", Note: "Some events were missed"})
+		s.addMark(Mark{At: s.kamNow(now), Kind: "gap", Note: "Some events were missed"})
 	}
 
-	oldest := now.Add(-BucketCount*time.Minute).Unix() / 60
-	latest := now.Unix() / 60
+	// Events are bucketed by their own KAM timestamps (MON-DS-10). The band follows KAM's clock
+	// (one consistent clock for charts), not KAMmon's, so a KAM clock ahead never loses events.
+	kamMinute := s.kamNow(now).Unix() / 60
+	latest := kamMinute + 2 // a little slack: events may carry KAM's clock of a moment later
+	oldest := kamMinute - (BucketCount - 1)
+	wrapped := false
 	for _, ev := range resp.Events {
 		if ev.Seq <= s.cursor {
 			continue
@@ -123,25 +135,59 @@ func (s *Store) ApplyEvents(resp kam.EventsResponse, now time.Time) {
 		s.next = (s.next + 1) % len(s.ring)
 		if s.count < len(s.ring) {
 			s.count++
+		} else {
+			wrapped = true
 		}
-		if s.count == 1 && ev.At.Before(s.historyStart) {
+		if ev.At.Before(s.historyStart) {
 			s.historyStart = ev.At
 		}
 		if ev.Kind == kam.KindRoom {
 			s.roomEventsSeen = true
 		}
-		// Hard bucket bounds (MON-DS-18): a clock-skewed or future-dated event stays in the ring,
-		// but never grows the bucket map beyond the last 1440 minutes.
+		// Hard bucket bounds (MON-DS-18): anything outside the band stays in the ring, and the
+		// bucket map is pruned to the band after each poll, including when the clock moves back.
 		if m := ev.At.Unix() / 60; m >= oldest && m <= latest {
 			s.add(m, ev)
 		}
 	}
+	if wrapped {
+		// The ring just dropped its oldest entries; recompute where history truly starts from what
+		// is still kept, since a later sequence number can carry an earlier timestamp.
+		minAt := time.Time{}
+		for _, kept := range s.ring {
+			if kept.At.IsZero() {
+				continue
+			}
+			if minAt.IsZero() || kept.At.Before(minAt) {
+				minAt = kept.At
+			}
+		}
+		if !minAt.IsZero() {
+			s.historyStart = minAt
+		}
+	}
+	s.pruneBuckets(oldest, latest)
+	s.eventsAt = now
+}
+
+// pruneBuckets keeps the bucket map within the band and the documented cap of 1440 minutes
+// (MON-DS-18): future buckets go when the clock moves back, and when the cap is exceeded the
+// oldest entries drop. Must hold s.mu.
+func (s *Store) pruneBuckets(oldest, latest int64) {
 	for m := range s.buckets {
-		if m < oldest {
+		if m < oldest || m > latest {
 			delete(s.buckets, m)
 		}
 	}
-	s.eventsAt = now
+	for len(s.buckets) > BucketCount {
+		smallest := int64(1 << 62)
+		for m := range s.buckets {
+			if m < smallest {
+				smallest = m
+			}
+		}
+		delete(s.buckets, smallest)
+	}
 }
 
 func (s *Store) add(minute int64, ev kam.Event) {
@@ -402,6 +448,12 @@ type Window struct {
 }
 
 // Window sums the buckets in [now-d, now). At most 60 slots: 15m gives 15 one-minute slots, 1h 60, 24h 60 of 24 minutes.
+// Window sums one minute-aligned stretch of buckets over the range (docs/requirements/Overview.md
+// §3.2). Both edges sit on minute boundaries of KAM's clock, so every bar holds an exact set of
+// minutes: no bar double-counts a boundary minute, and no packet inside the range is lost. The end
+// of the window is the current minute of KAM's clock, so freshly bucketed events land in the newest
+// bar and the chart can lag KAMmon's clock by up to a minute — the axis says what it covers. At
+// most 60 slots: 15m gives 15 one-minute bars, 1h 60, 24h 60 of 24 minutes.
 func (s *Store) Window(now time.Time, d time.Duration) Window {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -413,22 +465,20 @@ func (s *Store) Window(now time.Time, d time.Duration) Window {
 	if n < 1 {
 		n = 1
 	}
-	w := Window{From: now.Add(-d), To: now, SlotWidth: d / time.Duration(n), Slots: make([]Slot, n), PostsByRoom: map[string]int{}}
+	// One consistent clock: the buckets are keyed by their own KAM timestamps (MON-DS-10), so the
+	// window is drawn on KAM's clock too.
+	w := Window{From: s.kamNow(now).Truncate(time.Minute).Add(time.Minute).Add(-d), SlotWidth: d / time.Duration(n), Slots: make([]Slot, n), PostsByRoom: map[string]int{}}
+	w.To = w.From.Add(d)
 	for i := range w.Slots {
 		w.Slots[i].Start = w.From.Add(time.Duration(i) * w.SlotWidth)
 	}
 	slotSec := int64(w.SlotWidth / time.Second)
 	for minute, b := range s.buckets {
 		start := minute * 60
-		// Every minute that overlaps [From, To] counts (MON-DS: rolling windows). A boundary minute
-		// counts wholly into the first/last bar, at most one minute outside the exact range.
-		if start+60 <= w.From.Unix() || start >= w.To.Unix() {
+		if start < w.From.Unix() || start >= w.To.Unix() {
 			continue
 		}
 		idx := int((start - w.From.Unix()) / slotSec)
-		if idx < 0 {
-			idx = 0
-		}
 		if idx >= n {
 			idx = n - 1
 		}
