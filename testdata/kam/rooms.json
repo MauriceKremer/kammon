@@ -1,0 +1,25 @@
+{
+  "rooms": [
+    {
+      "id": "lobby",
+      "name": "Emmen local",
+      "enabled": true,
+      "public_key": "8e2cb91aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "max_clients": 20,
+      "clients_remembered": 9,
+      "last_activity_at": "2026-10-11T14:59:48Z",
+      "last_post_at": "2026-10-11T14:59:00Z",
+      "retained_posts": 412,
+      "counters": {
+        "logins_ok": 41,
+        "logins_failed": 2,
+        "logins_rate_limited": 0,
+        "posts_accepted": 131,
+        "posts_rejected": 1,
+        "pushes_sent": 320,
+        "pushes_acked": 311,
+        "push_timeouts": 9
+      }
+    }
+  ]
+}

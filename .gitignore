@@ -1,0 +1,9 @@
+/kammon
+/kammon.bytecoder.nl
+/kammon.local.yml
+*.test
+.DS_Store
+
+# Agent skills are installed per machine, like in the KAM repository
+/.agents/skills
+/skills-lock.json

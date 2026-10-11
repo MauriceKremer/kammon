@@ -1,0 +1,7 @@
+{
+  "channels": [
+    { "name": "#emmen", "key_strategy": "derived", "enabled": true, "stored_messages": 3120, "last_message_at": "2026-10-11T14:59:58Z" },
+    { "name": "#public", "key_strategy": "public", "enabled": true, "stored_messages": 2410, "last_message_at": "2026-10-11T14:59:46Z" },
+    { "name": "#field", "key_strategy": "explicit", "enabled": false, "stored_messages": 0, "last_message_at": null }
+  ]
+}

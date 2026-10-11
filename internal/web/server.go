@@ -1,0 +1,386 @@
+// Package web holds KAMmon's routes, handlers and templates. Pages read the store, never KAM.
+package web
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"html/template"
+	"io/fs"
+	"net/http"
+	"net/url"
+	"time"
+
+	"kammon.bytecoder.nl/internal/auth"
+	"kammon.bytecoder.nl/internal/config"
+	"kammon.bytecoder.nl/internal/store"
+	"kammon.bytecoder.nl/internal/view"
+	webassets "kammon.bytecoder.nl/web"
+)
+
+const (
+	sessionCookie = "kammon_session"
+	themeCookie   = "kammon_theme"
+)
+
+type Deps struct {
+	Config config.Config
+	Store  *store.Store
+	Now    func() time.Time
+	Demo   bool
+}
+
+type Server struct {
+	cfg      config.Config
+	store    *store.Store
+	now      func() time.Time
+	demo     bool
+	sessions *auth.Sessions
+	pages    map[string]*template.Template
+	static   http.Handler
+}
+
+// access is the role a route needs. There is no zero value, so a route cannot forget to say (MON-AX-11).
+type access int
+
+const (
+	public access = iota + 1
+	viewer
+	admin
+)
+
+type route struct {
+	pattern string
+	access  access
+	handler http.HandlerFunc
+}
+
+func New(d Deps) (*Server, error) {
+	if d.Now == nil {
+		d.Now = time.Now
+	}
+	s := &Server{
+		cfg: d.Config, store: d.Store, now: d.Now, demo: d.Demo,
+		sessions: auth.NewSessions(d.Config.SessionIdle(), d.Now),
+		pages:    map[string]*template.Template{},
+	}
+	base, err := template.ParseFS(webassets.FS, "templates/layout.html", "templates/partials/*.html")
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range []string{"overview", "placeholder", "login"} {
+		clone, err := base.Clone()
+		if err != nil {
+			return nil, err
+		}
+		if s.pages[name], err = clone.ParseFS(webassets.FS, "templates/pages/"+name+".html"); err != nil {
+			return nil, err
+		}
+	}
+	staticFS, err := fs.Sub(webassets.FS, "static")
+	if err != nil {
+		return nil, err
+	}
+	s.static = http.StripPrefix("/static/", http.FileServerFS(staticFS))
+	return s, nil
+}
+
+func (s *Server) routes() []route {
+	routes := []route{
+		{"GET /static/", public, s.static.ServeHTTP},
+		{"GET /login", public, s.loginPage},
+		{"POST /login", public, s.loginSubmit},
+		{"POST /logout", viewer, s.logout},
+		{"GET /{$}", viewer, s.overviewPage},
+		{"GET /ui/overview", viewer, s.overviewPartial},
+	}
+	for _, p := range view.Pages(config.RoleAdmin) {
+		if p.Key == "overview" {
+			continue
+		}
+		level := viewer
+		if p.Admin {
+			level = admin
+		}
+		routes = append(routes, route{"GET " + p.Path, level, s.placeholder(p.Key)})
+	}
+	return routes
+}
+
+func (s *Server) Handler() http.Handler {
+	mux := http.NewServeMux()
+	for _, r := range s.routes() {
+		mux.Handle(r.pattern, s.guard(r.access, r.handler))
+	}
+	return securityHeaders(mux)
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Referrer-Policy", "same-origin")
+		next.ServeHTTP(w, r)
+	})
+}
+
+type principal struct {
+	User config.User
+	Role config.Role
+}
+
+type principalKey struct{}
+
+func principalOf(r *http.Request) principal {
+	p, _ := r.Context().Value(principalKey{}).(principal)
+	return p
+}
+
+// guard enforces the role of a route on every request (MON-AX-2, MON-AX-8, MON-AX-11) and, for changes,
+// that a browser-supplied Origin matches this host.
+func (s *Server) guard(need access, h http.HandlerFunc) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && !sameOrigin(r) {
+			http.Error(w, "Cross-site request refused.", http.StatusForbidden)
+			return
+		}
+		if need == public {
+			h(w, r)
+			return
+		}
+		user, ok := s.currentUser(r)
+		if !ok {
+			if r.Header.Get("HX-Request") != "" {
+				w.Header().Set("HX-Redirect", "/login")
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+		p := principal{User: user, Role: auth.EffectiveRole(user, r)}
+		r = r.WithContext(context.WithValue(r.Context(), principalKey{}, p))
+		if need == admin && p.Role != config.RoleAdmin {
+			s.render(w, r, http.StatusForbidden, "placeholder", s.pageFor(r, "", "Not available", "This page is for the administrator on this computer.", placeholderData{Text: "You can look at the other pages, but this one is only available to the administrator using this computer."}))
+			return
+		}
+		h(w, r)
+	})
+}
+
+func sameOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	u, err := url.Parse(origin)
+	return err == nil && u.Host == r.Host
+}
+
+func (s *Server) currentUser(r *http.Request) (config.User, bool) {
+	c, err := r.Cookie(sessionCookie)
+	if err != nil {
+		return config.User{}, false
+	}
+	return s.sessions.Get(c.Value)
+}
+
+func secure(r *http.Request) bool {
+	return r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
+}
+
+func themeOf(r *http.Request) string {
+	if c, err := r.Cookie(themeCookie); err == nil && (c.Value == "dark" || c.Value == "light") {
+		return c.Value
+	}
+	return ""
+}
+
+type loginData struct {
+	Theme, Error, Hint string
+}
+
+func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.currentUser(r); ok {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	s.renderLogin(w, r, http.StatusOK, "")
+}
+
+func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, status int, message string) {
+	data := loginData{Theme: themeOf(r), Error: message}
+	if s.demo {
+		data.Hint = "Demo mode: admin / admin or viewer / viewer."
+	}
+	s.execute(w, status, s.pages["login"], "login", data)
+}
+
+func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Bad request.", http.StatusBadRequest)
+		return
+	}
+	user, ok := auth.Check(s.cfg.Users, r.PostForm.Get("name"), r.PostForm.Get("password"))
+	if !ok {
+		s.renderLogin(w, r, http.StatusUnauthorized, "Wrong name or password.")
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name: sessionCookie, Value: s.sessions.Create(user), Path: "/",
+		HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: secure(r),
+	})
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
+	if c, err := r.Cookie(sessionCookie); err == nil {
+		s.sessions.Delete(c.Value)
+	}
+	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: secure(r)})
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+type staleBar struct {
+	Show, Down bool
+	Text       string
+}
+
+type nodeBlock struct {
+	Name, LinkText, LinkClass, Radio, Uptime, Mode string
+}
+
+type placeholderData struct{ Text, Slice, Doc string }
+
+// page is everything the layout needs.
+type page struct {
+	Title, Subtitle, Active string
+	Nav                     []view.Page
+	UserName, RoleLabel     string
+	RoleNotice, Theme       string
+	Stale                   staleBar
+	Node                    nodeBlock
+	Content                 any
+}
+
+func (s *Server) pageFor(r *http.Request, active, title, subtitle string, content any) page {
+	p := principalOf(r)
+	pg := page{
+		Title: title, Subtitle: subtitle, Active: active, Nav: view.Pages(p.Role),
+		UserName: p.User.Name, RoleLabel: "Viewer", Theme: themeOf(r),
+		Stale: s.staleBar(), Node: s.nodeBlock(), Content: content,
+	}
+	if p.Role == config.RoleAdmin {
+		pg.RoleLabel = "Admin"
+	}
+	if p.User.Role == config.RoleAdmin && p.Role == config.RoleViewer {
+		pg.RoleNotice = "Signed in as admin, but this is not a local request. View only."
+	}
+	return pg
+}
+
+func (s *Server) staleBar() staleBar {
+	now := s.now()
+	f, last := s.store.Freshness(now)
+	switch {
+	case f == store.Fresh:
+		return staleBar{}
+	case last.IsZero():
+		return staleBar{Show: true, Down: true, Text: "Waiting for KAM."}
+	default:
+		return staleBar{Show: true, Down: f == store.Down, Text: fmt.Sprintf("KAM has not answered for %s. Showing data from %s.", shortAge(now.Sub(last)), last.Local().Format("15:04:05"))}
+	}
+}
+
+func shortAge(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%d s", int(d/time.Second))
+	}
+	return fmt.Sprintf("%d min", int(d/time.Minute))
+}
+
+func (s *Server) nodeBlock() nodeBlock {
+	now := s.now()
+	st, _ := s.store.Status()
+	f, _ := s.store.Freshness(now)
+	nb := nodeBlock{Name: "KAM", LinkText: "Waiting for KAM", Radio: "—"}
+	if s.demo {
+		nb.Mode = "DEMO · GENERATED DATA"
+	}
+	if st.Epoch == "" {
+		nb.LinkClass = "down"
+		return nb
+	}
+	if st.NodeName != "" {
+		nb.Name = st.NodeName
+	}
+	nb.LinkText = "KAM connected"
+	switch f {
+	case store.Stale:
+		nb.LinkClass, nb.LinkText = "stale", "KAM slow to answer"
+	case store.Down:
+		nb.LinkClass, nb.LinkText = "down", "KAM not answering"
+	}
+	nb.Radio = fmt.Sprintf("%.3f MHz · SF%d / BW%d", float64(st.Radio.FrequencyHz)/1e6, st.Radio.SpreadingFactor, st.Radio.BandwidthHz/1000)
+	nb.Uptime = uptime(st.Now.Sub(st.StartedAt))
+	return nb
+}
+
+func (s *Server) overviewPage(w http.ResponseWriter, r *http.Request) {
+	data := s.overview(principalOf(r).Role, r.URL.Query().Get("range"))
+	s.render(w, r, http.StatusOK, "overview", s.pageFor(r, "overview", "Network overview", "Observed packets, airtime and rooms for this node", data))
+}
+
+// overviewPartial is what htmx fetches every 2 seconds (MON-OV-11). The stale bar and node block ride along out of band.
+func (s *Server) overviewPartial(w http.ResponseWriter, r *http.Request) {
+	data := s.overview(principalOf(r).Role, r.URL.Query().Get("range"))
+	var buf bytes.Buffer
+	t := s.pages["overview"]
+	for _, part := range []struct {
+		name string
+		data any
+	}{{"overview-live", data}, {"stalebar", s.staleBar()}, {"nodeblock", s.nodeBlock()}} {
+		if err := t.ExecuteTemplate(&buf, part.name, part.data); err != nil {
+			http.Error(w, "Template error.", http.StatusInternalServerError)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = buf.WriteTo(w)
+}
+
+var placeholders = map[string]placeholderData{
+	"traffic":     {Text: "A live table of every packet heard or sent, with filters and CSV export.", Slice: "slice 2", Doc: "docs/requirements/Traffic.md"},
+	"channels":    {Text: "Channel activity and decoded messages.", Slice: "slice 3", Doc: "docs/requirements/Channels.md"},
+	"rooms":       {Text: "Room activity, remembered clients and posts.", Slice: "slice 3", Doc: "docs/requirements/Rooms.md"},
+	"accounts":    {Text: "Room roles for the administrator.", Slice: "slice 6", Doc: "docs/requirements/RoomAccounts.md"},
+	"automations": {Text: "Starlark scripts: write, test and manage.", Slice: "slice 7", Doc: "docs/requirements/Automations.md"},
+	"modem":       {Text: "KISS modem snapshot, queries and radio settings.", Slice: "slice 5", Doc: "docs/requirements/KissModem.md"},
+}
+
+func (s *Server) placeholder(key string) http.HandlerFunc {
+	p, _ := view.Find(key)
+	return func(w http.ResponseWriter, r *http.Request) {
+		s.render(w, r, http.StatusOK, "placeholder", s.pageFor(r, key, p.Title, "Not built yet", placeholders[key]))
+	}
+}
+
+func (s *Server) render(w http.ResponseWriter, r *http.Request, status int, name string, pg page) {
+	s.execute(w, status, s.pages[name], "layout", pg)
+}
+
+// execute renders into a buffer first so a template error never sends half a page.
+func (s *Server) execute(w http.ResponseWriter, status int, t *template.Template, name string, data any) {
+	var buf bytes.Buffer
+	if err := t.ExecuteTemplate(&buf, name, data); err != nil {
+		http.Error(w, "Template error.", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(status)
+	_, _ = buf.WriteTo(w)
+}

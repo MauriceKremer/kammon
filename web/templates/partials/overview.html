@@ -1,0 +1,55 @@
+{{define "overview-live"}}<div id="overview-live" hx-get="/ui/overview?range={{.Range}}" hx-trigger="every 2s" hx-swap="outerHTML" hx-target="this">
+  <div class="heading">
+    <span class="segmented" role="group" aria-label="Time range">{{range .Ranges}}<a href="/?range={{.Key}}" hx-get="/ui/overview?range={{.Key}}" hx-target="#overview-live" hx-swap="outerHTML" hx-push-url="/?range={{.Key}}"{{if .Active}} aria-current="true"{{end}}>{{.Label}}</a>{{end}}</span>
+  </div>
+
+  <div class="metrics">
+    {{range .Metrics}}<div class="metric">
+      <p class="metric-label">{{.Label}}</p>
+      <p class="metric-value">{{.Value}}{{if .Unit}} <small>{{.Unit}}</small>{{end}}</p>
+      <p class="small {{if .Warn}}warn{{else}}muted{{end}}">{{.Caption}}</p>
+    </div>{{end}}
+  </div>
+
+  <div class="dashboard">
+    <div class="main">
+      <section class="section" aria-labelledby="airtime-title">
+        <div class="section-head">
+          <div><h2 id="airtime-title">Airtime</h2><p class="small muted">Observed packet airtime · {{.SlotText}}</p></div>
+          <span class="mono muted">axis 0–{{.AxisTop}}</span>
+        </div>
+        <div role="img" aria-label="{{.ChartAlt}}">{{.Chart}}</div>
+        <div class="chart-labels" aria-hidden="true">{{range .Labels}}<span>{{.}}</span>{{end}}</div>
+        {{if .HistoryNote}}<p class="small muted">{{.HistoryNote}}</p>{{end}}
+        {{range .Marks}}<p class="small warn">{{.}}</p>{{end}}
+        <div class="legend">{{range .Classes}}<span><span class="swatch {{.Key}}"></span>{{.Name}}</span>{{end}}</div>
+      </section>
+
+      <section class="section" aria-labelledby="mix-title">
+        <h2 id="mix-title">Packet mix</h2>
+        <p class="small muted">By packet count · {{.RangeLabel}} · repeats included</p>
+        <div class="mix-list">{{range .Classes}}<div class="mix-row"><span class="swatch {{.Key}}"></span>{{.Name}}<strong>{{.Count}}</strong><span class="muted">{{.Percent}}</span></div>{{end}}</div>
+        <p class="small muted">Room traffic means requests, posts and acknowledgements for this node's rooms (probable, by address hash).</p>
+      </section>
+    </div>
+
+    <div class="side">
+      <section class="section" aria-labelledby="recent-title">
+        <h2 id="recent-title">Recent packets</h2>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Time</th><th>Type</th><th>Source / destination</th><th>SNR</th></tr></thead>
+            <tbody>{{range .Recent}}<tr><td class="mono muted">{{.Time}}</td><td><span class="tag {{.TypeClass}}">{{.Type}}</span></td><td>{{.Label}}</td><td class="mono">{{.SNR}}</td></tr>
+            {{else}}<tr><td colspan="4" class="muted">No packets yet.</td></tr>{{end}}</tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="rooms-title">
+        <h2 id="rooms-title">Rooms</h2>
+        {{range .Rooms}}<div class="room-line"><h3>{{.Name}}</h3><p>{{.Activity}}</p><p>{{.Remembered}} remembered</p></div>
+        {{else}}<p class="small muted">{{.RoomsNote}}</p>{{end}}
+      </section>
+    </div>
+  </div>
+</div>{{end}}

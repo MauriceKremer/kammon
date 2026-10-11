@@ -1,0 +1,13 @@
+listen: ":8080"
+kam_monitor_url: "http://127.0.0.1:8766"
+kam_scripts_url: "http://127.0.0.1:8765"
+session_idle_hours: 8
+
+# Channels whose message text web viewers may read. Everyone else sees metadata only.
+viewer_text_channels: ["#public"]
+
+# Passwords are plain text, like channel keys in kam.yml. An admin only has admin
+# power on a request from this computer; from anywhere else the admin is a viewer.
+users:
+  - { name: maurice, password: "change-me", role: admin }
+  - { name: observer, password: "change-me-too", role: viewer }

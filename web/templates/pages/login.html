@@ -1,0 +1,24 @@
+{{define "login"}}<!doctype html>
+<html lang="en"{{if .Theme}} data-theme="{{.Theme}}"{{end}}>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · KAMmon</title>
+<link rel="stylesheet" href="/static/kammon.css">
+</head>
+<body class="login-page">
+<main class="login">
+  <form method="post" action="/login">
+    <div class="brand">KAM<span class="mon">mon</span></div>
+    <h1>Sign in</h1>
+    <label for="name">Name</label>
+    <input id="name" name="name" autocomplete="username" required autofocus>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
+    <button class="primary" type="submit">Sign in</button>
+    {{if .Hint}}<p class="small muted proto">{{.Hint}}</p>{{end}}
+  </form>
+</main>
+</body>
+</html>{{end}}

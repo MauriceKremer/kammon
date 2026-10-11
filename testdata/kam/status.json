@@ -1,0 +1,34 @@
+{
+  "api_version": 1,
+  "epoch": "7f3a9c2e41b8d605",
+  "now": "2026-10-11T15:00:00.120Z",
+  "started_at": "2026-10-08T00:33:41Z",
+  "node_name": "kam",
+  "modem": { "link": "up", "device_name": "Emmen KISS", "firmware_version": 1 },
+  "radio": {
+    "frequency_hz": 868000000,
+    "bandwidth_hz": 125000,
+    "spreading_factor": 8,
+    "coding_rate": 5,
+    "tx_power_dbm": 14,
+    "source": "modem_echo"
+  },
+  "duty_cycle": { "configured_percent": 1.0, "used_ms": 21600, "window_s": 3600 },
+  "tx": {
+    "queued": 0,
+    "submitted": 38,
+    "sent": 38,
+    "completed": 38,
+    "rejected": 0,
+    "evicted": 0,
+    "deferred": 0,
+    "gate_timeouts": 0
+  },
+  "persistence": {
+    "adverts": { "depth": 0, "dropped": 0 },
+    "group_texts": { "depth": 0, "dropped": 0 }
+  },
+  "rooms": { "enabled": true, "count": 3 },
+  "automation": { "enabled": true, "scripts_enabled": 2, "queue_depth": 0, "events_dropped": 0 },
+  "event_ring": { "capacity": 8192, "first_seq": 5931, "last_seq": 8123 }
+}

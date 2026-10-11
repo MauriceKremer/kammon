@@ -1,0 +1,4 @@
+{{define "content"}}<div class="placeholder">
+  <p>{{.Content.Text}}</p>
+  {{if .Content.Doc}}<p class="muted small">Planned in {{.Content.Slice}}. Requirements: <code>{{.Content.Doc}}</code></p>{{end}}
+</div>{{end}}

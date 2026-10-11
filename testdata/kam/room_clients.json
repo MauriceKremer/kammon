@@ -1,0 +1,29 @@
+{
+  "room": "lobby",
+  "clients": [
+    {
+      "public_key": "ed8342bcaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "role": "admin",
+      "pinned": true,
+      "last_activity_at": "2026-10-11T14:59:48Z",
+      "push_state": "idle",
+      "label": "Maurice"
+    },
+    {
+      "public_key": "b590f2e8aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "role": "read_write",
+      "pinned": false,
+      "last_activity_at": "2026-10-09T09:10:00Z",
+      "push_state": "paused",
+      "label": null
+    },
+    {
+      "public_key": "cb28b6f4aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "role": "guest",
+      "pinned": false,
+      "last_activity_at": null,
+      "push_state": "idle",
+      "label": null
+    }
+  ]
+}
