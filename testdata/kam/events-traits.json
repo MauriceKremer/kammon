@@ -1,0 +1,58 @@
+{
+  "epoch": "7f3a9c2e41b8d605",
+  "first_seq": 5931,
+  "last_seq": 8123,
+  "reset": false,
+  "events": [
+    {
+      "seq": 8120,
+      "at": "2026-10-11T14:59:58.412Z",
+      "kind": "rx",
+      "payload_type": "GRP_TXT",
+      "route": "flood",
+      "hops": 2,
+      "len": 87,
+      "snr_db": 8.5,
+      "rssi_dbm": -97,
+      "airtime_ms": 312,
+      "channel": "#emmen",
+      "name": "PA3M"
+    },
+    {
+      "seq": 8121,
+      "at": "2026-10-11T14:59:58.900Z",
+      "kind": "rx",
+      "payload_type": "GRP_TXT",
+      "route": "flood",
+      "hops": 3,
+      "len": 87,
+      "snr_db": 3.2,
+      "rssi_dbm": -111,
+      "airtime_ms": 312,
+      "duplicate": true,
+      "channel": "#emmen",
+      "name": "PA3M"
+    },
+    {
+      "seq": 8122,
+      "at": "2026-10-11T14:59:59.100Z",
+      "kind": "tx",
+      "payload_type": "ACK",
+      "route": "direct",
+      "len": 8,
+      "airtime_ms": 94,
+      "ok": true,
+      "origin": "room",
+      "room": "lobby"
+    },
+    {
+      "seq": 8123,
+      "at": "2026-10-11T14:59:59.700Z",
+      "kind": "room",
+      "room": "lobby",
+      "event": "post",
+      "client": "72f188caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "role": "read_write"
+    }
+  ]
+}

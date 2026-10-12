@@ -34,10 +34,22 @@ func TestFixturesDecodeStrictly(t *testing.T) {
 		t.Fatalf("status = %+v", status)
 	}
 
+	// events.json is recorded from the live node: four real RX events, all with SNR.
 	var events EventsResponse
 	decodeStrict(t, "events.json", &events)
-	if len(events.Events) != 4 || events.Events[0].SNRdB == nil || !events.Events[1].Duplicate || events.Events[2].OK == nil {
-		t.Fatalf("events = %+v", events)
+	if len(events.Events) != 4 || events.Events[0].SNRdB == nil || events.Events[0].Duplicate || events.Events[0].Kind != "rx" {
+		t.Fatalf("recorded events = %+v", events)
+	}
+	// D14: the recorded page was complete, so the continuation cursor sits on the ring head.
+	if events.NextAfter != events.LastSeq {
+		t.Fatalf("next_after %d does not follow the served page (last_seq %d)", events.NextAfter, events.LastSeq)
+	}
+
+	// events-traits.json covers the fields the live ring had not produced yet (see its README).
+	var traits EventsResponse
+	decodeStrict(t, "events-traits.json", &traits)
+	if !traits.Events[1].Duplicate || traits.Events[2].OK == nil || traits.Events[3].Kind != "room" {
+		t.Fatalf("trait events = %+v", traits.Events)
 	}
 
 	var channels struct{ Channels []Channel }

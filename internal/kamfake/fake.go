@@ -203,6 +203,11 @@ func (f *Fake) events(w http.ResponseWriter, r *http.Request) {
 			out.Events = append(out.Events, f.ring[idx:end]...)
 		}
 	}
+	// D14: the poller continues from the largest sequence number this page served.
+	out.NextAfter = f.seq
+	if n := len(out.Events); n > 0 {
+		out.NextAfter = out.Events[n-1].Seq
+	}
 	writeJSON(w, out)
 }
 
