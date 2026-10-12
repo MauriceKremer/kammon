@@ -592,3 +592,59 @@ func TestTrafficCSVFormulaGuard(t *testing.T) {
 		t.Errorf("formula values must carry the apostrophe guard: %q", body)
 	}
 }
+
+// MON-AX-6: the fifth failed login starts delaying answers by two seconds; a same-host key
+// survives changing ports.
+func TestLoginSlowdownAfterFiveFailures(t *testing.T) {
+	clock := t0
+	var pauses []time.Duration
+	srv, err := New(Deps{Config: config.Demo(), Store: store.New(), Now: func() time.Time { return clock }, Sleep: func(d time.Duration) { pauses = append(pauses, d) }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+
+	post := func(c *http.Client) {
+		resp, err := c.PostForm(ts.URL+"/login", url.Values{"name": {"admin"}, "password": {"nope"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+	c := &http.Client{}
+	for i := 0; i < 4; i++ {
+		post(c) // the login page is on loopback, so this admin is local; the failures still count
+	}
+	if len(pauses) != 0 {
+		t.Fatalf("delays before the fifth failure: %v", pauses)
+	}
+	post(c)
+	if len(pauses) != 0 {
+		t.Fatalf("the fifth failure is not slowed: %v", pauses)
+	}
+	post(c)
+	if len(pauses) != 1 || pauses[0] != 2*time.Second {
+		t.Fatalf("delays = %v, want the sixth attempt to wait 2 s", pauses)
+	}
+
+	// The slowdown keys on the host part: a fresh port from the same machine is the same attacker.
+	var pauses2 []time.Duration
+	srv2, _ := New(Deps{Config: config.Demo(), Store: store.New(), Now: func() time.Time { return clock }, Sleep: func(d time.Duration) { pauses2 = append(pauses2, d) }})
+	ts2 := httptest.NewServer(srv2.Handler())
+	t.Cleanup(ts2.Close)
+	c2 := &http.Client{}
+	for i := 0; i < 5; i++ {
+		resp, err := c2.PostForm(ts2.URL+"/login", url.Values{"name": {"admin"}, "password": {"nope"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		c2.CloseIdleConnections() // force new connections with new source ports
+	}
+	resp, _ := c2.PostForm(ts2.URL+"/login", url.Values{"name": {"admin"}, "password": {"nope"}})
+	resp.Body.Close()
+	if len(pauses2) != 1 {
+		t.Fatalf("a port-changing client still earned one delay: %v", pauses2)
+	}
+}

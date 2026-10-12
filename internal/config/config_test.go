@@ -57,3 +57,47 @@ func TestExampleConfigLoads(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// MON-AX-21: optional TLS needs both halves and readable files.
+func TestTLSConfigPairs(t *testing.T) {
+	write := func(name, content string) string {
+		p := filepath.Join(t.TempDir(), name)
+		if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	cert := write("cert.pem", "fake")
+	key := write("key.pem", "fake")
+	missing := filepath.Join(t.TempDir(), "missing.pem")
+
+	cases := []struct {
+		name string
+		yaml string
+		want string
+	}{
+		{"plain http", "users: [{name: a, password: p, role: viewer}]", ""},
+		{"cert without key", "tls_cert: " + missing + "\nusers: [{name: a, password: p, role: viewer}]", "go together"},
+		{"key without cert", "tls_key: " + missing + "\nusers: [{name: a, password: p, role: viewer}]", "go together"},
+		{"missing cert file", "tls_cert: " + missing + "\ntls_key: " + key + "\nusers: [{name: a, password: p, role: viewer}]", "tls_cert:"},
+		{"missing key file", "tls_cert: " + cert + "\ntls_key: " + missing + "\nusers: [{name: a, password: p, role: viewer}]", "tls_key:"},
+		{"valid pair", "tls_cert: " + cert + "\ntls_key: " + key + "\nusers: [{name: a, password: p, role: viewer}]", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "kammon.yml")
+			if err := os.WriteFile(path, []byte(c.yaml), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := Load(path)
+			switch {
+			case c.want == "" && err != nil:
+				t.Fatalf("%s: %v", c.name, err)
+			case c.want == "" && cfg.TLSCert != cert && c.name == "valid pair":
+				t.Fatalf("%s: cert not kept", c.name)
+			case c.want != "" && (err == nil || !strings.Contains(err.Error(), c.want)):
+				t.Fatalf("%s: err = %v, want it to contain %q", c.name, err, c.want)
+			}
+		})
+	}
+}

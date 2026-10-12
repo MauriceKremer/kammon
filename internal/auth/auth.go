@@ -122,3 +122,12 @@ func EffectiveRole(u config.User, r *http.Request) config.Role {
 	}
 	return config.RoleViewer
 }
+
+// RemoteHost is the host part of the request's connection address — the key for per-address
+// settings such as the login slowdown (MON-AX-6). A client's changing port is the same address.
+func RemoteHost(r *http.Request) string {
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
+}

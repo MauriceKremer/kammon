@@ -68,7 +68,13 @@ func run(configPath string, demo bool) error {
 		defer cancel()
 		_ = httpServer.Shutdown(shutdown)
 	}()
-	slog.Info("KAMmon listening", "address", cfg.Listen, "kam", cfg.KamMonitorURL)
+	slog.Info("KAMmon listening", "address", cfg.Listen, "tls", cfg.TLSCert != "", "kam", cfg.KamMonitorURL)
+	if cfg.TLSCert != "" {
+		if err := httpServer.ListenAndServeTLS(cfg.TLSCert, cfg.TLSKey); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+		return nil
+	}
 	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}

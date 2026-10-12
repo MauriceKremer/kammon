@@ -111,6 +111,9 @@ viewer_text_channels: ["#public"]
 users:
   - { name: maurice, password: "change-me", role: admin }
   - { name: observer, password: "change-me-too", role: viewer }
+# Optional: serve HTTPS directly instead of a reverse proxy (MON-AX-21).
+# tls_cert: cert.pem
+# tls_key: key.pem
 ```
 
 ## 7. Tests

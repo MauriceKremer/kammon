@@ -40,6 +40,8 @@ type Config struct {
 	SessionIdleHours   int      `yaml:"session_idle_hours"`
 	ViewerTextChannels []string `yaml:"viewer_text_channels"`
 	Users              []User   `yaml:"users"`
+	TLSCert            string   `yaml:"tls_cert"` // optional: serve HTTPS directly (MON-AX-21)
+	TLSKey             string   `yaml:"tls_key"`
 }
 
 // SessionIdle is the idle timeout of a login session.
@@ -93,6 +95,19 @@ func (c *Config) normalize() error {
 	}
 	if c.SessionIdleHours < 1 {
 		return errors.New("session_idle_hours must be at least 1")
+	}
+	switch {
+	case c.TLSCert == "" && c.TLSKey == "":
+		// plain HTTP; a reverse proxy is the other way to HTTPS (MON-AX-20, 21)
+	case c.TLSCert != "" && c.TLSKey != "":
+		if _, err := os.Stat(c.TLSCert); err != nil {
+			return fmt.Errorf("tls_cert: %w", err)
+		}
+		if _, err := os.Stat(c.TLSKey); err != nil {
+			return fmt.Errorf("tls_key: %w", err)
+		}
+	default:
+		return errors.New("tls_cert and tls_key go together, or neither")
 	}
 	if len(c.Users) == 0 {
 		return errors.New("at least one user is required")

@@ -28,6 +28,8 @@ type Deps struct {
 	Store  *store.Store
 	Now    func() time.Time
 	Demo   bool
+	// Sleep is the pause login slowdowns impose (MON-AX-6); tests substitute it.
+	Sleep func(time.Duration)
 }
 
 type Server struct {
@@ -36,6 +38,8 @@ type Server struct {
 	now      func() time.Time
 	demo     bool
 	sessions *auth.Sessions
+	slowdown *auth.Slowdown
+	sleep    func(time.Duration)
 	pages    map[string]*template.Template
 	static   http.Handler
 }
@@ -59,9 +63,14 @@ func New(d Deps) (*Server, error) {
 	if d.Now == nil {
 		d.Now = time.Now
 	}
+	if d.Sleep == nil {
+		d.Sleep = time.Sleep
+	}
 	s := &Server{
 		cfg: d.Config, store: d.Store, now: d.Now, demo: d.Demo,
 		sessions: auth.NewSessions(d.Config.SessionIdle(), d.Now),
+		slowdown: auth.NewSlowdown(),
+		sleep:    d.Sleep,
 		pages:    map[string]*template.Template{},
 	}
 	base, err := template.ParseFS(webassets.FS, "templates/layout.html", "templates/partials/*.html")
@@ -228,8 +237,13 @@ func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad request.", http.StatusBadRequest)
 		return
 	}
+	// MON-AX-6: after five failed logins in a minute, the answer waits two seconds.
+	if d := s.slowdown.Delay(auth.RemoteHost(r), s.now()); d > 0 {
+		s.sleep(d)
+	}
 	user, ok := auth.Check(s.cfg.Users, r.PostForm.Get("name"), r.PostForm.Get("password"))
 	if !ok {
+		s.slowdown.Fail(auth.RemoteHost(r), s.now())
 		s.renderLogin(w, r, http.StatusUnauthorized, "Wrong name or password.")
 		return
 	}
