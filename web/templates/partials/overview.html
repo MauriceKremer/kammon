@@ -40,8 +40,8 @@
         <h2 id="recent-title">Recent packets</h2>
         <div class="table-scroll">
           <table>
-            <thead><tr><th>Time</th><th>Type</th><th>Source / destination</th><th>SNR</th></tr></thead>
-            <tbody>{{range .Recent}}<tr><td class="mono muted">{{.Time}}</td><td><span class="tag {{.TypeClass}}">{{.Type}}</span></td><td>{{.Label}}</td><td class="mono">{{.SNR}}</td></tr>
+            <thead><tr><th>Time</th><th>Type</th><th>Source / destination</th></tr></thead>
+            <tbody>{{range .Recent}}<tr><td class="mono muted">{{.Time}}</td><td><span class="tag {{.TypeClass}}">{{.Type}}</span></td><td>{{.Label}}</td></tr>
             {{else}}<tr><td colspan="4" class="muted">No packets yet.</td></tr>{{end}}</tbody>
           </table>
         </div>

@@ -22,6 +22,7 @@ Recorded 2026-10-11 during planning. Reasons are in [DESIGN.md](DESIGN.md) §13 
 | D16 | Signal reporting | Always enabled | Preserve useful measurements without another setting |
 | D17 | Recording | Short lock, bounded copy | No separate queue or worker; no claim of zero waiting |
 | D18 | Dry runs | 500 ms default, 3000 ms maximum, one at a time, 16 replies / 4096 bytes | Bounded tests without asynchronous jobs |
+| D19 | Per-packet SNR and RSSI | Measured and stored with every event, never shown on packet pages | KAM listens through a local repeater: signal strength describes the hop to KAM, not the sender, so the numbers carry no message |
 | A1 | Room posts and client labels | Admin only (the allow list covers channel text only) | Assumption; confirm before building the Rooms page |
 | A2 | Events | Metadata only; message text is fetched on demand | Keeps text out of the ring |
 | A3 | Repositories | KAM and KAMmon are separate repositories | KAM must work without KAMmon; KAM's packages are `internal/` |

@@ -7,7 +7,7 @@
 
 Every packet KAM hears or sends becomes an event with its type, route, hop count, signal strength and an estimated airtime, **but never its payload**. The Traffic page shows those events from KAMmon's memory, newest first, and lets the operator filter and export them. It includes repeats and the packet types KAM does not otherwise process, which is why it can show the real mix on the air.
 
-Plain words: **route** says how a packet travels. A *flood* is repeated by every repeater that hears it; a *direct* packet follows a known path. **Hops** is how many repeaters it passed. **SNR** (signal-to-noise ratio) and **RSSI** (received signal strength) say how well KAM heard it.
+Plain words: **route** says how a packet travels. A *flood* is repeated by every repeater that hears it; a *direct* packet follows a known path. **Hops** is how many repeaters it passed.
 
 ## 2. Goals and non-goals
 
@@ -29,7 +29,7 @@ Plain words: **route** says how a packet travels. A *flood* is repeated by every
 |---|---|
 | **Filter bar** | Search box (source or destination), packet type select, direction select (all, RX, TX), "Hide repeats" toggle, Export CSV. |
 | **Type summary** | One line per packet type in the current filter: count and percentage. |
-| **Table** | Time, direction, type tag, source / destination, route and hops, SNR, estimated airtime. Repeats are marked "repeat". |
+| **Table** | Time, direction, type tag, source / destination, route and hops, estimated airtime. Repeats are marked "repeat". |
 | **Footnote** | "Observed packets only. Unattributed or undecryptable payloads keep their visible packet type." |
 
 ### 3.1 Source and destination text
@@ -54,7 +54,7 @@ Plain words: **route** says how a packet travels. A *flood* is repeated by every
 | MON-TR-5 | Filters: free text on the source / destination text, packet type, direction, hide repeats. They combine with AND. | MUST |
 | MON-TR-6 | Filter state is in the URL query string so a view can be shared and survives a reload. | SHOULD |
 | MON-TR-7 | The type summary reflects the filter and the store contents, not just the 100 visible rows. | SHOULD |
-| MON-TR-8 | SNR and RSSI show a dash when the event has none; zero is never used to mean unknown. | MUST |
+| MON-TR-8 | SNR and RSSI arrive with the events but are not displayed (decisions D19: behind a local repeater they describe the hop to KAM, not the sender). The measurement stays in the event feed for KAM's own status work. | MUST |
 | MON-TR-9 | Airtime is labelled estimated. | MUST |
 | MON-TR-10 | Export CSV writes the filtered rows that the store holds (not only the visible ones). Columns match the table. The file is named `kammon-traffic-<time>.csv`. | MUST |
 | MON-TR-11 | In CSV, a value that starts with `=`, `+`, `-` or `@` gets a leading apostrophe, because names come from the radio. | MUST |
@@ -73,7 +73,7 @@ Plain words: **route** says how a packet travels. A *flood* is repeated by every
 
 | Element | Viewer | Admin |
 |---|---|---|
-| Time, direction, type, route, hops, SNR, airtime | Yes | Yes |
+| Time, direction, type, route, hops, airtime | Yes | Yes |
 | Advert names | Yes (adverts are public over the air) | Yes |
 | Group-text sender | Only for channels in `viewer_text_channels` | Yes |
 | Channel name | Yes | Yes |

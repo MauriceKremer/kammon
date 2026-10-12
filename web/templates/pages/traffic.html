@@ -27,9 +27,9 @@
   <p class="small muted">{{.Summary}}{{range .Types}} · {{.Name}} {{.Count}} ({{.Percent}}){{end}}</p>
   <div class="table-scroll">
     <table>
-      <thead><tr><th>Time</th><th>Dir</th><th>Type</th><th>Source / destination</th><th>Route</th><th>SNR</th><th>RSSI</th><th>Est. airtime</th></tr></thead>
-      <tbody>{{range .Rows}}<tr><td class="mono muted">{{.Time}}</td><td>{{.Dir}}{{if .Repeat}} <span class="tag repeat">repeat</span>{{end}}</td><td><span class="tag {{.TypeClass}}">{{.Type}}</span></td><td>{{.Label}}</td><td class="mono">{{.Route}}</td><td class="mono">{{.SNR}}</td><td class="mono">{{.RSSI}}</td><td class="mono">{{.Airtime}}</td></tr>
-      {{else}}<tr><td colspan="8" class="muted">No packets match this filter.</td></tr>{{end}}</tbody>
+      <thead><tr><th>Time</th><th>Dir</th><th>Type</th><th>Source / destination</th><th>Route</th><th>Est. airtime</th></tr></thead>
+      <tbody>{{range .Rows}}<tr><td class="mono muted">{{.Time}}</td><td>{{.Dir}}{{if .Repeat}} <span class="tag repeat">repeat</span>{{end}}</td><td><span class="tag {{.TypeClass}}">{{.Type}}</span></td><td>{{.Label}}</td><td class="mono">{{.Route}}</td><td class="mono">{{.Airtime}}</td></tr>
+      {{else}}<tr><td colspan="6" class="muted">No packets match this filter.</td></tr>{{end}}</tbody>
     </table>
   </div>
   {{if .HistoryNote}}<p class="small muted">{{.HistoryNote}}</p>{{end}}

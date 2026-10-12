@@ -23,8 +23,8 @@ const rowsPerLoad = 100 // MON-TR-2
 type typeCount struct{ Name, Count, Percent string }
 
 type trafficRow struct {
-	Time, Dir, Type, TypeClass, Label, Route, SNR, RSSI, Airtime string
-	Repeat                                                       bool
+	Time, Dir, Type, TypeClass, Label, Route, Airtime string
+	Repeat                                            bool
 }
 
 type trafficData struct {
@@ -109,23 +109,19 @@ func (s *Server) trafficMatches(role config.Role, allow []string, f trafficFilte
 
 func (s *Server) trafficRowFor(role config.Role, allow []string, ev kam.Event) trafficRow {
 	row := trafficRow{
-		Time:  ev.At.Local().Format("15:04:05"),
-		Dir:   "RX",
-		Type:  orDash(ev.PayloadType),
-		Label: view.PacketLabel(role, allow, ev, s.roomNames()),
-		Route: routeText(ev),
-		SNR:   "—", RSSI: "—", Airtime: "—",
+		Time:    ev.At.Local().Format("15:04:05"),
+		Dir:     "RX",
+		Type:    orDash(ev.PayloadType),
+		Label:   view.PacketLabel(role, allow, ev, s.roomNames()),
+		Route:   routeText(ev),
+		Airtime: "—",
 	}
 	if ev.Kind == kam.KindTX {
 		row.Dir = "TX"
 	}
 	row.TypeClass = typeClass(ev.PayloadType)
-	if ev.SNRdB != nil {
-		row.SNR = fmt.Sprintf("%+.1f", *ev.SNRdB)
-	}
-	if ev.RSSIdBm != nil {
-		row.RSSI = fmt.Sprintf("%d dBm", *ev.RSSIdBm)
-	}
+	// SNR and RSSI stay in the event data but are not displayed: behind a local repeater they say
+	// how well KAM heard the repeater, not anything about the sender (docs/DECISIONS.md D19).
 	if ev.AirtimeMS != nil {
 		row.Airtime = fmt.Sprintf("%s ms", thousands(*ev.AirtimeMS))
 	}
@@ -344,7 +340,7 @@ func (s *Server) csvPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 
 	cw := csv.NewWriter(w)
-	_ = cw.Write([]string{"Time", "Direction", "Type", "Source / destination", "Route", "SNR (dB)", "RSSI (dBm)", "Est. airtime (ms)", "Repeat"})
+	_ = cw.Write([]string{"Time", "Direction", "Type", "Source / destination", "Route", "Est. airtime (ms)", "Repeat"})
 	for _, ev := range matches {
 		row := s.trafficRowFor(role, allow, ev)
 		at, _ := ev.At.MarshalText()
@@ -352,18 +348,11 @@ func (s *Server) csvPage(w http.ResponseWriter, r *http.Request) {
 		if ev.AirtimeMS != nil {
 			airtime = fmt.Sprintf("%d", *ev.AirtimeMS)
 		}
-		snr, rssi := "", ""
-		if ev.SNRdB != nil {
-			snr = fmt.Sprintf("%+.1f", *ev.SNRdB)
-		}
-		if ev.RSSIdBm != nil {
-			rssi = fmt.Sprintf("%d", *ev.RSSIdBm)
-		}
 		repeat := ""
 		if row.Repeat {
 			repeat = "repeat"
 		}
-		_ = cw.Write([]string{string(at), row.Dir, csvGuard(row.Type), csvGuard(row.Label), csvGuard(row.Route), csvGuard(snr), csvGuard(rssi), csvGuard(airtime), csvGuard(repeat)})
+		_ = cw.Write([]string{string(at), row.Dir, csvGuard(row.Type), csvGuard(row.Label), csvGuard(row.Route), csvGuard(airtime), csvGuard(repeat)})
 	}
 	cw.Flush()
 }

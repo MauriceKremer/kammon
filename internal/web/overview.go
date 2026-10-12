@@ -42,7 +42,7 @@ type metric struct {
 
 type classRow struct{ Key, Name, Count, Percent string }
 
-type packetRow struct{ Time, Type, TypeClass, Label, SNR string }
+type packetRow struct{ Time, Type, TypeClass, Label string }
 
 type roomRow struct {
 	Name, Activity string
@@ -260,16 +260,12 @@ func (s *Server) packetRowFor(role config.Role, allow []string, ev kam.Event) pa
 		Time:  ev.At.Local().Format("15:04:05"),
 		Type:  ev.PayloadType,
 		Label: view.PacketLabel(role, allow, ev, s.roomNames()),
-		SNR:   "—",
 	}
 	switch ev.PayloadType {
 	case "ADVERT":
 		row.TypeClass = "advert"
 	case "ACK":
 		row.TypeClass = "ack"
-	}
-	if ev.SNRdB != nil {
-		row.SNR = fmt.Sprintf("%+.1f", *ev.SNRdB)
 	}
 	if ev.Duplicate {
 		row.Label += " (repeat)"
