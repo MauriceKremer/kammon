@@ -155,9 +155,17 @@ func principalOf(r *http.Request) principal {
 // that a browser-supplied Origin matches this host.
 func (s *Server) guard(need access, h http.HandlerFunc) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodHead && !sameOrigin(r) {
-			http.Error(w, "Cross-site request refused.", http.StatusForbidden)
-			return
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			if !sameOrigin(r) {
+				http.Error(w, "Cross-site request refused.", http.StatusForbidden)
+				return
+			}
+			// A state-changing route needs the htmx header on top of the Origin check (MON-AX-18);
+			// pages that change state in a browser always carry it.
+			if need != public && r.Header.Get("HX-Request") == "" {
+				http.Error(w, "This route answers only to the in-page controls.", http.StatusBadRequest)
+				return
+			}
 		}
 		if need == public {
 			h(w, r)
@@ -259,6 +267,11 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 		s.sessions.Delete(c.Value)
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: secure(r)})
+	if r.Header.Get("HX-Request") != "" {
+		w.Header().Set("HX-Redirect", "/login")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 

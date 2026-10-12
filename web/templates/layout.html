@@ -25,7 +25,7 @@
     <span class="who">{{.UserName}} · {{.RoleLabel}}</span>
     <span>
       <button type="button" id="theme-toggle">Light mode</button>
-      <form method="post" action="/logout"><button type="submit">Sign out</button></form>
+      <form hx-post="/logout" hx-swap="none"><button type="submit">Sign out</button></form>
     </span>
   </div>
   {{template "stalebar" .Stale}}

@@ -35,8 +35,8 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 
 ## Slice 4: Access hardening
 
-- [ ] Failed-login slowdown (MON-AX-6), Origin and htmx header checks on every change route (MON-AX-17, 18), optional TLS (MON-AX-21)
-- [ ] Theme cookie read by the server (design §7.3)
+- [x] Failed-login slowdown (MON-AX-6), Origin and htmx header checks on every change route (MON-AX-17, 18), optional TLS (MON-AX-21)
+- [x] Theme cookie read by the server (design §7.3)
 
 ## Slice 5: KISS modem (needs KAM API phase 3)
 

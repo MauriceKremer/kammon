@@ -242,15 +242,27 @@ func TestLogoutNeedsSameOriginAndEndsTheSession(t *testing.T) {
 	}
 	req, _ = http.NewRequest(http.MethodPost, h.ts.URL+"/logout", nil)
 	req.Header.Set("Origin", h.ts.URL)
+	req.Header.Set("HX-Request", "true")
 	if resp, err = c.Do(req); err != nil {
 		t.Fatal(err)
 	}
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusSeeOther {
-		t.Fatalf("logout: %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK || resp.Header.Get("HX-Redirect") != "/login" {
+		t.Fatalf("logout: %d header %q", resp.StatusCode, resp.Header.Get("HX-Redirect"))
 	}
 	if status, _, _ := get(t, c, h.ts.URL+"/"); status != http.StatusSeeOther {
 		t.Fatalf("after logout the overview must redirect, got %d", status)
+	}
+	// MON-AX-18: a plain post without the htmx header does not reach the change route.
+	c2 := h.login(t, "viewer", "viewer")
+	req, _ = http.NewRequest(http.MethodPost, h.ts.URL+"/logout", nil)
+	req.Header.Set("Origin", h.ts.URL)
+	if resp, err = c2.Do(req); err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("logout without the htmx header: %d", resp.StatusCode)
 	}
 }
 
