@@ -106,9 +106,9 @@ type Event struct {
 
 // EventsResponse is GET /v1/events (API-EV-2).
 type EventsResponse struct {
-	Epoch    string  `json:"epoch"`
-	FirstSeq uint64  `json:"first_seq"`
-	LastSeq  uint64  `json:"last_seq"`
+	Epoch    string `json:"epoch"`
+	FirstSeq uint64 `json:"first_seq"`
+	LastSeq  uint64 `json:"last_seq"`
 	// NextAfter is the largest sequence number served in this page: the poller continues with
 	// after=next_after (contract D14, recorded KAM response). A caught-up page carries the ring
 	// head, so the next poll still starts after it.
