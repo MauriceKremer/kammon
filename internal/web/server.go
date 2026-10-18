@@ -23,6 +23,11 @@ const (
 	themeCookie   = "kammon_theme"
 )
 
+// AssetVersion is the cache-buster of the shared static assets (kammon.css and
+// the static scripts). Bump it when one of those files changes, so browsers drop
+// their cached copy instead of running or styling the pages with the old rules.
+const AssetVersion = "kammon-5"
+
 type Deps struct {
 	Config config.Config
 	Store  *store.Store
@@ -77,7 +82,7 @@ func New(d Deps) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, name := range []string{"overview", "placeholder", "login", "traffic"} {
+	for _, name := range []string{"overview", "placeholder", "login", "traffic", "channels", "rooms"} {
 		clone, err := base.Clone()
 		if err != nil {
 			return nil, err
@@ -96,7 +101,7 @@ func New(d Deps) (*Server, error) {
 
 func (s *Server) routes() []route {
 	routes := []route{
-		{"GET /static/", public, s.static.ServeHTTP},
+		{"GET /static/", public, cachedFS(s.static)},
 		{"GET /login", public, s.loginPage},
 		{"POST /login", public, s.loginSubmit},
 		{"POST /logout", viewer, s.logout},
@@ -105,11 +110,15 @@ func (s *Server) routes() []route {
 		{"GET /traffic", viewer, s.trafficPage},
 		{"GET /ui/traffic", viewer, s.trafficPartial},
 		{"GET /traffic.csv", viewer, s.csvPage},
+		{"GET /channels", viewer, s.channelsPage},
+		{"GET /ui/channel-messages", viewer, s.channelMessagesPartial},
+		{"GET /rooms", viewer, s.roomsPage},
+		{"GET /ui/room-posts", admin, s.roomPostsPartial},
 	}
 	// Placeholder routes for the pages that are not built yet. Built pages register their own
 	// routes above; the overview and traffic pages take themselves out of this loop.
 	for _, p := range view.Pages(config.RoleAdmin) {
-		if p.Key == "overview" || p.Key == "traffic" {
+		if p.Key == "overview" || p.Key == "traffic" || p.Key == "channels" || p.Key == "rooms" {
 			continue
 		}
 		level := viewer
@@ -127,6 +136,15 @@ func (s *Server) Handler() http.Handler {
 		mux.Handle(r.pattern, s.guard(r.access, r.handler))
 	}
 	return securityHeaders(mux)
+}
+
+// cachedFS lets shared caches (Cloudflare, browsers) hold static assets for
+// four hours. Requests stay public GETs; the dynamic pages never carry this header.
+func cachedFS(h http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=14400")
+		h.ServeHTTP(w, r)
+	}
 }
 
 func securityHeaders(next http.Handler) http.Handler {
@@ -221,6 +239,8 @@ func themeOf(r *http.Request) string {
 
 type loginData struct {
 	Theme, Error, Hint string
+	// StaticVersion is the static asset cache-buster, shared with the layout (AssetVersion).
+	StaticVersion string
 }
 
 func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
@@ -232,7 +252,7 @@ func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, status int, message string) {
-	data := loginData{Theme: themeOf(r), Error: message}
+	data := loginData{Theme: themeOf(r), Error: message, StaticVersion: AssetVersion}
 	if s.demo {
 		data.Hint = "Demo mode: admin / admin or viewer / viewer."
 	}
@@ -293,9 +313,12 @@ type page struct {
 	Nav                     []view.Page
 	UserName, RoleLabel     string
 	RoleNotice, Theme       string
-	Stale                   staleBar
-	Node                    nodeBlock
-	Content                 any
+	// StaticVersion is the static asset cache-buster (AssetVersion); the login
+	// page links the same version, tests keep them equal.
+	StaticVersion string
+	Stale         staleBar
+	Node          nodeBlock
+	Content       any
 }
 
 func (s *Server) pageFor(r *http.Request, active, title, subtitle string, content any) page {
@@ -303,7 +326,8 @@ func (s *Server) pageFor(r *http.Request, active, title, subtitle string, conten
 	pg := page{
 		Title: title, Subtitle: subtitle, Active: active, Nav: view.Pages(p.Role),
 		UserName: p.User.Name, RoleLabel: "Viewer", Theme: themeOf(r),
-		Stale: s.staleBar(), Node: s.nodeBlock(), Content: content,
+		StaticVersion: AssetVersion,
+		Stale:         s.staleBar(), Node: s.nodeBlock(), Content: content,
 	}
 	if p.Role == config.RoleAdmin {
 		pg.RoleLabel = "Admin"

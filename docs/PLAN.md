@@ -28,10 +28,10 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 
 - [x] Filtered table from the event ring, paging, pause, CSV export (MON-TR-1..13)
 
-## Slice 3: Channels and Rooms (needs KAM API phase 2)
+## Slice 3: Channels and Rooms
 
-- [ ] Channels page (MON-CH-1..12)
-- [ ] Rooms page with the activity indicator and legend (MON-RM-1..14)
+- [x] Channels page (MON-CH-1..12)
+- [x] Rooms page with the activity indicator and legend (MON-RM-1..14)
 
 ## Slice 4: Access hardening
 
@@ -50,9 +50,12 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 
 - [ ] List, editor, validate, save, enable, recover, delete, dry run (MON-AU-1..23)
 
+## Slice 4b: Manuals
+
+Removed (D23, 2026-10-18): the manuals, their public `/manuals/` route and the sidebar Help section left the interface; the app sidebar carries the Workspace section only, and the pinned copies of KAM's manuals went with them.
+
 ## Open points
 
-- Confirm assumption A1 in [DECISIONS.md](DECISIONS.md) before slice 3.
-- Replace the hand-written `testdata/kam/*.json` with recorded KAM responses when KAM ships the monitor API.
+- Replace the hand-written phase-2 text fixtures with recorded KAM responses when available.
 - Before integration, adapt scaffold DTOs, fake KAM and fixtures to the clarified contract: event `next_after`, list envelopes and no pinned-room-role field. Passing scaffold tests do not yet prove compatibility with this revision.
 - Decide whether demo mode ships in the release binary.

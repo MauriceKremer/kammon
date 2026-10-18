@@ -22,11 +22,11 @@ func Activity(now time.Time, at *time.Time) Indicator {
 	}
 	switch age := now.Sub(*at); {
 	case age < 5*time.Minute:
-		return Indicator{Class: "fresh", Title: "Heard under 5 minutes ago."}
+		return Indicator{Class: "fresh", Title: "Heard under 5 minutes ago.", Text: "Fresh"}
 	case age < time.Hour:
-		return Indicator{Class: "recent", Title: "Heard 5 to 60 minutes ago."}
+		return Indicator{Class: "recent", Title: "Heard 5 to 60 minutes ago.", Text: "Recent"}
 	case age <= 24*time.Hour:
-		return Indicator{Class: "older", Title: "Heard 1 to 24 hours ago."}
+		return Indicator{Class: "older", Title: "Heard 1 to 24 hours ago.", Text: "Older"}
 	default:
 		return Indicator{Class: "stale", Title: "Stale Node: silent for over 24 hours.", Text: "Stale Node"}
 	}

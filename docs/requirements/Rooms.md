@@ -1,6 +1,6 @@
 # KAMmon Requirements: Room Monitor
 
-**Status:** Requirements only. Nothing is built.
+**Status:** Phase 2 page implemented; worker snapshots, persisted last-heard values and role-filtered views are covered by focused tests.
 **Scope:** Watching the room servers KAM hosts: how active each room is, which clients it remembers and when it last heard them, and the posts in it. Managing roles is in [RoomAccounts.md](RoomAccounts.md). Design: [DESIGN.md](../DESIGN.md) §4.2, §8.2. Findings behind the wording: [../research/kam-room-activity.md](../research/kam-room-activity.md).
 
 ## 1. Summary

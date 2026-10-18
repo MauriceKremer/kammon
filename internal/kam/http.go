@@ -20,8 +20,10 @@ type Reader interface {
 	Status(ctx context.Context) (Status, error)
 	Events(ctx context.Context, after uint64, epoch string, limit int) (EventsResponse, error)
 	Channels(ctx context.Context) ([]Channel, error)
+	ChannelMessages(ctx context.Context, name string, limit int, beforeID int64, query string) (ChannelMessages, error)
 	Rooms(ctx context.Context) ([]Room, error)
 	RoomClients(ctx context.Context, roomID string) ([]RoomClient, error)
+	RoomPosts(ctx context.Context, roomID string, limit int) ([]RoomPost, error)
 }
 
 // HTTP reads from KAM's monitor listener.
@@ -97,6 +99,19 @@ func (h *HTTP) Channels(ctx context.Context) ([]Channel, error) {
 	return out.Channels, err
 }
 
+func (h *HTTP) ChannelMessages(ctx context.Context, name string, limit int, beforeID int64, search string) (ChannelMessages, error) {
+	query := url.Values{"limit": {strconv.Itoa(limit)}}
+	if beforeID > 0 {
+		query.Set("before_id", strconv.FormatInt(beforeID, 10))
+	}
+	if search != "" {
+		query.Set("q", search)
+	}
+	var out ChannelMessages
+	err := h.get(ctx, "/v1/channels/"+url.PathEscape(name)+"/messages", query, &out)
+	return out, err
+}
+
 func (h *HTTP) Rooms(ctx context.Context) ([]Room, error) {
 	var out struct {
 		Rooms []Room `json:"rooms"`
@@ -111,4 +126,13 @@ func (h *HTTP) RoomClients(ctx context.Context, roomID string) ([]RoomClient, er
 	}
 	err := h.get(ctx, "/v1/rooms/"+url.PathEscape(roomID)+"/clients", nil, &out)
 	return out.Clients, err
+}
+
+func (h *HTTP) RoomPosts(ctx context.Context, roomID string, limit int) ([]RoomPost, error) {
+	query := url.Values{"limit": {strconv.Itoa(limit)}}
+	var out struct {
+		Posts []RoomPost `json:"posts"`
+	}
+	err := h.get(ctx, "/v1/rooms/"+url.PathEscape(roomID)+"/posts", query, &out)
+	return out.Posts, err
 }

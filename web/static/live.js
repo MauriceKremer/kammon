@@ -32,9 +32,19 @@
   document.addEventListener("htmx:afterSwap", function () { paint(); });
 
   document.addEventListener("click", function (evt) {
-    if (!evt.target.closest || !evt.target.closest("#pause")) return;
-    paused = !paused;
-    paint();
+    if (!evt.target.closest) return;
+    if (evt.target.closest("#pause")) {
+      paused = !paused;
+      paint();
+      return;
+    }
+    var copy = evt.target.closest("[data-copy]");
+    if (copy && navigator.clipboard) {
+      navigator.clipboard.writeText(copy.getAttribute("data-copy")).then(function () {
+        copy.title = "Copied";
+        window.setTimeout(function () { copy.title = "Copy full public key"; }, 1200);
+      });
+    }
   });
 
   paint();

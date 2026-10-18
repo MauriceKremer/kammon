@@ -122,8 +122,24 @@ type Channel struct {
 	Name           string     `json:"name"`
 	KeyStrategy    string     `json:"key_strategy"`
 	Enabled        bool       `json:"enabled"`
-	StoredMessages int        `json:"stored_messages"`
+	StoredMessages int64      `json:"stored_messages"`
 	LastMessageAt  *time.Time `json:"last_message_at"`
+}
+
+type ChannelMessage struct {
+	ID         int64     `json:"id"`
+	ReceivedAt time.Time `json:"received_at"`
+	Sender     *string   `json:"sender"`
+	Body       *string   `json:"body"`
+	HopCount   int       `json:"hop_count"`
+	SNRdB      *float64  `json:"snr_db"`
+	RSSIdBm    *int      `json:"rssi_dbm"`
+}
+
+type ChannelMessages struct {
+	Channel      string           `json:"channel"`
+	Messages     []ChannelMessage `json:"messages"`
+	NextBeforeID *int64           `json:"next_before_id"`
 }
 
 // Room is one entry of GET /v1/rooms (API-RM-1).
@@ -136,7 +152,7 @@ type Room struct {
 	ClientsRemembered int               `json:"clients_remembered"`
 	LastActivityAt    *time.Time        `json:"last_activity_at"`
 	LastPostAt        *time.Time        `json:"last_post_at"`
-	RetainedPosts     int               `json:"retained_posts"`
+	RetainedPosts     int64             `json:"retained_posts"`
 	Counters          map[string]uint64 `json:"counters"`
 }
 
@@ -144,8 +160,14 @@ type Room struct {
 type RoomClient struct {
 	PublicKey      string     `json:"public_key"`
 	Role           string     `json:"role"`
-	Pinned         bool       `json:"pinned"`
 	LastActivityAt *time.Time `json:"last_activity_at"`
 	PushState      string     `json:"push_state"`
 	Label          *string    `json:"label"`
+}
+
+type RoomPost struct {
+	ID        uint32    `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	AuthorKey string    `json:"author_key"`
+	Body      string    `json:"body"`
 }

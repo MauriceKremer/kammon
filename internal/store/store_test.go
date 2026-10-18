@@ -46,6 +46,47 @@ func TestClassify(t *testing.T) {
 	}
 }
 
+func TestTextRequestCacheQueuesOnceAndExpires(t *testing.T) {
+	s := New()
+	request := TextRequest{Kind: "channel", Channel: "#emmen", Limit: 50}
+	if _, _, exists, fresh := s.RequestText(request, t0); exists || fresh {
+		t.Fatal("a cache miss must be reported")
+	}
+	s.RequestText(request, t0)
+	if requests := s.TakeTextRequests(10); len(requests) != 1 {
+		t.Fatalf("duplicate cache miss queued %d requests", len(requests))
+	}
+	page := kam.ChannelMessages{Channel: "#emmen", Messages: []kam.ChannelMessage{{ID: 4, Body: ptr("signal")}}}
+	s.CompleteText(request, page, nil, t0, nil)
+	got, _, exists, fresh := s.RequestText(request, t0.Add(4*time.Second))
+	if !exists || !fresh || len(got.Messages) != 1 || *got.Messages[0].Body != "signal" {
+		t.Fatalf("cached page: %+v, exists=%v fresh=%v", got, exists, fresh)
+	}
+	s.RequestText(request, t0.Add(TextPageTTL))
+	if requests := s.TakeTextRequests(10); len(requests) != 1 {
+		t.Fatalf("expired page queued %d refreshes", len(requests))
+	}
+}
+
+func TestFreshnessLimitsAreConfigurable(t *testing.T) {
+	s := New(WithFreshness(2*time.Second, 5*time.Second))
+	s.ApplyEvents(reply("e1", 1, false, rx(1, t0, "GRP_TXT", 300)), t0)
+	if f, _ := s.Freshness(t0.Add(time.Second)); f != Fresh {
+		t.Fatalf("1 s old: %v, want fresh", f)
+	}
+	if f, at := s.Freshness(t0.Add(3 * time.Second)); f != Stale || !at.Equal(t0) {
+		t.Fatalf("3 s old: %v at %v, want stale at %v", f, at, t0)
+	}
+	if f, _ := s.Freshness(t0.Add(6 * time.Second)); f != Down {
+		t.Fatalf("6 s old: %v, want down", f)
+	}
+	zero := New(WithFreshness(0, time.Second)) // nonsense values keep the defaults
+	zero.ApplyEvents(reply("e1", 1, false, rx(1, t0, "GRP_TXT", 300)), t0)
+	if f, _ := zero.Freshness(t0.Add(45 * time.Second)); f != Stale {
+		t.Fatalf("defaults kept: 45 s old: %v, want stale", f)
+	}
+}
+
 func TestBackfillThenCaughtUpDoesNotDoubleCount(t *testing.T) {
 	s := New()
 	s.ApplyEvents(reply("e1", 1, false, rx(1, t0.Add(-5*time.Minute), "GRP_TXT", 300), rx(2, t0.Add(-4*time.Minute), "ADVERT", 200)), t0)

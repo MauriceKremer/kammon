@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -146,9 +147,53 @@ func (f *Fake) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/status", f.status)
 	mux.HandleFunc("GET /v1/events", f.events)
 	mux.HandleFunc("GET /v1/channels", f.channels)
+	mux.HandleFunc("GET /v1/channels/{name}/messages", f.channelMessages)
 	mux.HandleFunc("GET /v1/rooms", f.rooms)
 	mux.HandleFunc("GET /v1/rooms/{id}/clients", f.roomClients)
+	mux.HandleFunc("GET /v1/rooms/{id}/posts", f.roomPosts)
 	return mux
+}
+
+func (f *Fake) channelMessages(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if name != "#emmen" && name != "#public" && name != "#field" {
+		http.Error(w, `{"error":"channel not found"}`, http.StatusNotFound)
+		return
+	}
+	texts := []kam.ChannelMessage{
+		{ID: 410, ReceivedAt: f.now().UTC().Add(-2 * time.Second), Sender: ptr("PA3M"), Body: ptr("Signal check from the north path"), HopCount: 2, SNRdB: ptr(8.5), RSSIdBm: ptr(-97)},
+		{ID: 409, ReceivedAt: f.now().UTC().Add(-50 * time.Second), Sender: ptr("Scout"), Body: ptr("All clear at the bridge"), HopCount: 1, SNRdB: ptr(4.25), RSSIdBm: ptr(-103)},
+		{ID: 408, ReceivedAt: f.now().UTC().Add(-3 * time.Minute), Sender: ptr("LoRaLab"), Body: ptr("Testing the new antenna"), HopCount: 0},
+	}
+	search := r.URL.Query().Get("q")
+	if search != "" {
+		filtered := texts[:0]
+		for _, item := range texts {
+			if item.Sender != nil && containsFold(*item.Sender, search) || item.Body != nil && containsFold(*item.Body, search) {
+				filtered = append(filtered, item)
+			}
+		}
+		texts = filtered
+	}
+	limit, _ := strconv.Atoi(orDefault(r.URL.Query().Get("limit"), "50"))
+	if limit < 1 {
+		limit = 50
+	}
+	if before, _ := strconv.ParseInt(r.URL.Query().Get("before_id"), 10, 64); before > 0 {
+		filtered := texts[:0]
+		for _, item := range texts {
+			if item.ID < before {
+				filtered = append(filtered, item)
+			}
+		}
+		texts = filtered
+	}
+	texts = texts[:min(limit, len(texts))]
+	writeJSON(w, kam.ChannelMessages{Channel: name, Messages: texts})
+}
+
+func containsFold(value, query string) bool {
+	return strings.Contains(strings.ToLower(value), strings.ToLower(query))
 }
 
 // Serve listens on a free loopback port until ctx ends and returns the base URL.
@@ -264,8 +309,20 @@ func (f *Fake) roomClients(w http.ResponseWriter, r *http.Request) {
 	}
 	now := f.now().UTC().Truncate(time.Second)
 	writeJSON(w, map[string]any{"room": "lobby", "clients": []kam.RoomClient{
-		{PublicKey: clients[0], Role: "admin", Pinned: true, LastActivityAt: ptr(now.Add(-12 * time.Second)), PushState: "idle", Label: ptr("Maurice")},
+		{PublicKey: clients[0], Role: "admin", LastActivityAt: ptr(now.Add(-12 * time.Second)), PushState: "idle", Label: ptr("Maurice")},
 		{PublicKey: clients[1], Role: "read_write", LastActivityAt: ptr(now.Add(-2 * time.Minute)), PushState: "idle", Label: ptr("PA3M")},
 		{PublicKey: clients[2], Role: "read_write", LastActivityAt: ptr(now.Add(-48 * time.Hour)), PushState: "paused"},
+	}})
+}
+
+func (f *Fake) roomPosts(w http.ResponseWriter, r *http.Request) {
+	if r.PathValue("id") != "lobby" {
+		http.Error(w, `{"error":"room not found"}`, http.StatusNotFound)
+		return
+	}
+	now := f.now().UTC().Truncate(time.Second)
+	writeJSON(w, map[string]any{"room": "lobby", "posts": []kam.RoomPost{
+		{ID: 91, CreatedAt: now.Add(-time.Minute), AuthorKey: clients[0], Body: "Hello Emmen"},
+		{ID: 90, CreatedAt: now.Add(-5 * time.Minute), AuthorKey: clients[1], Body: "Radio check"},
 	}})
 }

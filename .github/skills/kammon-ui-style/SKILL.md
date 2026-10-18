@@ -13,7 +13,7 @@ A calm, dense operator console. Dark by default, light on request. No cards, gra
 
 ## Tokens (`web/static/kammon.css`)
 
-Same names as the KAM manuals. Dark / light:
+Same names as in [docs/DESIGN.md](../../docs/DESIGN.md) §5.1. Dark / light:
 
 | Token | Dark | Light |
 |---|---|---|

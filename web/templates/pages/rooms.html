@@ -1,0 +1,42 @@
+{{define "content"}}
+<div class="resource-layout">
+  <nav class="resource-list" aria-label="Rooms">
+    {{range .Content.Rooms}}<a class="resource-item{{if .Selected}} selected{{end}}" href="/rooms?room={{.ID}}"{{if .Selected}} aria-current="page"{{end}}>
+      <span class="resource-item-top"><strong>{{.Name}}</strong><span class="mono">{{.Posts}} posts/h</span></span>
+      <span class="small muted">{{.Activity}} · {{.Remembered}} remembered</span>
+    </a>{{else}}<p class="muted small">{{if .Content.EmptyMessage}}{{.Content.EmptyMessage}}{{else}}Waiting for KAM's room list.{{end}}</p>{{end}}
+  </nav>
+  <section class="resource-detail" aria-label="Room details">
+    {{if .Content.Selected}}
+      <div class="section-head"><div><h2>{{.Content.Name}}</h2><p class="small muted">Serving · {{.Content.ClientsRemembered}} remembered clients</p></div>
+        <button type="button" class="copy-key" data-copy="{{.Content.PublicKey}}" title="Copy full room public key"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#copy"></use></svg><span class="mono">{{printf "%.12s" .Content.PublicKey}}</span></button>
+      </div>
+      <div class="resource-metrics">{{range .Content.Metrics}}<div><span class="metric-label">{{.Label}}</span><strong>{{.Value}}</strong><span class="small muted">{{.Caption}}</span></div>{{end}}</div>
+      <p class="small muted resource-caption">Last heard is radio activity, not a live connection. Stale Node means a stored client was not heard for over 24 hours; its session has not expired. Unknown means no reliable last-heard time is available.</p>
+      {{if .Content.IsAdmin}}
+        <section class="section room-clients"><div class="section-head"><h3>Client activity</h3><span class="small muted">{{.Content.HeardLastHour}} heard in the last hour</span></div>
+          <div class="activity-legend" aria-label="Activity legend">
+            <span><i class="ind fresh" title="Heard under 5 minutes ago"></i>Fresh</span><span><i class="ind recent" title="Heard 5 to 60 minutes ago"></i>Recent</span><span><i class="ind older" title="Heard 1 to 24 hours ago"></i>Older</span><span><i class="ind stale" title="Stale Node: silent for over 24 hours"></i>Stale Node</span><span><i class="ind unknown" title="Unknown: no time is recorded"></i>Unknown</span>
+          </div>
+          <div class="table-scroll"><table><thead><tr><th>Client</th><th>Role</th><th>Last heard</th><th>Push</th></tr></thead><tbody>
+            {{range .Content.Clients}}<tr><td>{{if eq .Label .Key}}<span title="{{.Key}}">{{.Label}}</span> <button type="button" class="icon-button" data-copy="{{.Key}}" title="Copy full public key"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#copy"></use></svg></button>{{else}}{{.Label}}{{end}}</td><td>{{.Role}}</td><td title="{{.Indicator.Title}}"><i class="ind {{.Indicator.Class}}" aria-hidden="true"></i>{{.Indicator.Text}} · <time class="mono">{{.LastHeard}}</time></td><td>{{.PushState}}</td></tr>{{else}}<tr><td colspan="4" class="muted">No remembered clients.</td></tr>{{end}}
+          </tbody></table></div>
+        </section>
+        <section class="section"><div class="section-head"><h3>Room counters</h3></div><p class="small muted">{{range $i, $line := .Content.Counters}}{{if $i}} · {{end}}{{$line}}{{end}}</p><p class="small muted">{{.Content.DeliveryAcked}} pushes acknowledged · {{.Content.DeliveryTimedOut}} timed out · {{.Content.PausedClients}} clients paused</p></section>
+        <section class="section"><div class="section-head"><h3>Room feed</h3></div>{{template "room-posts" .Content}}</section>
+      {{else}}
+        <p class="small muted">Client activity and posts are visible to the administrator.</p>
+      {{end}}
+    {{else}}
+      <p class="muted">{{.Content.EmptyMessage}}</p>
+    {{end}}
+  </section>
+</div>
+{{end}}
+
+{{define "room-posts"}}
+<div id="room-posts" hx-get="{{.FeedURL}}" hx-trigger="load, every 10s" hx-swap="outerHTML">
+  {{if .CacheMessage}}<p class="small muted">{{.CacheMessage}}</p>{{end}}
+  <div class="room-feed">{{range .Posts}}<article class="room-post"><header><strong>{{.Author}}</strong><time class="mono muted">{{.Time}}</time></header><p>{{.Body}}</p></article>{{else}}<p class="small muted">No retained posts.</p>{{end}}</div>
+</div>
+{{end}}

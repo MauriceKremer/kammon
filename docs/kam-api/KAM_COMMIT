@@ -1,2 +1,2 @@
-commit: 7da79de51b1380472f10a8a727d1966af1966d6c (plus uncommitted docs/FeatureMonitorApi.md at copy time)
-copied: 2026-10-11
+base commit: 7da79de51b1380472f10a8a727d1966af1966d6c
+copy: KAM working tree after phase-2 implementation, 2026-10-12

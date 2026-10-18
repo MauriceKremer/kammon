@@ -45,6 +45,7 @@ func newHarness(t *testing.T) *harness {
 	status.Rooms.Enabled, status.Rooms.Count = true, 1
 	status.Automation.Enabled, status.Automation.ScriptsEnabled, status.Automation.QueueDepth = true, 2, 1
 	st.SetStatus(status, t0)
+	st.SetChannels([]kam.Channel{{Name: "#emmen", KeyStrategy: "derived", Enabled: true}, {Name: "#public", KeyStrategy: "public", Enabled: true}}, t0)
 	st.SetRooms([]kam.Room{{ID: "lobby", Name: "Emmen local", Enabled: true, ClientsRemembered: 9, LastActivityAt: ptr(t0.Add(-12 * time.Second))}}, nil, t0)
 
 	srv, err := New(Deps{Config: config.Demo(), Store: st, Now: func() time.Time { return now }})
@@ -185,6 +186,39 @@ func TestViewerNeverReceivesHiddenSenderNames(t *testing.T) {
 	}
 }
 
+func TestChannelAndRoomPagesRespectViewerVisibility(t *testing.T) {
+	h := newHarness(t)
+	viewerClient := h.login(t, "viewer", "viewer")
+	adminClient := h.login(t, "admin", "admin")
+	clients := []kam.RoomClient{
+		{PublicKey: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", Role: "admin", Label: ptr("RoomAdmin"), LastActivityAt: ptr(t0.Add(-48 * time.Hour))},
+	}
+	h.st.SetRooms([]kam.Room{{ID: "lobby", Name: "Emmen local", Enabled: true, ClientsRemembered: 1}}, map[string][]kam.RoomClient{"lobby": clients}, t0)
+	channelText := ptr("private channel message")
+	channelSender := ptr("PrivateSender")
+	h.st.CompleteText(store.TextRequest{Kind: "channel", Channel: "#emmen", Limit: 50}, kam.ChannelMessages{Channel: "#emmen", Messages: []kam.ChannelMessage{{ID: 2, Sender: channelSender, Body: channelText}}}, nil, t0, nil)
+	roomBody := []kam.RoomPost{{ID: 1, Body: "secret room post", AuthorKey: clients[0].PublicKey, CreatedAt: t0}}
+	h.st.CompleteText(store.TextRequest{Kind: "room", RoomID: "lobby", Limit: 20}, kam.ChannelMessages{}, roomBody, t0, nil)
+	for _, target := range []string{"/channels?channel=%23emmen", "/ui/channel-messages?channel=%23emmen"} {
+		_, body, _ := get(t, viewerClient, h.ts.URL+target)
+		if strings.Contains(body, "private channel message") || strings.Contains(body, "PrivateSender") || (strings.HasPrefix(target, "/channels") && !strings.Contains(body, "Text hidden")) {
+			t.Errorf("viewer channel view leaked text or omitted hidden state: %s", target)
+		}
+		_, body, _ = get(t, adminClient, h.ts.URL+target)
+		if !strings.Contains(body, "private channel message") || !strings.Contains(body, "PrivateSender") {
+			t.Errorf("admin channel view omitted stored message: %s", target)
+		}
+	}
+	_, viewerRooms, _ := get(t, viewerClient, h.ts.URL+"/rooms?room=lobby")
+	if strings.Contains(viewerRooms, "RoomAdmin") || strings.Contains(viewerRooms, "secret room post") || !strings.Contains(viewerRooms, "Client activity and posts are visible to the administrator.") {
+		t.Fatal("viewer room page exposed client or post data")
+	}
+	_, adminRooms, _ := get(t, adminClient, h.ts.URL+"/rooms?room=lobby")
+	if !strings.Contains(adminRooms, "RoomAdmin") || !strings.Contains(adminRooms, "Stale Node") || !strings.Contains(adminRooms, "secret room post") {
+		t.Fatal("admin room page omitted client activity or posts")
+	}
+}
+
 func TestPartialKeepsPollingAndCarriesOutOfBandParts(t *testing.T) {
 	h := newHarness(t)
 	c := h.login(t, "viewer", "viewer")
@@ -263,6 +297,66 @@ func TestLogoutNeedsSameOriginAndEndsTheSession(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("logout without the htmx header: %d", resp.StatusCode)
+	}
+}
+
+// Every page the server sends — app pages, the login page — links the shared
+// stylesheet at the one version; a bare copy under an old URL is a separate
+// cache entry that can hold the old rules and ship pages looking wrong. This
+// test keeps the version shared and the cache headers honest: the pages stay
+// no-store, the shared static files stay cacheable.
+func TestEveryPageLinksTheSharedStylesheetVersion(t *testing.T) {
+	h := newHarness(t)
+	want := `/static/kammon.css?v=` + AssetVersion
+	for _, target := range []string{"/login", "/"} {
+		c := h.client(t)
+		if target == "/" {
+			c = h.login(t, "viewer", "viewer")
+		}
+		_, body, header := get(t, c, h.ts.URL+target)
+		if !strings.Contains(body, want) {
+			t.Errorf("%s: page misses shared stylesheet version %s", target, AssetVersion)
+		}
+		if strings.Contains(body, `/static/kammon.css"`) {
+			t.Errorf("%s: page links the stylesheet without the version", target)
+		}
+		if ref := firstUndefaultedStaticRef(body); ref != "" {
+			t.Errorf("%s: page loads a static file without the shared version: %s", target, ref)
+		}
+		if header.Get("Cache-Control") != "no-store" {
+			t.Errorf("%s: Cache-Control = %q, want no-store", target, header.Get("Cache-Control"))
+		}
+	}
+	// The nav sections listener ships with the rest of the static set; its
+	// cache header stays public and it must carry the pageshow restore.
+	status, nav, header := get(t, h.client(t), h.ts.URL+"/static/nav.js")
+	if status != http.StatusOK || header.Get("Cache-Control") != "public, max-age=14400" {
+		t.Errorf("nav.js: %d %q", status, header.Get("Cache-Control"))
+	}
+	if !strings.Contains(nav, "pageshow") {
+		t.Error("nav.js must put the served section state back on a restored page")
+	}
+}
+
+// firstUndefaultedStaticRef finds the first `src="/static/..."` without a `?v=`
+// cache-buster: a separate cache entry in which an old file keeps living. `<use href="/static/...">`
+// references to the icon sprite pass on purpose; the sprite rarely changes.
+func firstUndefaultedStaticRef(s string) string {
+	for i := 0; ; {
+		k := strings.Index(s[i:], `src="/static/`)
+		if k < 0 {
+			return ""
+		}
+		j := k + i + len(`src="`)
+		end := strings.IndexByte(s[j:], '"')
+		if end < 0 {
+			return ""
+		}
+		ref := s[j : j+end]
+		if !strings.Contains(ref, "?v=") {
+			return ref
+		}
+		i = j + end
 	}
 }
 
@@ -427,7 +521,7 @@ func TestOverviewPauseControl(t *testing.T) {
 		}
 	}
 	_, body, _ = get(t, c, h.ts.URL+"/")
-	if !strings.Contains(body, `src="/static/live.js"`) {
+	if !strings.Contains(body, `src="/static/live.js?v=`+AssetVersion+`"`) {
 		t.Error("the page loads the pause script")
 	}
 }
@@ -658,5 +752,35 @@ func TestLoginSlowdownAfterFiveFailures(t *testing.T) {
 	resp.Body.Close()
 	if len(pauses2) != 1 {
 		t.Fatalf("a port-changing client still earned one delay: %v", pauses2)
+	}
+}
+
+// The manuals left the interface (D23): the sidebar lists only the Workspace
+// pages, nothing links to /manuals/, and no route serves them — including the
+// login page. The retired theme initializer is gone with them.
+func TestManualsAreGoneFromTheInterface(t *testing.T) {
+	h := newHarness(t)
+	_, body, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/")
+	if n := strings.Count(body, `<details class="nav-section" name="sidebar"`); n != 1 {
+		t.Errorf("the app sidebar has %d collapsible sections, want one", n)
+	}
+	for _, gone := range []string{
+		`<summary class="nav-label">Help</summary>`,
+		"nav-manuals",
+		"/manuals/",
+	} {
+		if strings.Contains(body, gone) {
+			t.Errorf("the overview page still mentions %q", gone)
+		}
+	}
+	_, body, _ = get(t, h.client(t), h.ts.URL+"/login")
+	if strings.Contains(body, "/manuals/") {
+		t.Error("the login page still links the manuals")
+	}
+	if status, _, _ := get(t, h.client(t), h.ts.URL+"/manuals/"); status != http.StatusNotFound {
+		t.Errorf("/manuals/: %d, want 404", status)
+	}
+	if status, _, _ := get(t, h.client(t), h.ts.URL+"/static/theme-init.js"); status != http.StatusNotFound {
+		t.Errorf("/static/theme-init.js: %d, want 404", status)
 	}
 }

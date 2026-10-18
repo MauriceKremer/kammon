@@ -1,4 +1,10 @@
 (function () {
+  // Keep the theme shared between the app and the manuals: one cookie drives both.
+  // The app pages also set the attribute server-side; this only fills the gap.
+  if (!document.documentElement.getAttribute("data-theme")) {
+    var m = document.cookie.match(/(?:^|;\s*)kammon_theme=(dark|light)(?:;|$)/);
+    if (m) document.documentElement.setAttribute("data-theme", m[1]);
+  }
   var button = document.getElementById("theme-toggle");
   if (!button) return;
   function current() {

@@ -1,6 +1,6 @@
 # KAMmon Requirements: Channels Page
 
-**Status:** Requirements only. Nothing is built.
+**Status:** Phase 2 page implemented; event-derived details and on-demand text caching are covered by `internal/web` and `internal/store` tests.
 **Scope:** Monitoring the channels KAM is configured to decode: how active each one is, and what was said on it. Design: [DESIGN.md](../DESIGN.md) §4.2 (master-detail). KAM side: [docs/kam-api/FeatureMonitorApi.md](../kam-api/FeatureMonitorApi.md) §7.2.
 
 ## 1. Summary
@@ -36,7 +36,7 @@ Keys are secrets. KAMmon never shows them and does not edit channels in version 
 | **Metric strip** (3) | Decoded messages in the last hour; last decoded message ("2 s ago"); received airtime in the last hour. |
 | **Caption** | "Airtime attributed to decoded RX packets, not total radio occupancy. Messages KAM cannot decrypt are not assigned to a channel here." |
 | **Search box** | Sender or message text. |
-| **Messages** | Newest first: sender, time, text, then route, SNR and RSSI. |
+| **Messages** | Newest first: sender, time, text, then route and hops. SNR and RSSI are not shown (D19). |
 | **Footnote** | "Channel keys and enabled states live in kam.yml. No key material is shown." |
 | **Unreadable** | "N group texts in the last hour could not be decoded (no matching channel key)." |
 
@@ -51,8 +51,8 @@ Keys are secrets. KAMmon never shows them and does not edit channels in version 
 | MON-CH-5 | The message list for an allowed viewer or an admin is fetched on demand from `GET /v1/channels/{name}/messages` (50 per request) and cached for 5 seconds. | MUST |
 | MON-CH-6 | "Older messages" loads the next 50 with `before_id`. | MUST |
 | MON-CH-7 | Search sends `q` to KAM and shows the result. Empty results say "No messages match this filter." | MUST |
-| MON-CH-8 | For a viewer on a channel that is not allow-listed, the page shows the metrics and a list of rows built from events (time, route, hops, SNR) with "Text hidden". No call is made to the messages endpoint. | MUST |
-| MON-CH-9 | SNR and RSSI appear on a message when KAM stored them; otherwise the footer shows the route and hops only. | MUST |
+| MON-CH-8 | For a viewer on a channel that is not allow-listed, the page shows the metrics and a list of rows built from events (time, route, hops) with "Text hidden". No call is made to the messages endpoint. | MUST |
+| MON-CH-9 | SNR and RSSI arrive with the events and stored messages but are not displayed (decision D19: KAM listens through a local repeater, so they describe the hop to KAM, not the sender). A message footer shows the route and hops only. | MUST |
 | MON-CH-10 | The unreadable-text line counts `rx` events with `payload_type = GRP_TXT` and no `channel`, per hour. | SHOULD |
 | MON-CH-11 | Message text is escaped when rendered. Names and text from the radio are untrusted. | MUST |
 | MON-CH-12 | When KAM does not answer, the list shows the last cached page with the stale-data bar; with no cache it says "Messages are unavailable right now." | MUST |
@@ -63,10 +63,10 @@ Keys are secrets. KAMmon never shows them and does not edit channels in version 
 |---|---|---|
 | Channel names, key type, enabled, stored count, last message | `GET /v1/channels` | API-CH-1, API-CH-4 |
 | Stored messages with paging and search | `GET /v1/channels/{name}/messages` | API-CH-2 |
-| SNR and RSSI per stored message | Two nullable columns in `group_texts` | API-CH-3 |
+| Per-message SNR and RSSI | Two nullable columns in `group_texts`; KAMmon stores, never displays (D19) | API-CH-3 |
 | Live counts and airtime | `rx` events with `channel` and `airtime_ms` | API-EV-3, API-EV-8 |
 
-If API-CH-3 is not built, MON-CH-9 shows the route and hops only; the rest of the page is unaffected.
+Nothing on the page depends on the signal columns (D19).
 
 ## 6. Visibility
 
@@ -74,7 +74,7 @@ If API-CH-3 is not built, MON-CH-9 shows the route and hops only; the rest of th
 |---|---|---|
 | Channel list, key type, counts, airtime, last activity | Yes | Yes |
 | Message text and sender | Only channels in `viewer_text_channels` | Yes |
-| Rows with time, route, hops and SNR | Yes, "Text hidden" where needed | Yes |
+| Rows with time, route and hops | Yes, "Text hidden" where needed | Yes |
 | Key material | Never | Never |
 
 ## 7. Tests

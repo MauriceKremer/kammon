@@ -72,6 +72,44 @@ func TestFixturesDecodeStrictly(t *testing.T) {
 	if clients.Clients[2].LastActivityAt != nil || clients.Clients[0].Label == nil {
 		t.Fatalf("clients = %+v", clients)
 	}
+	var messages ChannelMessages
+	decodeStrict(t, "channel_messages.json", &messages)
+	if messages.Channel != "#emmen" || len(messages.Messages) != 1 || messages.Messages[0].SNRdB == nil {
+		t.Fatalf("channel messages = %+v", messages)
+	}
+	var posts struct {
+		Room  string
+		Posts []RoomPost
+	}
+	decodeStrict(t, "room_posts.json", &posts)
+	if posts.Room != "lobby" || len(posts.Posts) != 1 || posts.Posts[0].Body == "" {
+		t.Fatalf("room posts = %+v", posts)
+	}
+}
+
+func TestHTTPReaderLoadsChannelHistoryAndRoomPosts(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /v1/channels/{name}/messages", func(w http.ResponseWriter, r *http.Request) {
+		if r.PathValue("name") != "#emmen" || r.URL.Query().Get("limit") != "12" || r.URL.Query().Get("before_id") != "9" || r.URL.Query().Get("q") != "signal %_" {
+			t.Errorf("channel request path/query: %s %s", r.URL.Path, r.URL.RawQuery)
+		}
+		_, _ = w.Write([]byte(`{"channel":"#emmen","messages":[],"next_before_id":null}`))
+	})
+	mux.HandleFunc("GET /v1/rooms/lobby/posts", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("limit") != "20" {
+			t.Errorf("room post query: %s", r.URL.RawQuery)
+		}
+		_, _ = w.Write([]byte(`{"room":"lobby","posts":[]}`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	reader := NewHTTP(srv.URL, time.Second)
+	if page, err := reader.ChannelMessages(context.Background(), "#emmen", 12, 9, "signal %_"); err != nil || page.Channel != "#emmen" || page.Messages == nil {
+		t.Fatalf("channel messages = %+v, %v", page, err)
+	}
+	if posts, err := reader.RoomPosts(context.Background(), "lobby", 20); err != nil || posts == nil {
+		t.Fatalf("room posts = %+v, %v", posts, err)
+	}
 }
 
 func TestHTTPReaderMapsStatusCodes(t *testing.T) {

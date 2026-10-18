@@ -33,7 +33,7 @@ Passwords sit in `kammon.yml` as plain text, like channel keys in `kam.yml`. Thi
 | Item | Viewer | Admin (on this computer) |
 |---|---|---|
 | Overview numbers, airtime chart, packet mix | Yes | Yes |
-| Traffic table: type, route, hops, SNR, airtime | Yes | Yes |
+| Traffic table: type, route, hops, airtime | Yes | Yes |
 | Traffic table: names (senders, advert names) | Advert names and names on allow-listed channels | Yes |
 | Channel list, counts, last activity | Yes | Yes |
 | Channel message **text** | Only channels in `viewer_text_channels` | Yes |
@@ -77,7 +77,7 @@ Anything marked "No" is not rendered and its routes answer `403`.
 
 | ID | Requirement | Level |
 |---|---|---|
-| MON-AX-13 | `viewer_text_channels` is a list of channel names. Text of other channels is shown to admins only; a viewer sees the row with time, route and SNR and the words "Text hidden". | MUST |
+| MON-AX-13 | `viewer_text_channels` is a list of channel names. Text of other channels is shown to admins only; a viewer sees the row with time, route and hops and the words "Text hidden". | MUST |
 | MON-AX-14 | One function builds every view model and applies the visibility table in §3. Templates never decide visibility. | MUST |
 | MON-AX-15 | Names that come from the radio (advert names, senders, message text, labels) are escaped when rendered, and never marked as safe HTML. | MUST |
 | MON-AX-16 | KAMmon never shows or logs channel keys, room passwords or its own passwords. KAM does not send the first two, and the config loader redacts the third. | MUST |

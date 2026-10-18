@@ -23,6 +23,34 @@ func TestBackoffSequence(t *testing.T) {
 	}
 }
 
+func TestJobsTakeTheirIntervalsFromEvery(t *testing.T) {
+	_, p, _ := fixture(t)
+	p.Every = map[string]time.Duration{"events": 5 * time.Second, "channels": time.Minute, "status": -time.Second}
+	p.Timeout = 9 * time.Second
+	got := map[string]time.Duration{}
+	for _, j := range p.jobs() {
+		got[j.name] = j.every
+	}
+	want := map[string]time.Duration{
+		"events":   5 * time.Second,
+		"status":   2 * time.Second, // a non-positive override is ignored
+		"rooms":    10 * time.Second,
+		"channels": time.Minute,
+	}
+	for name, w := range want {
+		if got[name] != w {
+			t.Errorf("%s interval = %v, want %v", name, got[name], w)
+		}
+	}
+	if p.timeout() != 9*time.Second {
+		t.Fatalf("timeout = %v, want 9s", p.timeout())
+	}
+	zero := &Poller{}
+	if zero.timeout() != defaultTimeout {
+		t.Fatalf("default timeout = %v", zero.timeout())
+	}
+}
+
 func fixture(t *testing.T) (*kamfake.Fake, *Poller, *time.Time) {
 	t.Helper()
 	now := t0
@@ -49,6 +77,23 @@ func TestBackfillFillsTheStoreFromTheWholeRing(t *testing.T) {
 	}
 	if w := p.Store.Window(t0, time.Hour); w.RX == 0 || w.TotalAirtimeMS == 0 {
 		t.Fatalf("empty window after backfill: %+v", w)
+	}
+}
+
+func TestOnDemandTextReadsPopulateTheStore(t *testing.T) {
+	_, p, now := fixture(t)
+	channelRequest := store.TextRequest{Kind: "channel", Channel: "#emmen", Limit: 50}
+	roomRequest := store.TextRequest{Kind: "room", RoomID: "lobby", Limit: 20}
+	p.Store.RequestText(channelRequest, *now)
+	p.Store.RequestText(roomRequest, *now)
+	p.TextRequests(context.Background())
+	channel, _, exists, fresh := p.Store.RequestText(channelRequest, *now)
+	if !exists || !fresh || channel.Channel != "#emmen" || len(channel.Messages) == 0 {
+		t.Fatalf("channel history cache: %+v, exists=%v fresh=%v", channel, exists, fresh)
+	}
+	_, posts, exists, fresh := p.Store.RequestText(roomRequest, *now)
+	if !exists || !fresh || len(posts) == 0 || posts[0].Body == "" {
+		t.Fatalf("room posts cache: %+v, exists=%v fresh=%v", posts, exists, fresh)
 	}
 }
 
@@ -89,6 +134,17 @@ func TestNotFoundStopsAskingForTenMinutes(t *testing.T) {
 	j := &job{name: "channels", every: 30 * time.Second, run: p.Channels}
 	p.runJob(context.Background(), j)
 	if !p.Store.NotServed("channels", *now) || !j.next.Equal(now.Add(10*time.Minute)) {
+		t.Fatalf("not-served=%v next=%v", p.Store.NotServed("channels", *now), j.next)
+	}
+}
+
+func TestNotFoundStopsAskingForTheConfiguredWait(t *testing.T) {
+	_, p, now := fixture(t)
+	p.Reader = notFoundReader{p.Reader}
+	p.NotServed = 2 * time.Minute
+	j := &job{name: "channels", every: 30 * time.Second, run: p.Channels}
+	p.runJob(context.Background(), j)
+	if !p.Store.NotServed("channels", *now) || !j.next.Equal(now.Add(2*time.Minute)) {
 		t.Fatalf("not-served=%v next=%v", p.Store.NotServed("channels", *now), j.next)
 	}
 }

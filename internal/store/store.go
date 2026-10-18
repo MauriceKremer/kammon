@@ -7,13 +7,14 @@ import (
 	"kammon.bytecoder.nl/internal/kam"
 )
 
-// Limits from docs/requirements/DataStore.md §3.
+// Limits from docs/requirements/DataStore.md §3. The freshness limits are the defaults;
+// kammon.yml can set its own (D24).
 const (
 	EventRingSize = 4096
 	BucketCount   = 1440 // minutes in 24 hours
 	MaxMarks      = 50
-	FreshFor      = 10 * time.Second
-	StaleFor      = 2 * time.Minute
+	FreshFor      = 10 * time.Second // a snapshot older than this is no longer fresh (MON-DS-13)
+	StaleFor      = 2 * time.Minute  // a snapshot older than this counts as down (MON-DS-13)
 
 	// Hard limits from docs/requirements/DataStore.md §3 (MON-DS-18).
 	MaxRooms              = 4
@@ -54,6 +55,10 @@ func (f Freshness) String() string { return [...]string{"down", "stale", "up"}[f
 type Store struct {
 	mu sync.RWMutex
 
+	// Freshness limits of the MON-DS-13 rule, set only at construction (Option).
+	freshFor time.Duration // a snapshot younger than this is fresh
+	staleFor time.Duration // a snapshot older than this is down
+
 	epoch  string
 	cursor uint64
 
@@ -74,17 +79,43 @@ type Store struct {
 	channels       []kam.Channel
 	rooms          []kam.Room
 	clients        map[string][]kam.RoomClient
+	textPages      map[textKey]textPage
+	textOrder      []textKey
+	textRequests   []TextRequest
+	textPending    map[textKey]bool
 	roomsAt        time.Time
 	notServed      map[string]time.Time
 }
 
-func New() *Store {
-	return &Store{
-		ring:      make([]kam.Event, EventRingSize),
-		buckets:   map[int64]*Bucket{},
-		clients:   map[string][]kam.RoomClient{},
-		notServed: map[string]time.Time{},
+// Option tunes a Store at construction.
+type Option func(*Store)
+
+// WithFreshness sets the MON-DS-13 age limits: a snapshot older than staleAfter is no longer
+// fresh, and one older than downAfter counts as down. Zero or nonsense values keep the defaults
+// (FreshFor, StaleFor).
+func WithFreshness(staleAfter, downAfter time.Duration) Option {
+	return func(s *Store) {
+		if staleAfter > 0 && downAfter > staleAfter {
+			s.freshFor, s.staleFor = staleAfter, downAfter
+		}
 	}
+}
+
+func New(opts ...Option) *Store {
+	s := &Store{
+		freshFor:    FreshFor,
+		staleFor:    StaleFor,
+		ring:        make([]kam.Event, EventRingSize),
+		buckets:     map[int64]*Bucket{},
+		clients:     map[string][]kam.RoomClient{},
+		textPages:   map[textKey]textPage{},
+		textPending: map[textKey]bool{},
+		notServed:   map[string]time.Time{},
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // Cursor returns what to send to KAM next: the epoch and the last sequence number seen (MON-DS-6).
@@ -322,15 +353,16 @@ func (s *Store) Freshness(now time.Time) (Freshness, time.Time) {
 	if s.channelsAt.After(last) {
 		last = s.channelsAt
 	}
-	return freshnessOf(last, now)
+	return s.freshnessOf(last, now)
 }
 
-// freshnessOf applies the MON-DS-13 rule: fresh under 10 s, stale 10 s to 2 min, down beyond that.
-func freshnessOf(last, now time.Time) (Freshness, time.Time) {
+// freshnessOf applies the MON-DS-13 rule: fresh under freshFor, stale up to staleFor, down
+// beyond that. The defaults are 10 s and 2 min.
+func (s *Store) freshnessOf(last, now time.Time) (Freshness, time.Time) {
 	switch age := now.Sub(last); {
-	case last.IsZero() || age >= StaleFor:
+	case last.IsZero() || age >= s.staleFor:
 		return Down, last
-	case age >= FreshFor:
+	case age >= s.freshFor:
 		return Stale, last
 	default:
 		return Fresh, last
@@ -356,7 +388,7 @@ func (s *Store) SnapshotFreshness(name string, now time.Time) (Freshness, time.T
 	default:
 		return Down, time.Time{}
 	}
-	return freshnessOf(last, now)
+	return s.freshnessOf(last, now)
 }
 
 // RoomEventsSeen reports whether the event ring has ever held a room event. KAM before the room

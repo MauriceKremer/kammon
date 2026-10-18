@@ -1,0 +1,42 @@
+{{define "content"}}
+<div class="resource-layout">
+  <nav class="resource-list" aria-label="Channels">
+    {{range .Content.Channels}}<a class="resource-item{{if .Selected}} selected{{end}}" href="/channels?channel={{urlquery .Name}}"{{if .Selected}} aria-current="page"{{end}}>
+      <span class="resource-item-top"><strong>{{.Name}}</strong><span class="mono">{{.Count}}</span></span>
+      <span class="small muted">{{.KeyType}} key · {{.State}}</span>
+    </a>{{else}}<p class="muted small">Waiting for the channel list.</p>{{end}}
+  </nav>
+  <section class="resource-detail" aria-label="Channel details">
+    {{if .Content.Selected}}
+      <div class="section-head"><div><h2>{{.Content.Selected}}</h2><p class="small muted">{{.Content.KeyType}} key · {{if eq .Content.State "Enabled"}}Decoding enabled{{else}}Decoding disabled{{end}}</p></div></div>
+      <div class="resource-metrics">{{range .Content.Metrics}}<div><span class="metric-label">{{.Label}}</span><strong>{{.Value}}</strong><span class="small muted">{{.Caption}}</span></div>{{end}}</div>
+      <p class="small muted resource-caption">{{.Content.ActivityNote}}</p>
+      {{if .Content.CanRead}}
+        <form class="filters resource-search" action="/channels" method="get" role="search">
+          <input type="hidden" name="channel" value="{{.Content.Selected}}">
+          <input type="search" name="q" value="{{.Content.Query}}" placeholder="Search sender or message" aria-label="Search sender or message">
+          <button type="submit">Search</button>
+        </form>
+        {{template "channel-messages" .Content}}
+      {{else}}
+        <div class="section"><h3>Observed messages</h3><div class="table-scroll"><table><thead><tr><th>Time</th><th>Route</th><th>Hops</th><th>Text</th></tr></thead><tbody>
+          {{range .Content.Events}}<tr><td class="mono muted">{{.Time}}</td><td>{{.Route}}</td><td>{{.Hops}}</td><td>Text hidden</td></tr>{{else}}<tr><td colspan="4" class="muted">No decoded group texts in the last hour.</td></tr>{{end}}
+        </tbody></table></div></div>
+      {{end}}
+      <p class="small muted resource-caption">Channel keys and enabled states live in kam.yml. No key material is shown.</p>
+    {{else}}<p class="muted">{{if .Stale.Show}}Waiting for KAM's channel list.{{else}}No configured channels.{{end}}</p>{{end}}
+  </section>
+</div>
+{{if .Content.Unreadable}}<p class="small muted resource-caption">{{.Content.Unreadable}} group texts in the last hour could not be decoded (no matching channel key).</p>{{end}}
+{{end}}
+
+{{define "channel-messages"}}
+<div id="channel-messages" hx-get="{{.MessageURL}}" hx-trigger="load, every 1s" hx-swap="outerHTML">
+  {{if .CacheMessage}}<p class="small muted">{{.CacheMessage}}</p>{{end}}
+  <div class="table-scroll"><table><thead><tr><th>Received</th><th>Sender</th><th>Message</th><th>Hops</th></tr></thead><tbody>
+    {{range .Messages}}<tr><td class="mono muted">{{.Time}}</td><td>{{.Sender}}</td><td class="message-body">{{.Body}}</td><td>{{.Hops}}</td></tr>
+    {{else}}<tr><td colspan="4" class="muted">{{if .Query}}No messages match this filter.{{else}}No stored messages yet.{{end}}</td></tr>{{end}}
+  </tbody></table></div>
+  {{if .OlderURL}}<button type="button" class="text-button" hx-get="{{.OlderURL}}" hx-target="#channel-messages" hx-swap="outerHTML">Older messages</button>{{end}}
+</div>
+{{end}}

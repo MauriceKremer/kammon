@@ -1,0 +1,11 @@
+{
+  "room": "lobby",
+  "posts": [
+    {
+      "id": 91,
+      "created_at": "2026-10-11T14:59:00Z",
+      "author_key": "ed8342bcaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "body": "Hello Emmen"
+    }
+  ]
+}

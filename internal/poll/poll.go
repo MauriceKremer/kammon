@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	readTimeout   = 3 * time.Second
-	notServedFor  = 10 * time.Minute
-	eventsPerPage = 2000
-	maxPages      = 20 // bounds one backfill; the ring holds at most 65536 events
+	defaultTimeout = 3 * time.Second  // the standard per-read timeout (MON-DS-2)
+	notServedFor   = 10 * time.Minute // default pause before asking a 404'd read again
+	eventsPerPage  = 2000
+	maxPages       = 20 // bounds one backfill; the ring holds at most 65536 events
 )
 
 // Backoff is the wait after the nth failure in a row: 1, 2, 4, 8 seconds, then 10 (MON-DS-3).
@@ -35,6 +35,14 @@ type Poller struct {
 	Now    func() time.Time
 	Log    *slog.Logger
 	Tick   time.Duration
+	// Every overrides how often a named read runs ("events", "status", "rooms", "channels");
+	// a missing or non-positive entry keeps the standard interval (docs/requirements/DataStore.md §5).
+	Every map[string]time.Duration
+	// Timeout overrides the per-read timeout; zero keeps the 3 second default (MON-DS-2).
+	Timeout time.Duration
+	// NotServed overrides how long the poller stops asking a read that KAM answers with 404;
+	// zero keeps 10 minutes.
+	NotServed time.Duration
 }
 
 type job struct {
@@ -48,16 +56,12 @@ type job struct {
 // Run polls until ctx ends. KAMmon starts and serves pages even when KAM is down (MON-DS-5).
 func (p *Poller) Run(ctx context.Context) {
 	p.defaults()
-	jobs := []*job{
-		{name: "events", every: time.Second, run: p.Events},
-		{name: "status", every: 2 * time.Second, run: p.Status},
-		{name: "rooms", every: 10 * time.Second, run: p.Rooms},
-		{name: "channels", every: 30 * time.Second, run: p.Channels},
-	}
+	jobs := p.jobs()
 	ticker := time.NewTicker(p.Tick)
 	defer ticker.Stop()
 	for {
 		now := p.Now()
+		p.TextRequests(ctx)
 		for _, j := range jobs {
 			if !now.Before(j.next) {
 				p.runJob(ctx, j)
@@ -67,6 +71,60 @@ func (p *Poller) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+		}
+	}
+}
+
+// jobs builds the periodic reads with their intervals; Every overrides a read's interval (§5).
+func (p *Poller) jobs() []*job {
+	return []*job{
+		{name: "events", every: p.interval("events", time.Second), run: p.Events},
+		{name: "status", every: p.interval("status", 2*time.Second), run: p.Status},
+		{name: "rooms", every: p.interval("rooms", 10*time.Second), run: p.Rooms},
+		{name: "channels", every: p.interval("channels", 30*time.Second), run: p.Channels},
+	}
+}
+
+func (p *Poller) interval(name string, def time.Duration) time.Duration {
+	if d, ok := p.Every[name]; ok && d > 0 {
+		return d
+	}
+	return def
+}
+
+func (p *Poller) timeout() time.Duration {
+	if p.Timeout > 0 {
+		return p.Timeout
+	}
+	return defaultTimeout
+}
+
+func (p *Poller) notServedWait() time.Duration {
+	if p.NotServed > 0 {
+		return p.NotServed
+	}
+	return notServedFor
+}
+
+// TextRequests services bounded on-demand history reads queued by the web layer (MON-DS-21).
+func (p *Poller) TextRequests(ctx context.Context) {
+	for _, request := range p.Store.TakeTextRequests(4) {
+		readCtx, cancel := context.WithTimeout(ctx, p.timeout())
+		var channel kam.ChannelMessages
+		var posts []kam.RoomPost
+		var err error
+		switch request.Kind {
+		case "channel":
+			channel, err = p.Reader.ChannelMessages(readCtx, request.Channel, request.Limit, request.BeforeID, request.Query)
+		case "room":
+			posts, err = p.Reader.RoomPosts(readCtx, request.RoomID, request.Limit)
+		default:
+			err = errors.New("unknown text request")
+		}
+		cancel()
+		p.Store.CompleteText(request, channel, posts, p.Now(), err)
+		if err != nil {
+			p.Log.Warn("KAM text read failed", "kind", request.Kind, "error", err)
 		}
 	}
 }
@@ -84,7 +142,7 @@ func (p *Poller) defaults() {
 }
 
 func (p *Poller) runJob(ctx context.Context, j *job) {
-	ctx, cancel := context.WithTimeout(ctx, readTimeout)
+	ctx, cancel := context.WithTimeout(ctx, p.timeout())
 	defer cancel()
 	err := j.run(ctx)
 	now := p.Now()
@@ -92,8 +150,9 @@ func (p *Poller) runJob(ctx context.Context, j *job) {
 	case err == nil:
 		j.failures, j.next = 0, now.Add(j.every)
 	case errors.Is(err, kam.ErrNotFound):
-		p.Store.MarkNotServed(j.name, now.Add(notServedFor))
-		j.failures, j.next = 0, now.Add(notServedFor)
+		wait := p.notServedWait()
+		p.Store.MarkNotServed(j.name, now.Add(wait))
+		j.failures, j.next = 0, now.Add(wait)
 	case ctx.Err() != nil && errors.Is(err, context.Canceled):
 		j.next = now.Add(j.every)
 	default:
