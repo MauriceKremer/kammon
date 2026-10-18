@@ -33,15 +33,46 @@ func (u User) LogValue() slog.Value {
 	return slog.GroupValue(slog.String("name", u.Name), slog.String("role", string(u.Role)))
 }
 
+// Poll holds how often the poller's reads run (docs/requirements/DataStore.md §5), each read's
+// timeout (MON-DS-2), and how long the poller stops asking a read that KAM answers with 404.
+// Durations are Go durations, like 500ms, 2s or 30s.
+type Poll struct {
+	Events    time.Duration `yaml:"events"`
+	Status    time.Duration `yaml:"status"`
+	Rooms     time.Duration `yaml:"rooms"`
+	Channels  time.Duration `yaml:"channels"`
+	Timeout   time.Duration `yaml:"timeout"`
+	NotServed time.Duration `yaml:"not_served"`
+}
+
+// Every maps the poller's read names to their intervals.
+func (p Poll) Every() map[string]time.Duration {
+	return map[string]time.Duration{
+		"events":   p.Events,
+		"status":   p.Status,
+		"rooms":    p.Rooms,
+		"channels": p.Channels,
+	}
+}
+
+// Freshness holds when a shown snapshot stops counting as fresh and when it counts as down
+// (MON-DS-13). Between the two limits the pages label the data stale.
+type Freshness struct {
+	StaleAfter time.Duration `yaml:"stale_after"`
+	DownAfter  time.Duration `yaml:"down_after"`
+}
+
 type Config struct {
-	Listen             string   `yaml:"listen"`
-	KamMonitorURL      string   `yaml:"kam_monitor_url"`
-	KamScriptsURL      string   `yaml:"kam_scripts_url"`
-	SessionIdleHours   int      `yaml:"session_idle_hours"`
-	ViewerTextChannels []string `yaml:"viewer_text_channels"`
-	Users              []User   `yaml:"users"`
-	TLSCert            string   `yaml:"tls_cert"` // optional: serve HTTPS directly (MON-AX-21)
-	TLSKey             string   `yaml:"tls_key"`
+	Listen             string    `yaml:"listen"`
+	KamMonitorURL      string    `yaml:"kam_monitor_url"`
+	KamScriptsURL      string    `yaml:"kam_scripts_url"`
+	Poll               Poll      `yaml:"poll"`
+	Freshness          Freshness `yaml:"freshness"`
+	SessionIdleHours   int       `yaml:"session_idle_hours"`
+	ViewerTextChannels []string  `yaml:"viewer_text_channels"`
+	Users              []User    `yaml:"users"`
+	TLSCert            string    `yaml:"tls_cert"` // optional: serve HTTPS directly (MON-AX-21)
+	TLSKey             string    `yaml:"tls_key"`
 }
 
 // SessionIdle is the idle timeout of a login session.
@@ -54,6 +85,8 @@ func defaults() Config {
 		Listen:           ":8080",
 		KamMonitorURL:    "http://127.0.0.1:8766",
 		KamScriptsURL:    "http://127.0.0.1:8765",
+		Poll:             Poll{Events: time.Second, Status: 2 * time.Second, Rooms: 10 * time.Second, Channels: 30 * time.Second, Timeout: 3 * time.Second, NotServed: 10 * time.Minute},
+		Freshness:        Freshness{StaleAfter: 10 * time.Second, DownAfter: 2 * time.Minute}, // store's FreshFor/StaleFor (MON-DS-13)
 		SessionIdleHours: 8,
 	}
 }
@@ -95,6 +128,26 @@ func (c *Config) normalize() error {
 	}
 	if c.SessionIdleHours < 1 {
 		return errors.New("session_idle_hours must be at least 1")
+	}
+	for _, p := range []struct {
+		name string
+		d    time.Duration
+	}{
+		{"poll.events", c.Poll.Events},
+		{"poll.status", c.Poll.Status},
+		{"poll.rooms", c.Poll.Rooms},
+		{"poll.channels", c.Poll.Channels},
+		{"poll.timeout", c.Poll.Timeout},
+		{"poll.not_served", c.Poll.NotServed},
+		{"freshness.stale_after", c.Freshness.StaleAfter},
+		{"freshness.down_after", c.Freshness.DownAfter},
+	} {
+		if p.d <= 0 {
+			return fmt.Errorf("%s must be a positive duration, like 1s, got %v", p.name, p.d)
+		}
+	}
+	if c.Freshness.DownAfter <= c.Freshness.StaleAfter {
+		return errors.New("freshness.down_after must be longer than freshness.stale_after")
 	}
 	switch {
 	case c.TLSCert == "" && c.TLSKey == "":

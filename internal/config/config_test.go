@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func write(t *testing.T, body string) string {
@@ -29,14 +30,48 @@ func TestLoadAppliesDefaultsAndNormalizesChannels(t *testing.T) {
 	}
 }
 
+func TestPollDefaultsAndOverrides(t *testing.T) {
+	cfg, err := Load(write(t, "poll:\n  events: 500ms\n  status: 5s\nusers:\n  - {name: a, password: p, role: viewer}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Poll.Events != 500*time.Millisecond || cfg.Poll.Status != 5*time.Second {
+		t.Fatalf("poll overrides not applied: %+v", cfg.Poll)
+	}
+	if cfg.Poll.Rooms != 10*time.Second || cfg.Poll.Channels != 30*time.Second || cfg.Poll.Timeout != 3*time.Second {
+		t.Fatalf("poll defaults not kept: %+v", cfg.Poll)
+	}
+	if got := cfg.Poll.Every()["events"]; got != 500*time.Millisecond {
+		t.Fatalf("Every()[events] = %v", got)
+	}
+}
+
+func TestFreshnessDefaultsAndOverrides(t *testing.T) {
+	cfg, err := Load(write(t, "freshness:\n  stale_after: 15s\n  down_after: 3m\nusers:\n  - {name: a, password: p, role: viewer}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Freshness.StaleAfter != 15*time.Second || cfg.Freshness.DownAfter != 3*time.Minute {
+		t.Fatalf("freshness overrides not applied: %+v", cfg.Freshness)
+	}
+	if cfg.Poll.NotServed != 10*time.Minute {
+		t.Fatalf("poll default not kept: %+v", cfg.Poll)
+	}
+}
+
 func TestLoadRejectsBadConfig(t *testing.T) {
 	cases := map[string]string{
-		"no users":       "listen: ':1'\n",
-		"bad role":       "users:\n  - {name: a, password: p, role: root}\n",
-		"empty password": "users:\n  - {name: a, password: '', role: viewer}\n",
-		"duplicate name": "users:\n  - {name: a, password: p, role: viewer}\n  - {name: a, password: q, role: admin}\n",
-		"bad url":        "kam_monitor_url: not-a-url\nusers:\n  - {name: a, password: p, role: viewer}\n",
-		"zero idle":      "session_idle_hours: 0\nusers:\n  - {name: a, password: p, role: viewer}\n",
+		"no users":         "listen: ':1'\n",
+		"bad role":         "users:\n  - {name: a, password: p, role: root}\n",
+		"empty password":   "users:\n  - {name: a, password: '', role: viewer}\n",
+		"duplicate name":   "users:\n  - {name: a, password: p, role: viewer}\n  - {name: a, password: q, role: admin}\n",
+		"bad url":          "kam_monitor_url: not-a-url\nusers:\n  - {name: a, password: p, role: viewer}\n",
+		"zero idle":        "session_idle_hours: 0\nusers:\n  - {name: a, password: p, role: viewer}\n",
+		"negative poll":    "poll: {events: -1s}\nusers:\n  - {name: a, password: p, role: viewer}\n",
+		"zero timeout":     "poll: {timeout: 0s}\nusers:\n  - {name: a, password: p, role: viewer}\n",
+		"zero not served":  "poll: {not_served: 0s}\nusers:\n  - {name: a, password: p, role: viewer}\n",
+		"zero stale after": "freshness: {stale_after: 0s}\nusers:\n  - {name: a, password: p, role: viewer}\n",
+		"stale after down": "freshness: {stale_after: 3m, down_after: 2m}\nusers:\n  - {name: a, password: p, role: viewer}\n",
 	}
 	for name, body := range cases {
 		if _, err := Load(write(t, body)); err == nil {

@@ -3,6 +3,23 @@ kam_monitor_url: "http://127.0.0.1:8766"
 kam_scripts_url: "http://127.0.0.1:8765"
 session_idle_hours: 8
 
+# How often the poller reads KAM, and each read's timeout (MON-DS-2). Durations are
+# Go durations, like 500ms, 2s or 30s. Leave a line out to keep its default.
+poll:
+  events:     1s    # new events and the cursor, /v1/events
+  status:     2s    # status, radio, duty cycle, counters, /v1/status
+  rooms:      10s   # rooms and their clients, /v1/rooms
+  channels:   30s   # channel list, /v1/channels
+  timeout:    3s    # the timeout of every read
+  not_served: 10m   # after a 404 the poller stops asking that read for this long
+
+# When a snapshot stops counting as fresh (MON-DS-13): younger than stale_after the pages
+# show it plain, between the two they add "slow to answer", older than down_after they
+# call it down. Leave a line out to keep its default.
+freshness:
+  stale_after: 30s
+  down_after:  2m
+
 # Channels whose message text web viewers may read. Everyone else sees metadata only.
 viewer_text_channels: ["#public"]
 

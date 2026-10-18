@@ -93,7 +93,7 @@ The page never has framed sections. Rules (1 px lines) separate regions; contain
 
 ### 5.1 Colour
 
-The prototype defines both themes with the same variable names the manuals use.
+The prototype defines both themes with the same variable names the app uses.
 
 | Token | Dark (default) | Light | Use |
 |---|---|---|---|
@@ -151,7 +151,7 @@ Headings are wide letters, so keep them short. Letter spacing stays at zero. Fon
 | **Segmented control** | 15m / 1h / 24h and similar; the pressed item has a `--bg-3` fill. |
 | **List item (master)** | Name, one or two lines of muted detail, a count or chevron. Selected: `--bg-2` fill with a 2 px left edge. |
 | **Activity indicator** | Dot or dotted line plus text, in five states (§8.2). |
-| **Message item** | Sender (bold) and time on one line, body, then a muted footer with route, SNR and RSSI. |
+| **Message item** | Sender (bold) and time on one line, body, then a muted footer with route and hops. |
 | **Filter bar** | A search box that grows, a select, an export button. |
 | **Fieldset** | Blue legend, two-column grid of labelled fields, a 11 px hint under each field that names the KISS command and the allowed range. |
 | **Readings list** | Label and mono value on one line with a subtle divider. |
@@ -161,6 +161,8 @@ Headings are wide letters, so keep them short. Letter spacing stays at zero. Fon
 | **Toast** | One line, bottom right, 3 seconds. |
 | **Access banner** | A ruled line with a lock icon: "Authenticated remote session · View only". |
 | **Stale-data bar** | A ruled line above the page: "KAM has not answered for 12 s. Showing data from 14:59:46." Amber. |
+
+Signal strength is never a column in a table or a footer on a message. KAM usually listens through a local repeater, so SNR and RSSI describe the hop to KAM, not the sender, and carry no message (decision D19). The measurement is still stored for KAM's own status work; KAMmon just does not display it.
 
 ## 7. Behaviour
 
@@ -258,6 +260,16 @@ kammon/
 listen: ":8080"
 kam_monitor_url: "http://127.0.0.1:8766"
 kam_scripts_url: "http://127.0.0.1:8765"
+poll:
+  events: 1s      # how often the poller reads KAM (DataStore.md §5)
+  status: 2s
+  rooms: 10s
+  channels: 30s
+  timeout: 3s
+  not_served: 10m
+freshness:
+  stale_after: 10s
+  down_after: 2m
 users:
   - { name: maurice, password: "change-me", role: admin }
   - { name: observer, password: "change-me-too", role: viewer }
@@ -277,6 +289,7 @@ viewer_text_channels: ["#public"]
 | Lucide from a CDN, fonts from Google | Embedded sprite and font files |
 | Simulated data, buttons that only toast | Real KAM calls; controls shown only when KAM supports them |
 | Mode selector "Local administrator / Remote viewer" | Real roles from the login and the request address |
+| SNR / RSSI in traffic tables and channel message footers | Not displayed; the measurement stays in the store (D19) |
 | Sample scripts using `msg.text` and `reply(msg, ...)` | Real API: `on_group_text(message)`, `message["body"]`, `reply(channel, text)` |
 | Theme toggle in page memory | Cookie plus `prefers-color-scheme` |
 

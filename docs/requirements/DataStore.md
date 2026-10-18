@@ -51,7 +51,7 @@ Total expected size: under 5 MB.
 | ID | Requirement | Level |
 |---|---|---|
 | MON-DS-1 | One poller goroutine owns all calls that read from KAM. Pages and admin actions do not poll. | MUST |
-| MON-DS-2 | Each read has its own timeout (3 s) and its own interval (§3). A failure of one read does not stop the others. | MUST |
+| MON-DS-2 | Each read has its own timeout (3 s) and its own interval (§3). A failure of one read does not stop the others. Timeout, interval and the 404 pause are defaults, settable per node in kammon.yml (D24). | MUST |
 | MON-DS-3 | After a failure the poller waits 1, 2, 4, 8 seconds, then stays at 10 seconds, and returns to normal after the first success. | MUST |
 | MON-DS-4 | The poller never sends a request body and never changes anything in KAM. | MUST |
 | MON-DS-5 | KAMmon starts and serves pages even when KAM is down. The pages show "Waiting for KAM" until the first answer. | MUST |
@@ -72,7 +72,7 @@ Total expected size: under 5 MB.
 
 | ID | Requirement | Level |
 |---|---|---|
-| MON-DS-13 | Each snapshot remembers when it was last refreshed. A page shows data as **fresh** (under 10 s old), **stale** (10 s to 2 min) or **down** (older, or never). | MUST |
+| MON-DS-13 | Each snapshot remembers when it was last refreshed. A page shows data as **fresh** (under 10 s old), **stale** (10 s to 2 min) or **down** (older, or never). The 10 s and 2 min thresholds are defaults, settable in kammon.yml (D24). | MUST |
 | MON-DS-14 | Stale and down data stay on screen with the stale-data bar: "KAM has not answered for 12 s. Showing data from 14:59:46." | MUST |
 | MON-DS-15 | KAMmon measures the difference between KAM's `now` (from `/v1/status`) and its own clock, and shows KAM time on every screen. | SHOULD |
 | MON-DS-16 | A chart caption says "History starts at HH:MM" when the store holds less than the selected range, and shows marks for gaps and KAM restarts. | MUST |
@@ -110,7 +110,7 @@ KAM requirements: `API-EV-1`, `API-EV-2`, `API-ST-1`, `API-F-7`..`API-F-9`.
 | KAM restarts while KAMmon runs | New epoch; add a restart mark; keep buckets; continue |
 | KAMmon was away longer than the ring covers | `reset: true`; gap mark; continue |
 | One read keeps failing (for example `/v1/modem`) | Only that panel goes stale; the rest stays fresh |
-| KAM answers `404` for an endpoint | That feature shows "Needs a newer KAM" and the poller stops asking for 10 minutes |
+| KAM answers `404` for an endpoint | That feature shows "Needs a newer KAM" and the poller stops asking for 10 minutes (default, D24) |
 | KAM is slow (over 3 s) | Treated as a failure for that read |
 | Browser asks for a page while KAM is down | The page renders from the store with the stale-data bar |
 

@@ -53,8 +53,14 @@ func run(configPath string, demo bool) error {
 		}
 	}
 
-	st := store.New()
-	poller := &poll.Poller{Reader: kam.NewHTTP(cfg.KamMonitorURL, 3*time.Second), Store: st}
+	st := store.New(store.WithFreshness(cfg.Freshness.StaleAfter, cfg.Freshness.DownAfter))
+	poller := &poll.Poller{
+		Reader:    kam.NewHTTP(cfg.KamMonitorURL, cfg.Poll.Timeout),
+		Store:     st,
+		Every:     cfg.Poll.Every(),
+		Timeout:   cfg.Poll.Timeout,
+		NotServed: cfg.Poll.NotServed,
+	}
 	go poller.Run(ctx)
 
 	srv, err := web.New(web.Deps{Config: cfg, Store: st, Demo: demo})
