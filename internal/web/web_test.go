@@ -23,6 +23,7 @@ func ptr[T any](v T) *T { return &v }
 
 type harness struct {
 	ts  *httptest.Server
+	s   *Server
 	st  *store.Store
 	now *time.Time
 }
@@ -54,7 +55,7 @@ func newHarness(t *testing.T) *harness {
 	}
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
-	return &harness{ts: ts, st: st, now: &now}
+	return &harness{ts: ts, s: srv, st: st, now: &now}
 }
 
 func (h *harness) client(t *testing.T) *http.Client {
@@ -145,24 +146,50 @@ func TestViewerSeesOverviewButNotAccounts(t *testing.T) {
 	}
 }
 
-func TestAdminPowerNeedsALocalRequest(t *testing.T) {
+func TestAdminKeepsPowerFromAnyAddress(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "admin", "admin")
-	status, body, _ := get(t, c, h.ts.URL+"/")
+	u, _ := url.Parse(h.ts.URL)
+	// Ask the mux directly, with a peer address from another computer: httptest.NewRequest
+	// defaults to 192.0.2.1:1234, which is not a loopback address, and the added forwarding
+	// header pretends a proxy is in the path. KAMmon adds no transport rules, so the
+	// session's role alone decides (MON-AX-8, MON-AX-23, D31).
+	asAdmin := func(target string) (int, string) {
+		r := httptest.NewRequest(http.MethodGet, target, nil)
+		r.Header.Set("X-Forwarded-For", "203.0.113.9")
+		for _, ck := range h.login(t, "admin", "admin").Jar.Cookies(u) {
+			r.AddCookie(ck)
+		}
+		rec := httptest.NewRecorder()
+		h.s.Handler().ServeHTTP(rec, r)
+		return rec.Code, rec.Body.String()
+	}
+	status, body := asAdmin("/")
 	if status != http.StatusOK || !strings.Contains(body, `href="/accounts"`) || !strings.Contains(body, "Admin") {
-		t.Fatalf("local admin: %d", status)
+		t.Fatalf("a remote admin keeps the admin pages: %d", status)
 	}
-	if status, _, _ = get(t, c, h.ts.URL+"/accounts"); status != http.StatusOK {
-		t.Fatalf("local admin on /accounts: %d", status)
+	if status, _ = asAdmin("/accounts"); status != http.StatusOK {
+		t.Fatalf("a remote admin keeps /accounts: %d", status)
 	}
-	// The same session arriving through a proxy is a viewer (MON-AX-9, MON-AX-10).
-	status, _, _ = get(t, c, h.ts.URL+"/accounts", "X-Forwarded-For", "203.0.113.9")
-	if status != http.StatusForbidden {
-		t.Fatalf("admin behind a proxy on /accounts: %d", status)
+
+	// A viewer from the same address stays a viewer, and admin routes still answer 403.
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.Header.Set("X-Forwarded-For", "203.0.113.9")
+	for _, ck := range h.login(t, "viewer", "viewer").Jar.Cookies(u) {
+		r.AddCookie(ck)
 	}
-	_, body, _ = get(t, c, h.ts.URL+"/", "X-Forwarded-For", "203.0.113.9")
-	if !strings.Contains(body, "not a local request") || strings.Contains(body, `href="/accounts"`) {
-		t.Fatal("a proxied admin gets the view-only notice and no admin navigation")
+	rec := httptest.NewRecorder()
+	h.s.Handler().ServeHTTP(rec, r)
+	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), `href="/accounts"`) {
+		t.Fatalf("a remote viewer stays a viewer: %d", rec.Code)
+	}
+	r2 := httptest.NewRequest(http.MethodGet, "/accounts", nil)
+	for _, ck := range h.login(t, "viewer", "viewer").Jar.Cookies(u) {
+		r2.AddCookie(ck)
+	}
+	rec2 := httptest.NewRecorder()
+	h.s.Handler().ServeHTTP(rec2, r2)
+	if rec2.Code != http.StatusForbidden {
+		t.Fatalf("a remote viewer on /accounts: %d, want 403 (MON-AX-11)", rec2.Code)
 	}
 }
 
@@ -932,7 +959,7 @@ func TestLoginSlowdownAfterFiveFailures(t *testing.T) {
 	}
 	c := &http.Client{}
 	for i := 0; i < 4; i++ {
-		post(c) // the login page is on loopback, so this admin is local; the failures still count
+		post(c) // four failures in the minute: none is slowed (MON-AX-6)
 	}
 	if len(pauses) != 0 {
 		t.Fatalf("delays before the fifth failure: %v", pauses)

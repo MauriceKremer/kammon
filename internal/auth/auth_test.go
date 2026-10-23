@@ -1,8 +1,6 @@
 package auth
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -62,52 +60,5 @@ func TestSessionsAreBounded(t *testing.T) {
 	}
 	if len(s.m) > maxSessions {
 		t.Fatalf("sessions = %d", len(s.m))
-	}
-}
-
-func TestIsLocal(t *testing.T) {
-	cases := []struct {
-		name, remote string
-		header       [2]string
-		want         bool
-	}{
-		{"loopback v4", "127.0.0.1:5000", [2]string{}, true},
-		{"loopback v6", "[::1]:5000", [2]string{}, true},
-		{"v4 mapped loopback", "[::ffff:127.0.0.1]:5000", [2]string{}, true},
-		{"lan address", "192.168.1.20:5000", [2]string{}, false},
-		{"loopback behind a proxy (X-Forwarded-For)", "127.0.0.1:5000", [2]string{"X-Forwarded-For", "203.0.113.9"}, false},
-		{"loopback behind a proxy (X-Real-IP)", "127.0.0.1:5000", [2]string{"X-Real-Ip", "203.0.113.9"}, false},
-		{"loopback behind a proxy (Forwarded)", "127.0.0.1:5000", [2]string{"Forwarded", "for=203.0.113.9"}, false},
-		{"empty header value still counts as present (MON-AX-9)", "127.0.0.1:5000", [2]string{"X-Forwarded-For", ""}, false},
-		{"empty X-Real-IP still counts as present", "127.0.0.1:5000", [2]string{"X-Real-Ip", ""}, false},
-		{"empty Forwarded still counts as present", "127.0.0.1:5000", [2]string{"Forwarded", ""}, false},
-		{"unknown other header is not a proxy header", "127.0.0.1:5000", [2]string{"X-Proxy-Custom", ""}, true},
-		{"garbage", "not-an-address", [2]string{}, false},
-	}
-	for _, c := range cases {
-		r := httptest.NewRequest(http.MethodGet, "/", nil)
-		r.RemoteAddr = c.remote
-		if c.header[0] != "" {
-			r.Header.Set(c.header[0], c.header[1])
-		}
-		if got := IsLocal(r); got != c.want {
-			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
-		}
-	}
-}
-
-func TestEffectiveRole(t *testing.T) {
-	local := httptest.NewRequest(http.MethodGet, "/", nil)
-	local.RemoteAddr = "127.0.0.1:1"
-	remote := httptest.NewRequest(http.MethodGet, "/", nil)
-	remote.RemoteAddr = "203.0.113.9:1"
-	if EffectiveRole(users[0], local) != config.RoleAdmin {
-		t.Error("local admin must be admin")
-	}
-	if EffectiveRole(users[0], remote) != config.RoleViewer {
-		t.Error("remote admin must be a viewer (MON-AX-10)")
-	}
-	if EffectiveRole(users[1], local) != config.RoleViewer {
-		t.Error("a viewer stays a viewer, even locally")
 	}
 }

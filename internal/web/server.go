@@ -217,10 +217,12 @@ func (s *Server) guard(need access, h http.HandlerFunc) http.Handler {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
-		p := principal{User: user, Role: auth.EffectiveRole(user, r)}
+		// The session carries the role; KAMmon adds no transport rules, so the address that a
+		// request comes from never changes what the role may do (MON-AX-8, D31).
+		p := principal{User: user, Role: user.Role}
 		r = r.WithContext(context.WithValue(r.Context(), principalKey{}, p))
 		if need == admin && p.Role != config.RoleAdmin {
-			s.render(w, r, http.StatusForbidden, "placeholder", s.pageFor(r, "", "Not available", "This page is for the administrator on this computer.", placeholderData{Text: "You can look at the other pages, but this one is only available to the administrator using this computer."}))
+			s.render(w, r, http.StatusForbidden, "placeholder", s.pageFor(r, "", "Not available", "This page is for the administrator.", placeholderData{Text: "You can look at the other pages, but this one is only available to the administrator."}))
 			return
 		}
 		h(w, r)
@@ -330,7 +332,7 @@ type page struct {
 	Title, Subtitle, Active string
 	Nav                     []view.Page
 	UserName, RoleLabel     string
-	RoleNotice, Theme       string
+	Theme                   string
 	// StaticVersion is the static asset cache-buster (AssetVersion); the login
 	// page links the same version, tests keep them equal.
 	StaticVersion string
@@ -349,9 +351,6 @@ func (s *Server) pageFor(r *http.Request, active, title, subtitle string, conten
 	}
 	if p.Role == config.RoleAdmin {
 		pg.RoleLabel = "Admin"
-	}
-	if p.User.Role == config.RoleAdmin && p.Role == config.RoleViewer {
-		pg.RoleNotice = "Signed in as admin, but this is not a local request. View only."
 	}
 	return pg
 }

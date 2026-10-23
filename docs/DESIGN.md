@@ -19,7 +19,7 @@ It is built for hobbyists. The page should make sense to someone who is new to r
 
 1. **Calm and dense.** A quiet charcoal console, small text, no cards, no decoration. Hierarchy comes from type size and spacing.
 2. **Honest labels.** Say what the number means. "Remembered clients" is not "online". "Echo" is not "verified". "Stale" is not "expired". See §8.
-3. **Read first, change second.** Every page works as a read-only view. Controls that change something appear only for the local administrator.
+3. **Read first, change second.** Every page works as a read-only view. Controls that change something appear only for the administrator.
 4. **Simple on purpose.** One Go program, one config file, no database, no build step for the front end, no new dependency without a clear reason.
 5. **KAM is open, KAMmon is a client.** KAM runs the radio, channels, rooms and scripts, and works fine without KAMmon. KAMmon only supplies the screens, the login and its own memory. KAM does not know KAMmon exists, so nothing in KAMmon may ask KAM to remember something for it. A slow, stopped or missing KAMmon changes nothing for KAM.
 
@@ -47,9 +47,9 @@ flowchart LR
 | Role | How it is recognised | Can do |
 |---|---|---|
 | **Viewer** | A user with `role: viewer` in `kammon.yml`, logged in from anywhere | Look at pages. Channel text only for allow-listed channels. No labels, no room posts. No controls. |
-| **Admin** | A user with `role: admin`, **and** the request comes from a loopback address | Everything a viewer sees, plus message text, room posts, client labels, and every control. |
+| **Admin** | A user with `role: admin` in `kammon.yml`, logged in from anywhere | Everything a viewer sees, plus message text, room posts, client labels, and every control. |
 
-- Roles follow the user, but admin power also needs a loopback request. An admin who logs in from the internet gets viewer access.
+- Roles follow the user. Admin power needs nothing more: KAMmon adds no transport rules (D31). It is written for the enthusiast — an operator who serves KAMmon beyond the LAN owns that setup and puts the proper services (HTTPS through a reverse proxy, or `tls_cert`/`tls_key`) in place first.
 - Controls are not just hidden. Routes that change something are not served at all to a viewer, so a hand-made request fails the same way.
 - Passwords are plain text in `kammon.yml`, like KAM's channel keys.
 
@@ -122,8 +122,8 @@ Every request then walks the same short path:
 
 1. A write (anything but GET) must be same-origin, and on a route that changes something it must carry the htmx header (MON-AX-18).
 2. The session cookie is looked up in `auth.Sessions`: memory only, a random 128-bit id, an idle timeout (MON-AX-3, MON-AX-4). Without a session the browser goes to `/login`; an htmx request is told with `HX-Redirect`.
-3. `auth.EffectiveRole` is checked on this request, not once at login (MON-AX-8): admin counts only from loopback, with no proxy header at all (MON-AX-9).
-4. The route's role is enforced. An admin route answers a viewer with the "administrator on this computer" page instead of its content.
+3. The principal carries the session's role, and the route checks it on this request, not once at login (MON-AX-8). KAMmon adds no transport rules, so the address a request comes from never changes the role (D31).
+4. The route's role is enforced. An admin route answers a viewer with the "administrator only" page instead of its content.
 5. The handler reads the store, `internal/view` keeps back what this role may not see (MON-AX-14), and the template renders the HTML. The htmx fragments under `/ui/...` answer small pieces; the live regions ask for them every two seconds.
 
 ## 4. Layout
@@ -232,7 +232,6 @@ Headings are wide letters, so keep them short. Letter spacing stays at zero. Fon
 | **Command log** | Mono, wrapping, scrolls inside its box; every line starts with the time and says whether it was a request or a reply. |
 | **Notice** | A 2 px amber left edge and 12 px text, used for "echo, not verification" and similar. No filled boxes. |
 | **Toast** | One line, bottom right, 3 seconds. |
-| **Access banner** | A ruled line with a lock icon: "Authenticated remote session · View only". |
 | **Stale-data bar** | A ruled line above the page: "KAM has not answered for 12 s. Showing data from 14:59:46." Amber. |
 
 Signal strength is never a column in a table or a footer on a message. KAM usually listens through a local repeater, so SNR and RSSI describe the hop to KAM, not the sender, and carry no message (decision D19). The measurement is still stored for KAM's own status work; KAMmon just does not display it.
@@ -360,7 +359,7 @@ viewer_text_channels: ["#public"]
 | `<canvas>` chart | Inline SVG drawn by the server |
 | Lucide from a CDN, fonts from Google | Embedded sprite and font files |
 | Simulated data, buttons that only toast | Real KAM calls; controls shown only when KAM supports them |
-| Mode selector "Local administrator / Remote viewer" | Real roles from the login and the request address |
+| Mode selector "Local administrator / Remote viewer" | Real roles from the login; addresses play no part (D31) |
 | SNR / RSSI in traffic tables and channel message footers | Not displayed; the measurement stays in the store (D19) |
 | Sample scripts using `msg.text` and `reply(msg, ...)` | Real API: `on_group_text(message)`, `message["body"]`, `reply(channel, text)` |
 | Theme toggle in page memory | Cookie plus `prefers-color-scheme` |
@@ -371,7 +370,7 @@ viewer_text_channels: ["#public"]
 |---|---|---|
 | D1 | Live data from KAM | Cursor pull over REST, polled on intervals set in kammon.yml (1-2 s by default, D24) |
 | D2 | After a KAMmon restart | Memory only; backfill from KAM; history start is labelled |
-| D3 | Admin versus web viewer | One listener, roles by user; admin power needs a loopback request |
+| D3 | Admin versus web viewer | One listener, roles by user; the loopback rule was withdrawn 2026-10-23, see D31 |
 | D4 | KAM endpoints | One listener (8766) for monitoring and scripts since KAM's unified listener (2026-10-23, D28); scripts stayed on 8765 before |
 | D5 | Modem changes | Apply, then save to `kam.yml` |
 | D6 | Room clients | List and remove; protocol roles are read-only |

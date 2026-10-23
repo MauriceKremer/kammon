@@ -14,7 +14,7 @@ You need Go 1.25 or newer.
 go run ./cmd/kammon -demo
 ```
 
-Open <http://127.0.0.1:8080>. Sign in as `admin` / `admin` (local administrator) or `viewer` / `viewer` (view only). Demo mode starts a fake KAM with generated traffic, so no radio is needed.
+Open <http://127.0.0.1:8080>. Sign in as `admin` / `admin` (administrator) or `viewer` / `viewer` (view only). Demo mode starts a fake KAM with generated traffic, so no radio is needed.
 
 ## Run against a real KAM
 
@@ -22,7 +22,7 @@ Open <http://127.0.0.1:8080>. Sign in as `admin` / `admin` (local administrator)
 2. Start KAM. Its KAM API listens on loopback (port `8766` by default; see [docs/kam-api/FeatureKamApi.md](docs/kam-api/FeatureKamApi.md)).
 3. Run `go run ./cmd/kammon -config kammon.local.yml`.
 
-Passwords are plain text in the config file, like channel keys in KAM. An `admin` user has admin power only on a request from the same computer; from anywhere else the admin is a view-only user.
+Passwords are plain text in the config file, like channel keys in KAM. KAMmon is written for the enthusiast and adds no hosting restrictions of its own, so the operator can choose what fits their setup: an `admin` user has admin power from any address. Serving the site beyond your LAN is that operator's decision — put the proper services (HTTPS through a reverse proxy, for example) in place first.
 
 ## Documents
 

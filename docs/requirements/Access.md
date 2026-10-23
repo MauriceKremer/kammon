@@ -8,9 +8,11 @@
 KAM has no users and no logins. It is an open system that listens on the local computer only. **KAMmon is the part that is shown to the world, so KAMmon does all the authentication.** It has two roles:
 
 - **Viewer.** Logs in with a name and password, can look at the pages, and cannot change anything.
-- **Admin.** Everything a viewer can do, plus message text, room posts, client names and every control. An admin must also be on the same computer (a loopback address).
+- **Admin.** Everything a viewer can do, plus message text, room posts, client names and every control, wherever they sign in from.
 
 Passwords sit in `kammon.yml` as plain text, like channel keys in `kam.yml`. This is a hobby tool; the setup stays simple.
+
+KAMmon is written for the enthusiast. It imposes no hosting or transport restrictions of its own, so the operator can choose what fits their setup: plain HTTP on the LAN, HTTPS from Go, or a reverse proxy. Serving the site beyond the LAN is the operator's decision and responsibility, done with the proper services in place that provide TLS functionality. This is a deliberate choice, not an oversight (D31).
 
 ## 2. Goals and non-goals
 
@@ -27,10 +29,11 @@ Passwords sit in `kammon.yml` as plain text, like channel keys in `kam.yml`. Thi
 - Per-user permissions beyond the two roles.
 - Protecting against an attacker who already controls the computer.
 - Hiding the existence of KAMmon (there is a login page).
+- Transport hardening for deployments beyond the LAN: the operator supplies HTTPS (MON-AX-21) or a reverse proxy, and KAMmon adds no transport rules of its own (D31).
 
 ## 3. Roles and visibility
 
-| Item | Viewer | Admin (on this computer) |
+| Item | Viewer | Admin |
 |---|---|---|
 | Overview numbers, airtime chart, packet mix | Yes | Yes |
 | Traffic table: type, route, hops, airtime | Yes | Yes |
@@ -67,11 +70,11 @@ Anything marked "No" is not rendered and its routes answer `403`.
 
 | ID | Requirement | Level |
 |---|---|---|
-| MON-AX-8 | A role is attached to the session when it is created. The check `role == admin` and `request from loopback` is made on every admin route, not once at login. | MUST |
-| MON-AX-9 | A request is "from loopback" when its connection address is a loopback address **and** it has no `X-Forwarded-For`, `X-Real-IP` or `Forwarded` header. A reverse proxy on the same computer therefore cannot give web visitors admin power. | MUST |
-| MON-AX-10 | An admin user on a non-local request gets viewer access and sees a notice: "Signed in as admin, but this is not a local request. View only." | MUST |
+| MON-AX-8 | A role is attached to the session when it is created. The role — and only the role — decides power on every route, on every request, from every address. KAMmon adds no transport check. | MUST |
 | MON-AX-11 | Routes are registered with a required role. A route that needs `admin` answers `403` to anyone else, whatever the page shows. | MUST |
 | MON-AX-12 | Navigation and pages leave out what the role cannot use, rather than showing disabled controls. | MUST |
+
+MON-AX-9 and MON-AX-10 (admin power on loopback requests only, and a view-only notice for a remote admin) were withdrawn on 2026-10-23; see D31 in [DECISIONS.md](../DECISIONS.md).
 
 ### 4.3 What viewers may see
 
@@ -97,6 +100,7 @@ Anything marked "No" is not rendered and its routes answer `403`.
 | MON-AX-20 | KAMmon listens on one address (`listen`, default `:8080`) over plain HTTP. | MUST |
 | MON-AX-21 | Optional `tls_cert` and `tls_key` serve HTTPS directly. A reverse proxy is the other way to get HTTPS. | MAY |
 | MON-AX-22 | The login page and error pages reveal nothing about KAM, the node name or the radio. | SHOULD |
+| MON-AX-23 | KAMmon imposes no restriction on how the site is hosted. Plain HTTP on the LAN, HTTPS from Go (MON-AX-21) and a reverse proxy are all valid; hosting beyond the LAN is the operator's responsibility, with the proper services in place (D31). | MUST |
 
 ## 5. What KAMmon needs from KAM
 
@@ -118,9 +122,9 @@ users:
 
 ## 7. Tests
 
-- Table tests for the permission table in §3 for each role and for local and non-local requests.
+- Table tests for the permission table in §3 for each role.
 - A test that every registered route has a required role, and that a route with none fails to start.
-- A test that an admin request with `X-Forwarded-For` is treated as a viewer.
+- A test that an admin session keeps admin power from a non-loopback, proxied request, and a viewer from the same address still gets `403` on an admin route (D31).
 - A test that no `GET` route changes state.
 - A test that a viewer's page source does not contain the text of a hidden message or a client label.
 

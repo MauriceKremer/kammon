@@ -1,6 +1,6 @@
 package auth
 
-// Package auth holds KAMmon's users, sessions and the local-request check. KAM has no part in any of it.
+// Package auth holds KAMmon's users, sessions and the login slowdown. KAM has no part in any of it.
 
 import (
 	"crypto/rand"
@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"net"
 	"net/http"
-	"net/netip"
 	"sync"
 	"time"
 
@@ -96,31 +95,6 @@ func (s *Sessions) Delete(id string) {
 	s.mu.Lock()
 	delete(s.m, id)
 	s.mu.Unlock()
-}
-
-// IsLocal reports whether a request comes from this computer: a loopback connection address and no
-// proxy header at all. Any forwarding header — including one with an empty value — means a proxy is
-// in the path, and a present-but-empty header must not be mistaken for “no header” (MON-AX-9).
-func IsLocal(r *http.Request) bool {
-	for _, h := range []string{"X-Forwarded-For", "X-Real-IP", "Forwarded"} {
-		if _, present := r.Header[http.CanonicalHeaderKey(h)]; present {
-			return false
-		}
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
-	}
-	addr, err := netip.ParseAddr(host)
-	return err == nil && addr.Unmap().IsLoopback()
-}
-
-// EffectiveRole is checked on every request, not once at login (MON-AX-8): an admin away from this computer is a viewer.
-func EffectiveRole(u config.User, r *http.Request) config.Role {
-	if u.Role == config.RoleAdmin && IsLocal(r) {
-		return config.RoleAdmin
-	}
-	return config.RoleViewer
 }
 
 // RemoteHost is the host part of the request's connection address — the key for per-address

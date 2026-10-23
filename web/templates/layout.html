@@ -28,7 +28,6 @@
     </span>
   </div>
   {{template "stalebar" .Stale}}
-  {{if .RoleNotice}}<p class="notice">{{.RoleNotice}}</p>{{end}}
   <div class="heading"><div><h1>{{.Title}}</h1><p class="muted small">{{.Subtitle}}</p></div></div>
   {{template "content" .}}
 </main>

@@ -54,7 +54,7 @@ diff ../kam/docs/FeatureKamApi.md docs/kam-api/FeatureKamApi.md   # contract dri
 | `internal/kamfake` | Fake KAM and the demo data generator (also used in tests) |
 | `internal/store` | In-memory history: event ring, minute buckets, snapshots, marks |
 | `internal/poll` | The poller: the only reader of KAM |
-| `internal/auth` | Users, sessions, local-request check |
+| `internal/auth` | Users, sessions, login slowdown |
 | `internal/view` | Visibility rules (what a role may see) |
 | `internal/web` | Routes, handlers, templates, chart |
 | `web/` | Embedded templates and static files (htmx is vendored, no CDN) |

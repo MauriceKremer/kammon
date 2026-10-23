@@ -29,5 +29,5 @@ Use these words in code, tests, docs and screens.
 | **Room protocol role** | Existing password-granted radio role in KAM. Shown read-only; independent of KAMmon web-user permissions. The pinned-role proposal is withdrawn. |
 | **Echo** | The modem returns the values the host stored. It does not prove the radio chip accepted them. |
 | **Viewer** | A logged-in user who can only look. |
-| **Admin** | A user with full control, effective only on a request from the same computer. |
+| **Admin** | A user with full control, wherever they log in from. KAMmon adds no transport rules; serving beyond the LAN is the operator's setup (D31). |
 | **Allow list** | `viewer_text_channels`: channels whose message text viewers may read. |

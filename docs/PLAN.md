@@ -12,7 +12,7 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 - [x] `kamfake`: fake KAM with cursor, epoch and reset semantics, and a demo data generator
 - [x] `store`: event ring, minute buckets, cursor logic, gap and restart marks, freshness (MON-DS-6..14, 16, 18)
 - [x] `poll`: backfill and polling with backoff (MON-DS-1..5, 7)
-- [x] `auth`: users, sessions, local-request check (MON-AX-1, 3..5, 8..11)
+- [x] `auth`: users, sessions, per-route roles (MON-AX-1, 3..5, 8, 11; the old 9 and 10 were withdrawn 2026-10-23, D31)
 - [x] `view`: channel-text visibility (MON-AX-13, 14)
 - [x] `web`: login, logout, shell, Overview (metrics, SVG chart, packet mix, recent packets), placeholders (MON-OV-1..4, 6, 7, 11; MON-AX-2, 11, 12)
 - [x] `-demo` mode

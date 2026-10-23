@@ -23,8 +23,10 @@ freshness:
 # Channels whose message text web viewers may read. Everyone else sees metadata only.
 viewer_text_channels: ["#public"]
 
-# Passwords are plain text, like channel keys in kam.yml. An admin only has admin
-# power on a request from this computer; from anywhere else the admin is a viewer.
+# Passwords are plain text, like channel keys in kam.yml. KAMmon adds no transport
+# restrictions of its own: an admin keeps admin power from any address, wherever they
+# sign in from. Serving the site beyond your LAN is the operator's choice; put the
+# proper services (TLS through a reverse proxy, for example) in place first.
 users:
   - { name: maurice, password: "change-me", role: admin }
   - { name: observer, password: "change-me-too", role: viewer }
