@@ -4,7 +4,7 @@ Recorded 2026-10-11 during planning. Reasons are in [DESIGN.md](DESIGN.md) §13 
 
 | ID | Decision | Outcome | Why |
 |---|---|---|---|
-| D1 | Live data from KAM | Cursor pull over REST, polled every 1-2 s | Plain REST, no streaming, easy recovery |
+| D1 | Live data from KAM | Cursor pull over REST, polled on intervals set in kammon.yml (1-2 s by default, D24) | Plain REST, no streaming, easy recovery |
 | D2 | After a KAMmon restart | Memory only; backfill from KAM's ring; history start is labelled | No database or files to maintain |
 | D3 | Admin versus web viewer | One listener, roles by user; admin power needs a request from the same computer | One port, no way for a remote visitor to reach admin routes |
 | D4 | KAM endpoints | A separate monitoring listener (8766); scripts stayed on 8765. Superseded 2026-10-23, see D28 | The existing script API stays untouched |

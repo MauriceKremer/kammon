@@ -29,7 +29,7 @@ It is built for hobbyists. The page should make sense to someone who is new to r
 flowchart LR
     Browser["Browser<br/>pages and htmx refresh"] -->|"HTTPS or HTTP, login"| Web["KAMmon web layer<br/>templates, sessions, role check"]
     Web --> Store[("In-memory store<br/>event history, buckets, snapshots")]
-    Poller["Poller<br/>every 1-2 s"] --> Store
+    Poller["Poller<br/>intervals from kammon.yml"] --> Store
     Poller -->|"GET /v1/events, /v1/status, ..."| KAM["KAM API<br/>127.0.0.1:8766"]
     Web -->|"admin actions only"| KAM
     KAM --- Radio["KISS modem and radio"]
@@ -333,14 +333,14 @@ kammon/
 listen: ":8080"
 kam_monitor_url: "http://127.0.0.1:8766"
 poll:
-  events: 1s      # how often the poller reads KAM (DataStore.md §5)
-  status: 2s
+  events: 5s      # how often the poller reads KAM (DataStore.md §5 has the defaults)
+  status: 5s
   rooms: 10s
   channels: 30s
   timeout: 3s
   not_served: 10m
 freshness:
-  stale_after: 10s
+  stale_after: 30s
   down_after: 2m
 users:
   - { name: maurice, password: "change-me", role: admin }
@@ -369,7 +369,7 @@ viewer_text_channels: ["#public"]
 
 | ID | Decision | Outcome |
 |---|---|---|
-| D1 | Live data from KAM | Cursor pull over REST, polled every 1-2 s |
+| D1 | Live data from KAM | Cursor pull over REST, polled on intervals set in kammon.yml (1-2 s by default, D24) |
 | D2 | After a KAMmon restart | Memory only; backfill from KAM; history start is labelled |
 | D3 | Admin versus web viewer | One listener, roles by user; admin power needs a loopback request |
 | D4 | KAM endpoints | One listener (8766) for monitoring and scripts since KAM's unified listener (2026-10-23, D28); scripts stayed on 8765 before |
