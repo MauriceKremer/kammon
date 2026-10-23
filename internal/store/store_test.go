@@ -485,3 +485,59 @@ func TestKAMAheadOfKAMmonKeepsEvents(t *testing.T) {
 		t.Fatalf("the ahead-KAM event is in the chart: %+v", w)
 	}
 }
+
+// PostHours sums accepted posts per hour for one room, matched by id or name like the last-hour
+// count (MON-RM-1); unknown rooms, posts without a room and hours outside the day count nowhere.
+func TestPostHoursSumsPerRoomPerHour(t *testing.T) {
+	s := New()
+	seq := uint64(0)
+	post := func(at time.Time, room string) kam.Event {
+		seq++
+		return kam.Event{Seq: seq, At: at, Kind: kam.KindRoom, Event: "post", Room: room}
+	}
+	plain := func(at time.Time) kam.Event {
+		seq++
+		return kam.Event{Seq: seq, At: at, Kind: kam.KindRX, PayloadType: "GRP_TXT", AirtimeMS: ptr(100)}
+	}
+	events := []kam.Event{
+		plain(t0.Add(-time.Minute)),              // a packet is not a post
+		post(t0.Add(-90*time.Minute), "L1"),      // hour 21, matched by id
+		post(t0.Add(-91*time.Minute), "Emerald"), // hour 21, matched by name
+		post(t0.Add(-90*time.Minute), "other"),   // another room
+		post(t0.Add(-90*time.Minute), ""),        // no room: counts for none
+		post(t0.Add(20*time.Second), "L1"),       // hour 23, the current KAM hour
+		post(t0.Add(20*time.Second), "L1"),
+		post(t0.Add(20*time.Second), "Emerald"),
+		plain(t0.Add(-24 * time.Hour).Add(30 * time.Minute)), // kept history, but before the day: not a bar
+	}
+	s.ApplyEvents(kam.EventsResponse{Epoch: "e1", Events: events}, t0)
+
+	hours, full := s.PostHours(t0, "L1", "L1", "Emerald") // duplicate key counts once
+	if hours[23] != 3 || hours[21] != 2 {
+		t.Fatalf("hours 21/23 = %d/%d, want 2/3: %v", hours[21], hours[23], hours)
+	}
+	for i, n := range hours {
+		if i != 21 && i != 23 && n != 0 {
+			t.Errorf("hour %d holds %d posts", i, n)
+		}
+	}
+	if !full {
+		t.Error("history reaches back past the day start, so the chart may call itself complete")
+	}
+}
+
+// A young history is not a quiet day: PostHours says the store holds less than a day, so a flat
+// chart is labelled as young instead of claiming no posts (MON-RM-15).
+func TestPostHoursSaysHistoryIsYoung(t *testing.T) {
+	s := New()
+	s.ApplyEvents(kam.EventsResponse{Epoch: "e1", Events: []kam.Event{
+		{Seq: 1, At: t0, Kind: kam.KindRoom, Event: "post", Room: "L1"},
+	}}, t0)
+	hours, full := s.PostHours(t0, "L1")
+	if hours[23] != 1 {
+		t.Fatalf("newest hour = %d, want 1: %v", hours[23], hours)
+	}
+	if full {
+		t.Error("a store older than minutes must not claim a full day of history")
+	}
+}

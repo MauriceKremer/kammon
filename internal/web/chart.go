@@ -63,3 +63,51 @@ func chartSVG(w store.Window) (chartMarkup, float64) {
 	b.WriteString(`</svg>`)
 	return chartMarkup(b.String()), axisMS / slotMS * 100
 }
+
+// sparkSVG draws the small bar trend in a detail strip: room posts per hour, channel messages per
+// minute. Like chartSVG the markup is built from numbers only, so no text from KAM can reach it;
+// this stays inside the template.HTML exception (a test enforces that). It stretches to its box
+// (preserveAspectRatio="none"), so one fixed CSS height fits every strip width.
+func sparkSVG(class string, values []int) chartMarkup {
+	const width, height = 600.0, 24.0
+	var peak int
+	for _, n := range values {
+		peak = max(peak, n)
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, `<svg class="chart chart-spark" viewBox="0 0 %.0f %.0f" preserveAspectRatio="none" aria-hidden="true">`, width, height)
+	barWidth := width / float64(len(values))
+	for i, n := range values {
+		if n <= 0 {
+			continue
+		}
+		h := float64(n) / float64(peak) * height
+		fmt.Fprintf(&b, `<rect class="%s" x="%.2f" y="%.2f" width="%.2f" height="%.2f"/>`,
+			class, float64(i)*barWidth+0.5, height-h, max(barWidth-1, 1), h)
+	}
+	b.WriteString(`</svg>`)
+	return chartMarkup(b.String())
+}
+
+// squareSparkSVG draws the presence trend under the messages metric: one square per minute that
+// decoded at least one message, resting on the base of the box, height equal to width (MON-CH-2).
+// A quiet minute looks like a quiet minute; how many the minute held lives in the metric's number
+// and its text alternative. It keeps the viewBox aspect instead of stretching, so the squares stay
+// squares at any strip width; the CSS gives .chart-square the matching aspect. Like sparkSVG the
+// markup is built from numbers only, so no text from KAM can reach it (a test enforces that).
+func squareSparkSVG(class string, values []int) chartMarkup {
+	const width, height = 600.0, 24.0
+	slot := width / float64(len(values))
+	side := max(slot-1, 1)
+	var b strings.Builder
+	fmt.Fprintf(&b, `<svg class="chart chart-spark chart-square" viewBox="0 0 %.0f %.0f" aria-hidden="true">`, width, height)
+	for i, n := range values {
+		if n <= 0 {
+			continue
+		}
+		fmt.Fprintf(&b, `<rect class="%s" x="%.2f" y="%.2f" width="%.2f" height="%.2f"/>`,
+			class, float64(i)*slot+0.5, height-side, side, side)
+	}
+	b.WriteString(`</svg>`)
+	return chartMarkup(b.String())
+}

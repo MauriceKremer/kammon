@@ -127,6 +127,7 @@ main { min-width: 0; padding: 0 32px 48px; }
 .chart { width: 100%; height: auto; display: block; }
 .chart .grid { stroke: var(--border-subtle); stroke-width: 1; }
 .c-group { fill: var(--signal); } .c-advert { fill: var(--warning); } .c-room { fill: var(--success); } .c-other { fill: var(--text-muted); }
+.c-posts, .c-msgs { fill: var(--signal); }
 .chart .mark-restart { fill: var(--warning); }
 .chart .mark-gap { fill: none; stroke: var(--warning); stroke-width: 1.5; }
 .chart-labels { display: flex; justify-content: space-between; margin-top: 8px; font: 11px var(--font-code); color: var(--text-muted); }
@@ -199,6 +200,10 @@ tr.traffic-detail > td { padding: 2px 12px 12px 0; }
 .resource-metrics > div:first-child { padding-left: 0; }
 .resource-metrics > div:last-child { border-right: 0; }
 .resource-metrics strong { font-size: 18px; font-weight: 550; overflow-wrap: anywhere; }
+.resource-metrics .posts-trend { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.posts-trend svg { flex: 1; width: 100%; min-width: 0; height: 22px; }
+/* The messages spark keeps the viewBox aspect so its squares render square (MON-CH-2). */
+.posts-trend svg.chart-square { height: auto; aspect-ratio: 25 / 1; }
 .resource-caption { max-width: 900px; margin: 12px 0 20px; }
 .resource-search { margin: 18px 0 12px; }
 .resource-search input[type="search"] { min-width: 180px; flex: 1 1 240px; }

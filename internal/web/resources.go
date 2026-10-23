@@ -1,6 +1,7 @@
 package web
 
 import (
+	"bytes"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -20,7 +21,11 @@ type channelLink struct {
 	Selected             bool
 }
 
-type channelMetric struct{ Label, Value, Caption string }
+type channelMetric struct {
+	Label, Value, Caption string
+	Chart                 chartMarkup // numbers-only SVG, drawn in chart.go
+	ChartAlt, ChartUnit   string
+}
 type eventRow struct {
 	Time, Route string
 	Hops        int
@@ -31,17 +36,17 @@ type messageRow struct {
 }
 
 type channelsData struct {
-	Channels                   []channelLink
-	Selected, KeyType, State   string
-	Query                      string
-	Metrics                    []channelMetric
-	CanRead, Hidden            bool
-	Events                     []eventRow
-	Messages                   []messageRow
-	MessageURL, OlderURL       string
-	NextBeforeID               *int64
-	CacheMessage, ActivityNote string
-	Unreadable                 int
+	Channels                         []channelLink
+	Selected, KeyType, State         string
+	Query                            string
+	Metrics                          []channelMetric
+	CanRead, Hidden                  bool
+	Events                           []eventRow
+	Messages                         []messageRow
+	MessageURL, MetricsURL, OlderURL string
+	NextBeforeID                     *int64
+	CacheMessage, ActivityNote       string
+	Unreadable                       int
 }
 
 func (s *Server) channelsPage(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +73,7 @@ func (s *Server) channels(r *http.Request) channelsData {
 		metricsNow = status.Now
 	}
 	for _, channel := range channels {
-		count, _, _ := s.channelMetrics(channel.Name, metricsNow)
+		count, _, _, _ := s.channelMetrics(channel.Name, metricsNow)
 		keyType := channel.KeyStrategy
 		state := "Enabled"
 		if !channel.Enabled {
@@ -88,13 +93,24 @@ func (s *Server) channels(r *http.Request) channelsData {
 		return data
 	}
 	data.CanRead = view.CanReadChannelText(principalOf(r).Role, s.cfg.ViewerTextChannels, data.Selected)
-	count, airtime, last := s.channelMetrics(data.Selected, metricsNow)
+	data.MetricsURL = "/ui/channel-metrics?channel=" + url.QueryEscape(data.Selected)
+	count, airtime, last, minutes := s.channelMetrics(data.Selected, metricsNow)
 	lastText := "No decoded message in the last hour"
 	if !last.IsZero() {
 		lastText = "Last decoded message " + ago(metricsNow.Sub(last))
 	}
+	active := 0
+	for _, n := range minutes {
+		if n > 0 {
+			active++
+		}
+	}
+	alt := fmt.Sprintf("Decoded messages over the last 60 minutes: %d in total, in %d of the 60 minutes. Every square is a minute with at least one message.", count, active)
+	if history := s.store.HistoryStart(); !history.IsZero() && history.After(metricsNow.Add(-time.Hour)) {
+		alt += " KAMmon has not kept a full hour of history yet."
+	}
 	data.Metrics = []channelMetric{
-		{Label: "Messages · last hour", Value: thousands(count), Caption: "Decoded group texts; repeats excluded"},
+		{Label: "Messages · last hour", Value: thousands(count), Caption: "Decoded group texts; repeats excluded", Chart: squareSparkSVG("c-msgs", minutes[:]), ChartAlt: alt, ChartUnit: "60 min"},
 		{Label: "Last decoded message", Value: lastText, Caption: "From observed RX events"},
 		{Label: "Estimated airtime · last hour", Value: fmt.Sprintf("%.1f s", float64(airtime)/1000), Caption: "All attributed RX packets, including repeats"},
 	}
@@ -153,6 +169,27 @@ func (s *Server) channelMessagesPartial(w http.ResponseWriter, r *http.Request) 
 	s.execute(w, http.StatusOK, t, "channel-messages", data)
 }
 
+// channelMetricsPartial is what htmx fetches every 2 s from the channels page (MON-CH-13): the
+// metric strip with its graph and numbers swaps in place, and the channel-list counts ride along
+// out of band.
+func (s *Server) channelMetricsPartial(w http.ResponseWriter, r *http.Request) {
+	data := s.channels(r)
+	var buf bytes.Buffer
+	t := s.pages["channels"]
+	for _, part := range []struct {
+		name string
+		data any
+	}{{"channel-metrics", data}, {"channel-list-oob", data}} {
+		if err := t.ExecuteTemplate(&buf, part.name, part.data); err != nil {
+			http.Error(w, "Template error.", http.StatusInternalServerError)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = buf.WriteTo(w)
+}
+
 func channelMessagesURL(channel, query string, beforeID int64) string {
 	values := url.Values{"channel": {channel}, "q": {query}}
 	if beforeID > 0 {
@@ -161,10 +198,7 @@ func channelMessagesURL(channel, query string, beforeID int64) string {
 	return "/ui/channel-messages?" + values.Encode()
 }
 
-func (s *Server) channelMetrics(name string, now time.Time) (int, int64, time.Time) {
-	count := 0
-	var airtime int64
-	var last time.Time
+func (s *Server) channelMetrics(name string, now time.Time) (count int, airtime int64, last time.Time, minutes [60]int) {
 	for _, event := range s.store.Recent(store.EventRingSize) {
 		if event.Kind != kam.KindRX || event.Channel != name || event.At.Before(now.Add(-time.Hour)) {
 			continue
@@ -174,12 +208,19 @@ func (s *Server) channelMetrics(name string, now time.Time) (int, int64, time.Ti
 			if event.At.After(last) {
 				last = event.At
 			}
+			// Oldest minute in the leftmost bar; an event at exactly the hour edge still lands in the
+			// first bar, so the bars always sum to the count.
+			idx := 59 - int(now.Sub(event.At)/time.Minute)
+			if idx < 0 {
+				idx = 0
+			}
+			minutes[idx]++
 		}
 		if event.AirtimeMS != nil {
 			airtime += int64(*event.AirtimeMS)
 		}
 	}
-	return count, airtime, last
+	return count, airtime, last, minutes
 }
 
 type roomLink struct {
@@ -211,6 +252,7 @@ type roomsData struct {
 	IsAdmin                         bool
 	CacheMessage, FeedURL           string
 	Metrics                         []channelMetric
+	MetricsURL                      string
 }
 
 func (s *Server) roomsPage(w http.ResponseWriter, r *http.Request) {
@@ -273,6 +315,7 @@ func (s *Server) rooms(r *http.Request) roomsData {
 		}
 		return data
 	}
+	data.MetricsURL = "/ui/room-metrics?room=" + url.QueryEscape(data.Selected)
 	var heard int
 	for _, client := range clients[data.Selected] {
 		if client.LastActivityAt != nil && !client.LastActivityAt.Before(nowKAM.Add(-time.Hour)) && !client.LastActivityAt.After(nowKAM) {
@@ -339,9 +382,19 @@ func (s *Server) rooms(r *http.Request) roomsData {
 			break
 		}
 	}
+	hours, fullDay := s.store.PostHours(nowKAM, data.Selected, data.Name)
+	total, peak := 0, 0
+	for _, n := range hours {
+		total += n
+		peak = max(peak, n)
+	}
+	alt := fmt.Sprintf("Accepted posts per hour over the last 24 hours: %d in total, busiest hour %d.", total, peak)
+	if !fullDay {
+		alt += " KAMmon has not kept a full day of history yet."
+	}
 	data.Metrics = []channelMetric{
-		{Label: "Last activity", Value: data.LastActivity, Caption: "Radio activity, not a live connection"},
-		{Label: "Posts · last hour", Value: thousands(data.PostsLastHour), Caption: "Accepted posts in the event ring"},
+		{Label: "Last activity", Value: data.LastActivity},
+		{Label: "Posts · last hour", Value: thousands(data.PostsLastHour), Chart: sparkSVG("c-posts", hours[:]), ChartAlt: alt, ChartUnit: "24 h"},
 		{Label: "Remembered clients", Value: thousands(data.ClientsRemembered), Caption: fmt.Sprintf("%d heard in the last hour", data.HeardLastHour)},
 	}
 	return data
@@ -354,4 +407,24 @@ func (s *Server) roomPostsPartial(w http.ResponseWriter, r *http.Request) {
 	}
 	data := s.rooms(r)
 	s.execute(w, http.StatusOK, s.pages["rooms"], "room-posts", data)
+}
+
+// roomMetricsPartial is what htmx fetches every 2 s from the Rooms page (MON-RM-16): the metric
+// strip with its graph and numbers swaps in place, and the room-list counts ride along out of band.
+func (s *Server) roomMetricsPartial(w http.ResponseWriter, r *http.Request) {
+	data := s.rooms(r)
+	var buf bytes.Buffer
+	t := s.pages["rooms"]
+	for _, part := range []struct {
+		name string
+		data any
+	}{{"room-metrics", data}, {"room-list-oob", data}} {
+		if err := t.ExecuteTemplate(&buf, part.name, part.data); err != nil {
+			http.Error(w, "Template error.", http.StatusInternalServerError)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = buf.WriteTo(w)
 }

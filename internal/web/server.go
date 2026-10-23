@@ -113,8 +113,10 @@ func (s *Server) routes() []route {
 		{"GET /traffic.csv", viewer, s.csvPage},
 		{"GET /channels", viewer, s.channelsPage},
 		{"GET /ui/channel-messages", viewer, s.channelMessagesPartial},
+		{"GET /ui/channel-metrics", viewer, s.channelMetricsPartial},
 		{"GET /rooms", viewer, s.roomsPage},
 		{"GET /ui/room-posts", admin, s.roomPostsPartial},
+		{"GET /ui/room-metrics", viewer, s.roomMetricsPartial},
 	}
 	// Placeholder routes for the pages that are not built yet. Built pages register their own
 	// routes above; the overview and traffic pages take themselves out of this loop.

@@ -36,3 +36,75 @@ func TestChartSvgIsNumbersOnly(t *testing.T) {
 		}
 	}
 }
+
+// TestPostsSparkSvgIsNumbersOnly applies the same rule-5 guard to the room posts mini chart and
+// pins its shape: one bar per hour that has posts, the peak hour at full height, silence otherwise.
+func TestPostsSparkSvgIsNumbersOnly(t *testing.T) {
+	hours := [24]int{}
+	hours[0], hours[22], hours[23] = 1, 3, 7
+	s := string(sparkSVG("c-posts", hours[:]))
+	if !strings.HasPrefix(s, `<svg class="chart chart-spark"`) || !strings.HasSuffix(s, `</svg>`) {
+		t.Fatalf("svg has an unexpected shape: %s", s)
+	}
+	if !strings.Contains(s, `preserveAspectRatio="none"`) {
+		t.Errorf("posts svg must stretch to its box: %s", s)
+	}
+	for _, want := range []string{
+		`<rect class="c-posts" x="0.50" y="20.57" width="24.00" height="3.43"/>`,   // hour 0, 1/7 of the peak
+		`<rect class="c-posts" x="575.50" y="0.00" width="24.00" height="24.00"/>`, // hour 23, the peak
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("bar missing or misplaced: %s", s)
+		}
+	}
+	if got := strings.Count(s, `<rect class="c-posts"`); got != 3 {
+		t.Errorf("bars = %d, want one per hour with posts: %s", got, s)
+	}
+	var empty [24]int
+	if s := string(sparkSVG("c-posts", empty[:])); strings.Contains(s, `<rect`) {
+		t.Errorf("hours without posts must not draw bars: %s", s)
+	}
+	// Numbers only: every text node between tags is empty; radio text can never show in the SVG.
+	for _, seg := range strings.Split(s, ">")[1:] {
+		if text, _, ok := strings.Cut(seg, "<"); ok && text != "" {
+			t.Errorf("svg contains text %q: %s", text, s)
+		}
+	}
+}
+
+// TestMessagesSparkSvgIsNumbersOnly applies the same rule-5 guard to the channel messages mini
+// chart and pins its shape: one square, height equal to width, per minute that decoded messages,
+// resting on the base of the box, however many messages the minute held.
+func TestMessagesSparkSvgIsNumbersOnly(t *testing.T) {
+	minutes := [60]int{}
+	minutes[0], minutes[58], minutes[59] = 1, 2, 4
+	s := string(squareSparkSVG("c-msgs", minutes[:]))
+	if !strings.HasPrefix(s, `<svg class="chart chart-spark chart-square"`) || !strings.HasSuffix(s, `</svg>`) {
+		t.Fatalf("svg has an unexpected shape: %s", s)
+	}
+	if strings.Contains(s, `preserveAspectRatio="none"`) {
+		t.Errorf("the square spark must keep the viewBox aspect, so squares stay square: %s", s)
+	}
+	for _, want := range []string{
+		`<rect class="c-msgs" x="0.50" y="15.00" width="9.00" height="9.00"/>`,   // minute 0, one square
+		`<rect class="c-msgs" x="580.50" y="15.00" width="9.00" height="9.00"/>`, // minute 58, two messages, same square
+		`<rect class="c-msgs" x="590.50" y="15.00" width="9.00" height="9.00"/>`, // minute 59, four messages, same square
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("square missing or misplaced: %s", s)
+		}
+	}
+	if got := strings.Count(s, `<rect class="c-msgs"`); got != 3 {
+		t.Errorf("squares = %d, want one per minute with messages: %s", got, s)
+	}
+	var empty [60]int
+	if s := string(squareSparkSVG("c-msgs", empty[:])); strings.Contains(s, `<rect`) {
+		t.Errorf("minutes without messages must not draw squares: %s", s)
+	}
+	// Numbers only: every text node between tags is empty; radio text can never show in the SVG.
+	for _, seg := range strings.Split(s, ">")[1:] {
+		if text, _, ok := strings.Cut(seg, "<"); ok && text != "" {
+			t.Errorf("svg contains text %q: %s", text, s)
+		}
+	}
+}

@@ -219,6 +219,138 @@ func TestChannelAndRoomPagesRespectViewerVisibility(t *testing.T) {
 	}
 }
 
+// The Posts metric carries the small 24 hour posts chart (MON-RM-15); its caption made room for
+// it, and the chart belongs to the strip that a viewer also sees (MON-RM-12).
+func TestRoomMetricStripHasPostsTrend(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer", "viewer")
+	_, body, _ := get(t, c, h.ts.URL+"/rooms?room=lobby")
+	if !strings.Contains(body, `class="posts-trend"`) || !strings.Contains(body, "Accepted posts per hour over the last 24 hours: 1 in total, busiest hour 1.") {
+		t.Fatalf("room strip lacks the posts trend: %s", body)
+	}
+	if strings.Contains(body, "Accepted posts in the event ring") {
+		t.Fatal("the removed ring caption is still shown")
+	}
+}
+
+// The Messages metric carries the small last-hour chart (docs/requirements/Channels.md §3); the
+// harness feed puts one #public message 40 s back, so its square is the last minute of the hour.
+func TestChannelMetricStripHasTheHourChart(t *testing.T) {
+	h := newHarness(t)
+	_, body, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/channels?channel=%23public")
+	for _, want := range []string{
+		"Decoded messages over the last 60 minutes: 1 in total, in 1 of the 60 minutes. Every square is a minute with at least one message.",
+		`<rect class="c-msgs" x="590.50" y="15.00" width="9.00" height="9.00"/>`,
+		"60 min",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("channel strip lacks the hour chart: %s", body)
+		}
+	}
+}
+
+// Minute arithmetic of the messages chart from a fixed event list, including repeats (MON-CH-2):
+// two non-repeats one to two minutes back share the same square, a repeat lands in no square, and
+// an event at exactly the hour edge still lands in the first minute, so every minute with counted
+// messages draws its one square.
+func TestChannelMetricMinutesAreTheRollingHour(t *testing.T) {
+	h := newHarness(t)
+	h.st.ApplyEvents(kam.EventsResponse{Epoch: "e1", FirstSeq: 6, LastSeq: 9, Events: []kam.Event{
+		{Seq: 6, At: t0.Add(-61 * time.Second), Kind: kam.KindRX, PayloadType: "GRP_TXT", Channel: "#public"},
+		{Seq: 7, At: t0.Add(-61 * time.Second), Kind: kam.KindRX, PayloadType: "GRP_TXT", Channel: "#public", Duplicate: true},
+		{Seq: 8, At: t0.Add(-90 * time.Second), Kind: kam.KindRX, PayloadType: "GRP_TXT", Channel: "#public"},
+		{Seq: 9, At: t0.Add(-time.Hour), Kind: kam.KindRX, PayloadType: "GRP_TXT", Channel: "#public"},
+	}}, t0)
+	_, body, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/channels?channel=%23public")
+	for _, want := range []string{
+		"Decoded messages over the last 60 minutes: 4 in total, in 3 of the 60 minutes. Every square is a minute with at least one message.",
+		`<rect class="c-msgs" x="0.50" y="15.00" width="9.00" height="9.00"/>`,   // the hour edge, kept
+		`<rect class="c-msgs" x="580.50" y="15.00" width="9.00" height="9.00"/>`, // minute 58, two messages, one square
+		`<rect class="c-msgs" x="590.50" y="15.00" width="9.00" height="9.00"/>`, // minute 59, one message
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("channel minute chart is wrong: %s", body)
+		}
+	}
+	if got := strings.Count(body, `<rect class="c-msgs"`); got != 3 {
+		t.Errorf("squares = %d, want one per minute with messages", got)
+	}
+}
+
+// The strip updates itself every 2 s: the polled metrics partial carries the graph and the numbers,
+// and the channel-list counts ride along out of band (MON-CH-13); no reload is needed.
+func TestChannelMetricsPartialUpdatesCountersAndList(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer", "viewer")
+	_, body, _ := get(t, c, h.ts.URL+"/channels?channel=%23public")
+	if !strings.Contains(body, `id="channel-metrics" hx-get="/ui/channel-metrics?channel=%23public" hx-trigger="every 2s" hx-swap="outerHTML"`) {
+		t.Fatalf("the strip does not poll for its own updates: %s", body)
+	}
+	if !strings.Contains(body, `id="channel-messages" hx-get="/ui/channel-messages?channel=%23public&amp;q=" hx-trigger="every 10s"`) {
+		t.Fatalf("the message list does not poll at half the text cache: %s", body)
+	}
+	h.st.ApplyEvents(kam.EventsResponse{Epoch: "e1", FirstSeq: 6, LastSeq: 6, Events: []kam.Event{
+		{Seq: 6, At: t0.Add(-5 * time.Second), Kind: kam.KindRX, PayloadType: "GRP_TXT", Channel: "#public"},
+	}}, t0)
+	status, partial, _ := get(t, c, h.ts.URL+"/ui/channel-metrics?channel=%23public")
+	if status != http.StatusOK {
+		t.Fatalf("metrics partial: %d", status)
+	}
+	for _, want := range []string{
+		`<strong>2</strong>`, // the count moved with the new message
+		"Decoded messages over the last 60 minutes: 2 in total, in 1 of the 60 minutes. Every square is a minute with at least one message.",
+		`<rect class="c-msgs" x="590.50" y="15.00" width="9.00" height="9.00"/>`, // both in the last minute, one square
+		`<nav class="resource-list" aria-label="Channels" id="channel-list" hx-swap-oob="true">`,
+		`<strong>#public</strong><span class="mono">2</span>`, // the list count rides along
+	} {
+		if !strings.Contains(partial, want) {
+			t.Errorf("metrics partial is missing %q: %s", want, partial)
+		}
+	}
+	if strings.Contains(partial, "private channel message") || strings.Contains(partial, "SecretSender") {
+		t.Error("the metrics partial must not carry message text (MON-CH-8, MON-CH-11)")
+	}
+}
+
+// The Rooms strip updates itself every 2 s like the Channels one (MON-RM-16): a new post moves the
+// numbers, the bar and the room-list count, without a reload. The partial carries numbers only,
+// never client keys or post text (MON-RM-12).
+func TestRoomMetricsPartialUpdatesCountersAndList(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer", "viewer")
+	_, body, _ := get(t, c, h.ts.URL+"/rooms?room=lobby")
+	if !strings.Contains(body, `id="room-metrics" hx-get="/ui/room-metrics?room=lobby" hx-trigger="every 20s" hx-swap="outerHTML"`) {
+		t.Fatalf("the strip does not poll at half the rooms frequency: %s", body)
+	}
+	h.st.ApplyEvents(kam.EventsResponse{Epoch: "e1", FirstSeq: 6, LastSeq: 6, Events: []kam.Event{
+		{Seq: 6, At: t0.Add(-5 * time.Second), Kind: kam.KindRoom, Room: "lobby", Event: "post"},
+	}}, t0)
+	status, partial, _ := get(t, c, h.ts.URL+"/ui/room-metrics?room=lobby")
+	if status != http.StatusOK {
+		t.Fatalf("metrics partial: %d", status)
+	}
+	for _, want := range []string{
+		`<strong>2</strong>`, // the post count moved with the new post
+		"Accepted posts per hour over the last 24 hours: 2 in total, busiest hour 2.",
+		`<nav class="resource-list" aria-label="Rooms" id="room-list" hx-swap-oob="true">`,
+		`<span class="mono">2 posts/h</span>`, // the list count rides along
+	} {
+		if !strings.Contains(partial, want) {
+			t.Errorf("room metrics partial is missing %q: %s", want, partial)
+		}
+	}
+	_, adminPage, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/rooms?room=lobby")
+	if !strings.Contains(adminPage, `id="room-posts" hx-get="/ui/room-posts?room=lobby" hx-trigger="every 10s"`) {
+		t.Errorf("the room feed does not poll at half the text cache: %s", adminPage)
+	}
+	_, adminBody, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/ui/room-metrics?room=lobby")
+	for _, bad := range []string{"secret room post", "0123456789abcdef"} {
+		if strings.Contains(adminBody, bad) {
+			t.Errorf("the room metrics partial must not carry %q (MON-RM-12)", bad)
+		}
+	}
+}
+
 func TestPartialKeepsPollingAndCarriesOutOfBandParts(t *testing.T) {
 	h := newHarness(t)
 	c := h.login(t, "viewer", "viewer")

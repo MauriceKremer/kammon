@@ -37,7 +37,7 @@ KAM remembers a client after it logs in, and does **not** forget it when the rad
 |---|---|
 | **Room list** (left) | Name, last activity, posts in the last hour. |
 | **Detail header** | Room name, "Serving", the room's short public key with a copy control. |
-| **Metric strip** (3) | Last activity; Posts last hour; Remembered clients, with "N heard in the last hour" below. |
+| **Metric strip** (3) | Last activity; Posts last hour, with small bars of accepted posts per hour over the last 24 hours (MON-RM-15); Remembered clients, with "N heard in the last hour" below. Strip and room list refresh on their own every 20 s (MON-RM-16). |
 | **Caption** | "Last heard is radio activity, not a live connection. Stale Node means a stored client was not heard for over 24 hours; its session has not expired. Unknown means no reliable last-heard time is available." |
 | **Legend** | The five activity states ([DESIGN.md](../DESIGN.md) §8.2). |
 | **Client activity** (admin) | Table: label or key, role, last activity with indicator. |
@@ -68,12 +68,14 @@ Boundaries: under 300 s is Fresh; 300 to 3599 s is Recent; 3600 to 86400 s is Ol
 | MON-RM-6 | The legend is always shown above a client table, and every indicator has a title that explains it in words. | MUST |
 | MON-RM-7 | The indicator never relies on colour alone: it also has a shape (dot, hollow dot, dotted line) and text. | MUST |
 | MON-RM-8 | Admin only: the client table shows label or key, role, last activity. Without a label the full key is available on hover and in a copy control. | MUST |
-| MON-RM-9 | Admin only: the room feed is fetched from `GET /v1/rooms/{id}/posts` (20 posts) when the room is opened, then refreshed every 10 s while the room is open. | MUST |
+| MON-RM-9 | Admin only: the room feed is fetched from `GET /v1/rooms/{id}/posts` (20 posts) when the room is opened, then refreshed every 10 s while the room is open — half the 5 s text cache. | MUST |
 | MON-RM-10 | Admin only: a post shows the author's label or short key, time and text. Text is escaped. | MUST |
 | MON-RM-11 | Delivery shows pushes acked and timed out from `room` events, and the number of clients whose `push_state` is `paused`. | SHOULD |
 | MON-RM-12 | A viewer sees the room list, the metric strip, the caption and the legend, and a line "Client activity and posts are visible to the administrator." No client or post data is fetched for a viewer. | MUST |
 | MON-RM-13 | A room that is disabled or failed validation in `kam.yml` does not appear. The page says nothing about it. | MUST |
 | MON-RM-14 | When `GET /v1/rooms` answers `503` (rooms disabled), the Rooms navigation item shows "Rooms are not enabled". | MUST |
+| MON-RM-15 | The Posts metric also shows a small server-drawn bar chart of accepted posts per hour over the last 24 hours, counted like the last-hour figure (matched by room id or name). The chart has a text alternative; while KAMmon holds less than a day of history it says so instead of reading as a quiet day. | MUST |
+| MON-RM-16 | The metric strip (with its chart) and the counts in the room list refresh on their own every 20 seconds — half the 10 s rooms poll — without a reload. The polled partial carries no client or post data, and no page region refreshes faster than once per second. | MUST |
 
 ## 5. What KAMmon needs from KAM
 
@@ -101,6 +103,7 @@ Without API-RM-9, every client reads Unknown after a KAM restart until it is hea
 - Indicator boundaries: 0, 299, 300, 3599, 3600, 86400, 86401 seconds and no time.
 - Unknown is never rendered as Stale.
 - The viewer page does not contain a client key list or a post.
+- The metrics partial updates the strip, the chart and the list counts without a reload, and carries no client or post data.
 - Rooms disabled and a room list with zero rooms.
 - A client list with 100 clients renders within the page time budget.
 

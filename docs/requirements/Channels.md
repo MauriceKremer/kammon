@@ -1,7 +1,7 @@
 # KAMmon Requirements: Channels Page
 
 **Status:** Phase 2 page implemented; event-derived details and on-demand text caching are covered by `internal/web` and `internal/store` tests.
-**Scope:** Monitoring the channels KAM is configured to decode: how active each one is, and what was said on it. Design: [DESIGN.md](../DESIGN.md) §4.2 (master-detail). KAM side: [docs/kam-api/FeatureMonitorApi.md](../kam-api/FeatureMonitorApi.md) §7.2.
+**Scope:** Monitoring the channels KAM is configured to decode: how active each one is, and what was said on it. Design: [DESIGN.md](../DESIGN.md) §4.2 (master-detail). KAM side: [docs/kam-api/FeatureKamApi.md](../kam-api/FeatureKamApi.md) §7.2.
 
 ## 1. Summary
 
@@ -33,7 +33,7 @@ Keys are secrets. KAMmon never shows them and does not edit channels in version 
 |---|---|
 | **Channel list** (left) | One item per channel: name, key type (public, derived, explicit), enabled or disabled, messages in the last hour. |
 | **Detail header** | Channel name, key type, "Decoding enabled" or "Disabled". |
-| **Metric strip** (3) | Decoded messages in the last hour; last decoded message ("2 s ago"); received airtime in the last hour. |
+| **Metric strip** (3) | Decoded messages in the last hour, with a small per-minute chart of that hour; last decoded message ("2 s ago"); received airtime in the last hour. Strip and channel list refresh on their own every 2 s, the message list every 10 s (MON-CH-13). |
 | **Caption** | "Airtime attributed to decoded RX packets, not total radio occupancy. Messages KAM cannot decrypt are not assigned to a channel here." |
 | **Search box** | Sender or message text. |
 | **Messages** | Newest first: sender, time, text, then route and hops. SNR and RSSI are not shown (D19). |
@@ -45,7 +45,7 @@ Keys are secrets. KAMmon never shows them and does not edit channels in version 
 | ID | Requirement | Level |
 |---|---|---|
 | MON-CH-1 | The channel list comes from `GET /v1/channels` (polled every 30 s). A new or removed channel appears within that time. | MUST |
-| MON-CH-2 | Metric values come from `rx` events in the store: count of decoded group texts with `channel = name` and `duplicate = false`, the newest one's time, and the sum of `airtime_ms` of all `rx` events for that channel. | MUST |
+| MON-CH-2 | Metric values come from `rx` events in the store: count of decoded group texts with `channel = name` and `duplicate = false`, the newest one's time, and the sum of `airtime_ms` of all `rx` events for that channel. The messages metric carries a small chart of the same events per minute over the hour: one square, height equal to width, for every minute that received at least one counted message. | MUST |
 | MON-CH-3 | A disabled channel is shown muted with "Decoding disabled". It still opens and shows its stored history. | MUST |
 | MON-CH-4 | The key type is shown as a word. The key itself, and any value derived from it, never appears. | MUST |
 | MON-CH-5 | The message list for an allowed viewer or an admin is fetched on demand from `GET /v1/channels/{name}/messages` (50 per request) and cached for 5 seconds. | MUST |
@@ -56,6 +56,7 @@ Keys are secrets. KAMmon never shows them and does not edit channels in version 
 | MON-CH-10 | The unreadable-text line counts `rx` events with `payload_type = GRP_TXT` and no `channel`, per hour. | SHOULD |
 | MON-CH-11 | Message text is escaped when rendered. Names and text from the radio are untrusted. | MUST |
 | MON-CH-12 | When KAM does not answer, the list shows the last cached page with the stale-data bar; with no cache it says "Messages are unavailable right now." | MUST |
+| MON-CH-13 | The metric strip (with its chart) and the counts in the channel list refresh on their own every 2 seconds — half the 1 s event poll — and the message list every 10 seconds — half the 5 s text cache — without a reload. No page region refreshes faster than once per second, and a partial must never re-fetch by refiring a `load` trigger on its own swapped-in markup. | MUST |
 
 ## 5. What KAMmon needs from KAM
 
@@ -80,6 +81,7 @@ Nothing on the page depends on the signal columns (D19).
 ## 7. Tests
 
 - Metric arithmetic from a fixed event list, including repeats.
+- The metrics partial updates the chart, the numbers and the list counts without a reload, and carries no message text.
 - The three message states: allowed, hidden for a viewer, KAM down.
 - A viewer's page source does not contain hidden text.
 - Paging with `before_id` and an empty result.

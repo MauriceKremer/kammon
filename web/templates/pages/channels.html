@@ -1,15 +1,10 @@
 {{define "content"}}
 <div class="resource-layout">
-  <nav class="resource-list" aria-label="Channels">
-    {{range .Content.Channels}}<a class="resource-item{{if .Selected}} selected{{end}}" href="/channels?channel={{urlquery .Name}}"{{if .Selected}} aria-current="page"{{end}}>
-      <span class="resource-item-top"><strong>{{.Name}}</strong><span class="mono">{{.Count}}</span></span>
-      <span class="small muted">{{.KeyType}} key · {{.State}}</span>
-    </a>{{else}}<p class="muted small">Waiting for the channel list.</p>{{end}}
-  </nav>
+  {{template "channel-list-oob" .Content}}
   <section class="resource-detail" aria-label="Channel details">
     {{if .Content.Selected}}
       <div class="section-head"><div><h2>{{.Content.Selected}}</h2><p class="small muted">{{.Content.KeyType}} key · {{if eq .Content.State "Enabled"}}Decoding enabled{{else}}Decoding disabled{{end}}</p></div></div>
-      <div class="resource-metrics">{{range .Content.Metrics}}<div><span class="metric-label">{{.Label}}</span><strong>{{.Value}}</strong><span class="small muted">{{.Caption}}</span></div>{{end}}</div>
+      {{template "channel-metrics" .Content}}
       <p class="small muted resource-caption">{{.Content.ActivityNote}}</p>
       {{if .Content.CanRead}}
         <form class="filters resource-search" action="/channels" method="get" role="search">
@@ -31,7 +26,7 @@
 {{end}}
 
 {{define "channel-messages"}}
-<div id="channel-messages" hx-get="{{.MessageURL}}" hx-trigger="load, every 1s" hx-swap="outerHTML">
+<div id="channel-messages" hx-get="{{.MessageURL}}" hx-trigger="every 10s" hx-swap="outerHTML">
   {{if .CacheMessage}}<p class="small muted">{{.CacheMessage}}</p>{{end}}
   <div class="table-scroll"><table><thead><tr><th>Received</th><th>Sender</th><th>Message</th><th>Hops</th></tr></thead><tbody>
     {{range .Messages}}<tr><td class="mono muted">{{.Time}}</td><td>{{.Sender}}</td><td class="message-body">{{.Body}}</td><td>{{.Hops}}</td></tr>
@@ -40,3 +35,10 @@
   {{if .OlderURL}}<button type="button" class="text-button" hx-get="{{.OlderURL}}" hx-target="#channel-messages" hx-swap="outerHTML">Older messages</button>{{end}}
 </div>
 {{end}}
+
+{{define "channel-metrics"}}<div class="resource-metrics" id="channel-metrics"{{if .MetricsURL}} hx-get="{{.MetricsURL}}" hx-trigger="every 2s" hx-swap="outerHTML"{{end}}>{{range .Metrics}}<div><span class="metric-label">{{.Label}}</span><strong>{{.Value}}</strong>{{if .Chart}}<span class="posts-trend" role="img" aria-label="{{.ChartAlt}}" title="{{.ChartAlt}}">{{.Chart}}<span class="small mono muted">{{.ChartUnit}}</span></span>{{else if .Caption}}<span class="small muted">{{.Caption}}</span>{{end}}</div>{{end}}</div>{{end}}
+
+{{define "channel-list-oob"}}<nav class="resource-list" aria-label="Channels" id="channel-list" hx-swap-oob="true">{{range .Channels}}<a class="resource-item{{if .Selected}} selected{{end}}" href="/channels?channel={{urlquery .Name}}"{{if .Selected}} aria-current="page"{{end}}>
+      <span class="resource-item-top"><strong>{{.Name}}</strong><span class="mono">{{.Count}}</span></span>
+      <span class="small muted">{{.KeyType}} key · {{.State}}</span>
+    </a>{{else}}<p class="muted small">Waiting for the channel list.</p>{{end}}</nav>{{end}}

@@ -561,6 +561,37 @@ func (s *Store) Window(now time.Time, d time.Duration) Window {
 	return w
 }
 
+// PostHours sums the accepted posts of one room per hour over the last 24 hours of KAM's clock,
+// oldest hour first, from the same buckets as the charts (MON-OV-8). A room is matched by id or
+// name, exactly like the last-hour count (MON-RM-1); an event that carries neither counts for no
+// room. Full is false while KAMmon holds less than a day of history, so a flat chart can be
+// labelled as young instead of quiet. Now must be KAM's clock time, as in the rooms handler.
+func (s *Store) PostHours(now time.Time, rooms ...string) (hours [24]int, full bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var keys []string
+	seen := map[string]bool{}
+	for _, room := range rooms {
+		if room != "" && !seen[room] {
+			seen[room] = true
+			keys = append(keys, room)
+		}
+	}
+	to := (now.Unix()/3600 + 1) * 3600 // the unfinished KAM hour is the newest bar
+	from := to - 24*3600
+	for minute, b := range s.buckets {
+		start := minute * 60
+		if start < from || start >= to || len(b.PostsByRoom) == 0 {
+			continue
+		}
+		n := int(start-from) / 3600
+		for _, key := range keys {
+			hours[n] += b.PostsByRoom[key]
+		}
+	}
+	return hours, !s.historyStart.IsZero() && !s.historyStart.After(time.Unix(from, 0))
+}
+
 func percent(ms int64, d time.Duration) float64 {
 	if d <= 0 {
 		return 0
