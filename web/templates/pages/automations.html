@@ -103,9 +103,10 @@
   </div>
   <p class="small muted">A filled SNR or RSSI tells the script the message heard the sender: the fixture says so.</p>
   <div class="fixture-actions">
-    {{if .DryRunSupported}}<button type="button" hx-post="/ui/script-dry-run" hx-target="#console" hx-swap="outerHTML" hx-include="#script-source">Dry run</button>
+    {{if .DryRunSupported}}<button type="button" hx-post="/ui/script-dry-run" hx-target="#dry-run-result" hx-swap="outerHTML" hx-include="#script-source">Dry run</button>
     {{else}}<span class="small muted">Needs a newer KAM.</span>{{end}}
   </div>
+  {{if .DryRunSupported}}{{template "fixture-console" .DryRunResult}}{{end}}
 </form>
 {{end}}
 
@@ -127,7 +128,9 @@
 </details>
 {{end}}
 
-{{define "console"}}<div id="console" class="script-console" role="status" aria-live="polite"{{if .Saved}} data-saved="true"{{end}}>{{range .Lines}}<p{{if ne .Class ""}} class="{{.Class}}"{{end}}>{{.Text}}</p>{{else}}<p class="muted">Validate, test and save write their result here.</p>{{end}}</div>{{end}}
+{{define "fixture-console"}}<div id="dry-run-result" class="script-console" role="status" aria-live="polite">{{range .Lines}}<p{{if ne .Class ""}} class="{{.Class}}"{{end}}>{{.Text}}</p>{{else}}<p class="muted">A dry run writes its replies here.</p>{{end}}</div>{{end}}
+
+{{define "console"}}<div id="console" class="script-console" role="status" aria-live="polite"{{if .Saved}} data-saved="true"{{end}}>{{range .Lines}}<p{{if ne .Class ""}} class="{{.Class}}"{{end}}>{{.Text}}</p>{{else}}<p class="muted">Validate and save write their result here.</p>{{end}}</div>{{end}}
 
 {{define "script-state-oob"}}
 <input type="hidden" name="id" value="{{.ID}}" id="script-id" hx-swap-oob="true">

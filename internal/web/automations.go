@@ -85,7 +85,10 @@ type editorData struct {
 	RunSummary string
 	// DryRunSupported is false when KAM answered 404 for the dry-run route (MON-AU-20, D30).
 	DryRunSupported bool
-	Console         scriptConsole
+	// DryRunResult is the box under the Dry run button at editor open: empty, a live region for
+	// the next test's replies (MON-AU-15).
+	DryRunResult scriptConsole
+	Console      scriptConsole
 }
 
 type automationsData struct {
@@ -350,6 +353,9 @@ type scriptReply struct {
 	Fresh    *kam.Script
 	Redirect string
 	Replace  string
+	// Fixture answers the Dry run button: its console swaps into the test-message form's own
+	// result below that button, not into the editor's console (MON-AU-15).
+	Fixture bool
 }
 
 // writeScriptReply writes the console and the out-of-band parts. Every answer swaps: a failure
@@ -357,7 +363,11 @@ type scriptReply struct {
 func (s *Server) writeScriptReply(w http.ResponseWriter, r *http.Request, reply scriptReply) {
 	t := s.pages["automations"]
 	var buf bytes.Buffer
-	if err := t.ExecuteTemplate(&buf, "console", reply.Console); err != nil {
+	name := "console"
+	if reply.Fixture {
+		name = "fixture-console"
+	}
+	if err := t.ExecuteTemplate(&buf, name, reply.Console); err != nil {
 		http.Error(w, "Template error.", http.StatusInternalServerError)
 		return
 	}
@@ -568,12 +578,12 @@ func (s *Server) scriptDryRunSubmit(w http.ResponseWriter, r *http.Request) {
 	if s.kam == nil {
 		console := notConnectedConsole()
 		console.Lines = append(console.Lines, sent)
-		s.writeScriptReply(w, r, scriptReply{Console: console})
+		s.writeScriptReply(w, r, scriptReply{Console: console, Fixture: true})
 		return
 	}
 	message, problem := fixtureMessage(form)
 	if problem != "" {
-		s.writeScriptReply(w, r, scriptReply{Console: scriptConsole{Lines: []consoleLine{{Text: problem, Class: "fail"}, sent}}})
+		s.writeScriptReply(w, r, scriptReply{Console: scriptConsole{Lines: []consoleLine{{Text: problem, Class: "fail"}, sent}}, Fixture: true})
 		return
 	}
 	test := kam.DryRunRequest{Source: form.Get("source"), Message: message}
@@ -581,7 +591,7 @@ func (s *Server) scriptDryRunSubmit(w http.ResponseWriter, r *http.Request) {
 		n, err := strconv.ParseInt(raw, 10, 64)
 		// KAM answers 422 out of range (§7.6.1); KAMmon refuses the obvious ones first (MON-AU-15).
 		if err != nil || n < 1 || n > 3000 {
-			s.writeScriptReply(w, r, scriptReply{Console: scriptConsole{Lines: []consoleLine{{Text: "The test timeout must be between 1 and 3000 ms.", Class: "fail"}, sent}}})
+			s.writeScriptReply(w, r, scriptReply{Console: scriptConsole{Lines: []consoleLine{{Text: "The test timeout must be between 1 and 3000 ms.", Class: "fail"}, sent}}, Fixture: true})
 			return
 		}
 		test.TimeoutMS = n
@@ -592,7 +602,7 @@ func (s *Server) scriptDryRunSubmit(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		console := dryRunErrorConsole(err)
 		console.Lines = append(console.Lines, sent)
-		s.writeScriptReply(w, r, scriptReply{Console: console})
+		s.writeScriptReply(w, r, scriptReply{Console: console, Fixture: true})
 		return
 	}
 	var lines []consoleLine
@@ -608,7 +618,7 @@ func (s *Server) scriptDryRunSubmit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	lines = append(lines, sent)
-	s.writeScriptReply(w, r, scriptReply{Console: scriptConsole{Lines: lines}})
+	s.writeScriptReply(w, r, scriptReply{Console: scriptConsole{Lines: lines}, Fixture: true})
 }
 
 // dryRunErrorConsole is the console of a dry run that could not run at all: an older KAM misses

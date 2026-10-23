@@ -174,6 +174,7 @@ func TestAutomationsEditorButtonPlacement(t *testing.T) {
 		{"the test-message form", `id="fixture-form"`},
 		{"the fixture's text field", `name="fx_body"`},
 		{"the dry run", `>Dry run</button>`},
+		{"the dry run's result", `id="dry-run-result"`},
 		{"save", `>Save</button>`},
 		{"delete", `>Delete</button>`},
 	} {
@@ -286,7 +287,9 @@ func TestAutomationsDryRunConsole(t *testing.T) {
 	if status != http.StatusOK {
 		t.Fatalf("dry run: %d", status)
 	}
-	for _, want := range []string{"Would send to #emmen: pong", "Nothing was sent.", "The test ran in 2 ms."} {
+	// The dry run answers into its own result below the button (MON-AU-15), not the editor's
+	// console, and the box keeps the live region.
+	for _, want := range []string{"id=\"dry-run-result\"", `role="status" aria-live="polite"`, "Would send to #emmen: pong", "Nothing was sent.", "The test ran in 2 ms."} {
 		if !strings.Contains(body, want) {
 			t.Errorf("dry run console misses %q: %s", want, body)
 		}

@@ -67,15 +67,16 @@
 
   // The server's answers always swap; these statuses are the ones that never reached it: the
   // guard refused the request, or KAMmon did not get through. Say so, keep the editor untouched.
-  // All of the editor's controls write to the same console, and two of them live outside the
-  // editor form itself: the dry run's button in the test-message form, and the Save and Delete
-  // row at the bottom of the page.
+  // All of the editor's controls write to the editor's console, except the dry run, whose result
+  // lives under its own button in the test-message form.
   function actionOrigin(elt) {
     return !!(elt && elt.closest && (elt.closest("#script-editor") || elt.closest("#fixture-form") || elt.closest("#script-actions")));
   }
 
-  function writeFail(text) {
-    var consoleBox = document.getElementById("console");
+  function writeFail(elt, text) {
+    var consoleBox = elt && elt.closest && elt.closest("#fixture-form")
+      ? document.getElementById("dry-run-result")
+      : document.getElementById("console");
     if (!consoleBox) return;
     consoleBox.removeAttribute("data-saved");
     while (consoleBox.firstChild) consoleBox.removeChild(consoleBox.firstChild);
@@ -90,16 +91,16 @@
     if (!actionOrigin(elt)) return;
     var status = (evt.detail.xhr && evt.detail.xhr.status) || 0;
     if (status === 403) {
-      writeFail("This page is for the administrator on this computer.");
+      writeFail(elt, "This page is for the administrator on this computer.");
     } else if (status === 401) {
       // The guard redirects to the login; nothing to say that the new page does not say.
     } else {
-      writeFail("KAMmon could not reach KAM. Nothing was changed. Try again.");
+      writeFail(elt, "KAMmon could not reach KAM. Nothing was changed. Try again.");
     }
   });
   document.body.addEventListener("htmx:sendError", function (evt) {
     var elt = (evt.detail && evt.detail.requestConfig && evt.detail.requestConfig.elt) || null;
     if (!actionOrigin(elt)) return;
-    writeFail("KAMmon could not reach KAM. Nothing was changed. Try again.");
+    writeFail(elt, "KAMmon could not reach KAM. Nothing was changed. Try again.");
   });
 })();
