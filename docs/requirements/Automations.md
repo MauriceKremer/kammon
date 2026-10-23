@@ -1,6 +1,6 @@
 # KAMmon Requirements: Automations (Starlark Workspace)
 
-**Status:** Requirements only. Nothing is built.
+**Status:** Built (2026-10-23): the list, the editor, validate, save, enable, disable, recover and delete (MON-AU-1..14, 21..23). The dry run and the run object wait for KAM API phase 5; a KAM without the dry-run route leaves the button out and says "Needs a newer KAM." (MON-AU-20, D30).
 **Scope:** Creating, testing, saving and managing the Starlark scripts that KAM runs when it hears a channel message. Design: [DESIGN.md](../DESIGN.md) §4.2 (master-detail). KAM side: [docs/kam-api/FeatureKamApi.md](../kam-api/FeatureKamApi.md) §7.6. Language and runtime: [docs/FeatureStarlark.md](../../../kam/docs/FeatureStarlark.md).
 
 ## 1. Summary

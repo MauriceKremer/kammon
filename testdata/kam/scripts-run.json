@@ -1,0 +1,31 @@
+[
+  {
+    "id": "echo",
+    "name": "echo.star",
+    "source": "def on_group_text(message):\n    if message[\"body\"] == \"!ping\":\n        reply(message[\"channel\"], \"pong\")\n",
+    "enabled": true,
+    "timeout_ms": 500,
+    "runtime_status": "READY",
+    "revision": 12,
+    "created_at": 1760700000,
+    "updated_at": 1760882400,
+    "run": {
+      "runs": 12,
+      "errors": 0,
+      "last_run_at": "2026-10-23T14:59:48.000Z",
+      "last_duration_ms": 2,
+      "last_replies": 1
+    }
+  },
+  {
+    "id": "welcome",
+    "name": "welcome.star",
+    "source": "def on_group_text(message):\n    if message[\"body\"] == \"!hello\":\n        reply(message[\"channel\"], \"Hello from Emmen!\")\n",
+    "enabled": true,
+    "timeout_ms": 1000,
+    "runtime_status": "READY",
+    "revision": 2,
+    "created_at": 1760700000,
+    "updated_at": 1760700000
+  }
+]

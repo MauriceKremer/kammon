@@ -54,8 +54,10 @@ func run(configPath string, demo bool) error {
 	}
 
 	st := store.New(store.WithFreshness(cfg.Freshness.StaleAfter, cfg.Freshness.DownAfter))
+	// One client for both the poller and the pages' admin actions (D28: one address serves both).
+	kamClient := kam.NewHTTP(cfg.KamMonitorURL, cfg.Poll.Timeout)
 	poller := &poll.Poller{
-		Reader:    kam.NewHTTP(cfg.KamMonitorURL, cfg.Poll.Timeout),
+		Reader:    kamClient,
 		Store:     st,
 		Every:     cfg.Poll.Every(),
 		Timeout:   cfg.Poll.Timeout,
@@ -63,7 +65,7 @@ func run(configPath string, demo bool) error {
 	}
 	go poller.Run(ctx)
 
-	srv, err := web.New(web.Deps{Config: cfg, Store: st, Demo: demo})
+	srv, err := web.New(web.Deps{Config: cfg, Store: st, Demo: demo, KAM: kamClient})
 	if err != nil {
 		return err
 	}

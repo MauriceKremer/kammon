@@ -49,7 +49,7 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 
 ## Slice 7: Automations (needs KAM API phase 5; the script routes already exist)
 
-- [ ] List, editor, validate, save, enable, recover, delete, dry run (MON-AU-1..23)
+- [x] List, editor, validate, save, enable, recover, delete, dry run (MON-AU-1..23, D29, D30). The dry run works against KAM's phase-5 route; until KAM ships it the button stays hidden behind "Needs a newer KAM." (MON-AU-20)
 
 ## Slice 4b: Manuals
 

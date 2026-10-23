@@ -113,6 +113,12 @@ func CanReadChannelText(role config.Role, allow []string, channel string) bool {
 	return role == config.RoleAdmin || slices.Contains(allow, config.NormalizeChannel(channel))
 }
 
+// CanEditScripts: editors, dry runs and every script action are admin-only; viewers see the
+// list's names, state, revision and run information but never the source (MON-AU-4, §6).
+func CanEditScripts(role config.Role) bool {
+	return role == config.RoleAdmin
+}
+
 // PacketLabel is the source or destination text of a packet event (docs/requirements/Traffic.md §3.1).
 // Sender names on channels a viewer may not read are replaced, and never appear in the page.
 // Events carry room ids, not room names; the caller supplies a resolver against the room snapshot.

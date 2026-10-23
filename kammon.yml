@@ -9,6 +9,7 @@ poll:
   status:     5s    # status, radio, duty cycle, counters, /v1/status
   rooms:      10s   # rooms and their clients, /v1/rooms
   channels:   30s   # channel list, /v1/channels
+  scripts:    10s   # script list and run information, /scripts
   timeout:    3s    # the timeout of every read
   not_served: 10m   # after a 404 the poller stops asking that read for this long
 

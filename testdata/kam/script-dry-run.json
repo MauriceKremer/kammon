@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "duration_ms": 1,
+  "replies": [
+    { "channel": "#emmen", "text": "@kam hello" }
+  ]
+}

@@ -14,6 +14,7 @@ import (
 
 	"kammon.bytecoder.nl/internal/auth"
 	"kammon.bytecoder.nl/internal/config"
+	"kammon.bytecoder.nl/internal/kam"
 	"kammon.bytecoder.nl/internal/store"
 	"kammon.bytecoder.nl/internal/view"
 	webassets "kammon.bytecoder.nl/web"
@@ -27,13 +28,16 @@ const (
 // AssetVersion is the cache-buster of the shared static assets (kammon.css and
 // the static scripts). Bump it when one of those files changes, so browsers drop
 // their cached copy instead of running or styling the pages with the old rules.
-const AssetVersion = "kammon-9"
+const AssetVersion = "kammon-10"
 
 type Deps struct {
 	Config config.Config
 	Store  *store.Store
 	Now    func() time.Time
 	Demo   bool
+	// KAM is the client for the admin's script calls; nil keeps the pages reading the store
+	// and the editor saying it is not connected (AGENTS rule 3).
+	KAM kam.Admin
 	// Sleep is the pause login slowdowns impose (MON-AX-6); tests substitute it.
 	Sleep func(time.Duration)
 }
@@ -48,6 +52,9 @@ type Server struct {
 	sleep    func(time.Duration)
 	pages    map[string]*template.Template
 	static   http.Handler
+	// kam is the client of the script calls; pages never use it, only the automations admin
+	// actions do (AGENTS rule 3).
+	kam kam.Admin
 }
 
 // access is the role a route needs. There is no zero value, so a route cannot forget to say (MON-AX-11).
@@ -73,7 +80,7 @@ func New(d Deps) (*Server, error) {
 		d.Sleep = time.Sleep
 	}
 	s := &Server{
-		cfg: d.Config, store: d.Store, now: d.Now, demo: d.Demo,
+		cfg: d.Config, store: d.Store, now: d.Now, demo: d.Demo, kam: d.KAM,
 		sessions: auth.NewSessions(d.Config.SessionIdle(), d.Now),
 		slowdown: auth.NewSlowdown(),
 		sleep:    d.Sleep,
@@ -83,7 +90,7 @@ func New(d Deps) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, name := range []string{"overview", "placeholder", "login", "traffic", "channels", "rooms"} {
+	for _, name := range []string{"overview", "placeholder", "login", "traffic", "channels", "rooms", "automations"} {
 		clone, err := base.Clone()
 		if err != nil {
 			return nil, err
@@ -117,11 +124,19 @@ func (s *Server) routes() []route {
 		{"GET /rooms", viewer, s.roomsPage},
 		{"GET /ui/room-posts", admin, s.roomPostsPartial},
 		{"GET /ui/room-metrics", viewer, s.roomMetricsPartial},
+		{"GET /automations", viewer, s.automationsPage},
+		{"GET /ui/script-list", viewer, s.scriptListPartial},
+		{"POST /ui/script-validate", admin, s.scriptValidateSubmit},
+		{"POST /ui/script-dry-run", admin, s.scriptDryRunSubmit},
+		{"POST /ui/script-save", admin, s.scriptSaveSubmit},
+		{"POST /ui/script-toggle", admin, s.scriptToggleSubmit},
+		{"POST /ui/script-recover", admin, s.scriptRecoverSubmit},
+		{"DELETE /ui/script", admin, s.scriptDeleteSubmit},
 	}
 	// Placeholder routes for the pages that are not built yet. Built pages register their own
 	// routes above; the overview and traffic pages take themselves out of this loop.
 	for _, p := range view.Pages(config.RoleAdmin) {
-		if p.Key == "overview" || p.Key == "traffic" || p.Key == "channels" || p.Key == "rooms" {
+		if p.Key == "overview" || p.Key == "traffic" || p.Key == "channels" || p.Key == "rooms" || p.Key == "automations" {
 			continue
 		}
 		level := viewer
@@ -442,11 +457,10 @@ func (s *Server) overviewPartial(w http.ResponseWriter, r *http.Request) {
 }
 
 var placeholders = map[string]placeholderData{
-	"channels":    {Text: "Channel activity and decoded messages.", Slice: "slice 3", Doc: "docs/requirements/Channels.md"},
-	"rooms":       {Text: "Room activity, remembered clients and posts.", Slice: "slice 3", Doc: "docs/requirements/Rooms.md"},
-	"accounts":    {Text: "Room roles for the administrator.", Slice: "slice 6", Doc: "docs/requirements/RoomAccounts.md"},
-	"automations": {Text: "Starlark scripts: write, test and manage.", Slice: "slice 7", Doc: "docs/requirements/Automations.md"},
-	"modem":       {Text: "KISS modem snapshot, queries and radio settings.", Slice: "slice 5", Doc: "docs/requirements/KissModem.md"},
+	"channels": {Text: "Channel activity and decoded messages.", Slice: "slice 3", Doc: "docs/requirements/Channels.md"},
+	"rooms":    {Text: "Room activity, remembered clients and posts.", Slice: "slice 3", Doc: "docs/requirements/Rooms.md"},
+	"accounts": {Text: "Room roles for the administrator.", Slice: "slice 6", Doc: "docs/requirements/RoomAccounts.md"},
+	"modem":    {Text: "KISS modem snapshot, queries and radio settings.", Slice: "slice 5", Doc: "docs/requirements/KissModem.md"},
 }
 
 func (s *Server) placeholder(key string) http.HandlerFunc {

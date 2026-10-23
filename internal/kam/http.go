@@ -24,6 +24,7 @@ type Reader interface {
 	Rooms(ctx context.Context) ([]Room, error)
 	RoomClients(ctx context.Context, roomID string) ([]RoomClient, error)
 	RoomPosts(ctx context.Context, roomID string, limit int) ([]RoomPost, error)
+	Scripts(ctx context.Context) ([]Script, error)
 }
 
 // HTTP reads from KAM's monitor listener.

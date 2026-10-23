@@ -1,0 +1,36 @@
+[
+  {
+    "id": "echo",
+    "name": "echo.star",
+    "source": "def on_group_text(message):\n    if message[\"body\"] == \"!ping\":\n        reply(message[\"channel\"], \"pong\")\n",
+    "enabled": true,
+    "timeout_ms": 500,
+    "runtime_status": "READY",
+    "revision": 4,
+    "created_at": 1760700000,
+    "updated_at": 1760882400
+  },
+  {
+    "id": "status",
+    "name": "status.star",
+    "source": "def on_group_text(message):\n    if message[\"body\"] == \"!status\":\n        reply(message[\"channel\"], \"Emmen node listening.\")\n",
+    "enabled": false,
+    "timeout_ms": 500,
+    "runtime_status": "READY",
+    "revision": 1,
+    "created_at": 1760700000,
+    "updated_at": 1760700000
+  },
+  {
+    "id": "broken",
+    "name": "broken.star",
+    "source": "def on_group_text(message)\n    reply(message[\"channel\"], \"missing colon\")\n",
+    "enabled": false,
+    "timeout_ms": 500,
+    "runtime_status": "BROKEN",
+    "last_error": "SyntaxError: line 1, column 26: expected ':'",
+    "revision": 3,
+    "created_at": 1760700000,
+    "updated_at": 1760880000
+  }
+]

@@ -82,6 +82,7 @@ func (p *Poller) jobs() []*job {
 		{name: "status", every: p.interval("status", 2*time.Second), run: p.Status},
 		{name: "rooms", every: p.interval("rooms", 10*time.Second), run: p.Rooms},
 		{name: "channels", every: p.interval("channels", 30*time.Second), run: p.Channels},
+		{name: "scripts", every: p.interval("scripts", 10*time.Second), run: p.Scripts},
 	}
 }
 
@@ -127,6 +128,17 @@ func (p *Poller) TextRequests(ctx context.Context) {
 			p.Log.Warn("KAM text read failed", "kind", request.Kind, "error", err)
 		}
 	}
+}
+
+// Scripts keeps the store's script list current (MON-AU-1). A failure keeps the old snapshot, so
+// the page shows the last known state and the stale-data bar (MON-AU-5).
+func (p *Poller) Scripts(ctx context.Context) error {
+	list, err := p.Reader.Scripts(ctx)
+	if err != nil {
+		return err
+	}
+	p.Store.SetScripts(list, p.Now())
+	return nil
 }
 
 func (p *Poller) defaults() {

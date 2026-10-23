@@ -20,6 +20,7 @@ const (
 	MaxRooms              = 4
 	MaxClientsPerRoom     = 100
 	MaxRoomNamesPerBucket = 64
+	MaxScripts            = 64 // a hobby node holds a handful; the snapshot truncates and says so
 )
 
 // Bucket is one minute of events summed per packet class.
@@ -85,6 +86,9 @@ type Store struct {
 	textPending    map[textKey]bool
 	roomsAt        time.Time
 	notServed      map[string]time.Time
+	scripts        []kam.Script
+	scriptsAt      time.Time
+	scriptsMore    int
 }
 
 // Option tunes a Store at construction.
@@ -287,6 +291,33 @@ func (s *Store) ClockOffset() time.Duration {
 	return s.clockOffset
 }
 
+// SetScripts stores the script list (MON-AU-1). The list never keeps a script's source: the
+// editor fetches GET /scripts/{id} directly when it opens (MON-AU-6, D29), and a page view of a
+// viewer shows no source (MON-AU-4). Beyond MaxScripts the list truncates and Scripts says so.
+func (s *Store) SetScripts(list []kam.Script, now time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(list) > MaxScripts {
+		s.scriptsMore = len(list) - MaxScripts
+		list = list[:MaxScripts]
+	} else {
+		s.scriptsMore = 0
+	}
+	s.scripts = make([]kam.Script, 0, len(list))
+	for _, script := range list {
+		script.Source = ""
+		s.scripts = append(s.scripts, script)
+	}
+	s.scriptsAt = now
+}
+
+// Scripts returns the stored script list, without source text, and how many entries were cut.
+func (s *Store) Scripts() (list []kam.Script, truncated int) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return append([]kam.Script(nil), s.scripts...), s.scriptsMore
+}
+
 func (s *Store) SetChannels(ch []kam.Channel, now time.Time) {
 	s.mu.Lock()
 	s.channels = append([]kam.Channel(nil), ch...)
@@ -370,8 +401,9 @@ func (s *Store) freshnessOf(last, now time.Time) (Freshness, time.Time) {
 }
 
 // SnapshotFreshness reports how recently one named snapshot was answered (MON-DS-13). Names are
-// the poller jobs: "events", "status", "channels", "rooms". Successful event polling says
-// nothing about the status or room snapshots: they are judged separately.
+// the poller jobs: "events", "status", "channels", "rooms", "scripts". Successful event polling
+// says nothing about the other snapshots: they are judged separately, so a read that keeps
+// failing marks only its own panel stale.
 func (s *Store) SnapshotFreshness(name string, now time.Time) (Freshness, time.Time) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -385,6 +417,8 @@ func (s *Store) SnapshotFreshness(name string, now time.Time) (Freshness, time.T
 		last = s.channelsAt
 	case "rooms":
 		last = s.roomsAt
+	case "scripts":
+		last = s.scriptsAt
 	default:
 		return Down, time.Time{}
 	}

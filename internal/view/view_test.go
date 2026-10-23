@@ -40,6 +40,16 @@ func TestCanReadChannelText(t *testing.T) {
 	}
 }
 
+// Scripts are read for everyone but edited only by admins (MON-AU-4, §6).
+func TestCanEditScripts(t *testing.T) {
+	if CanEditScripts(config.RoleViewer) {
+		t.Error("a viewer may not edit scripts")
+	}
+	if !CanEditScripts(config.RoleAdmin) {
+		t.Error("an admin may edit scripts")
+	}
+}
+
 func TestPacketLabelHidesSendersFromViewers(t *testing.T) {
 	allow := []string{"#public"}
 	hidden := kam.Event{Kind: kam.KindRX, PayloadType: "GRP_TXT", Channel: "#emmen", Name: "PA3M"}

@@ -29,11 +29,18 @@ type Fake struct {
 	ring     []kam.Event
 	last     time.Time
 	lastRoom time.Time
+
+	scripts      []fakeScript
+	automationOn bool
+	dryRunOn     bool
+	runInfoOn    bool
+	dryRunBusy   bool
 }
 
 // New returns a fake whose clock is now. It starts with half an hour of traffic already in the ring.
 func New(now func() time.Time, seed int64) *Fake {
-	f := &Fake{now: now, rng: rand.New(rand.NewSource(seed)), started: now().Add(-3 * 24 * time.Hour)}
+	f := &Fake{now: now, rng: rand.New(rand.NewSource(seed)), started: now().Add(-3 * 24 * time.Hour),
+		automationOn: true, dryRunOn: true, runInfoOn: true}
 	f.restart(30 * time.Minute)
 	return f
 }
@@ -51,6 +58,16 @@ func (f *Fake) restart(history time.Duration) {
 	f.seq = 0
 	f.ring = f.ring[:0]
 	f.last = f.now().Add(-history)
+	// Scripts persist in KAM's database over a restart; only the run information, which lives in
+	// memory, resets (API-AU-2).
+	if f.scripts == nil {
+		f.scripts = seedScripts(f.now())
+		return
+	}
+	for i := range f.scripts {
+		f.scripts[i].runs, f.scripts[i].errors, f.scripts[i].lastRunAt = 0, 0, time.Time{}
+		f.scripts[i].lastDurationMS, f.scripts[i].lastReplies = 0, 0
+	}
 }
 
 var (
@@ -77,6 +94,31 @@ func (f *Fake) advance() {
 		for n := f.rng.Intn(3); n > 0; n-- {
 			f.emit(f.generate(f.last.Add(time.Duration(f.rng.Intn(900)) * time.Millisecond)))
 		}
+		// About every 20 seconds an enabled script runs, so the demo page shows run information.
+		if f.rng.Intn(20) == 0 {
+			f.runScript(f.last)
+		}
+	}
+}
+
+// The caller holds f.mu.
+func (f *Fake) runScript(at time.Time) {
+	for i := range f.scripts {
+		if !f.scripts[i].enabled || f.scripts[i].status != kam.StatusREADY {
+			continue
+		}
+		duration := int64(1 + f.rng.Intn(3))
+		replies := f.rng.Intn(2)
+		ok := f.rng.Intn(10) > 0
+		f.scripts[i].runs++
+		f.scripts[i].lastRunAt, f.scripts[i].lastDurationMS, f.scripts[i].lastReplies = at, duration, replies
+		if ok {
+			f.emit(kam.Event{At: at, Kind: kam.KindScript, Script: f.scripts[i].name, OK: ptr(true), DurationMS: int(duration), Replies: replies})
+		} else {
+			f.scripts[i].errors++
+			f.emit(kam.Event{At: at, Kind: kam.KindScript, Script: f.scripts[i].name, OK: ptr(false), DurationMS: int(duration), Error: "the reply limit was reached"})
+		}
+		return
 	}
 }
 
@@ -151,6 +193,16 @@ func (f *Fake) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/rooms", f.rooms)
 	mux.HandleFunc("GET /v1/rooms/{id}/clients", f.roomClients)
 	mux.HandleFunc("GET /v1/rooms/{id}/posts", f.roomPosts)
+	mux.HandleFunc("GET /scripts", f.handleScriptList)
+	mux.HandleFunc("POST /scripts", f.handleScriptCreate)
+	mux.HandleFunc("POST /scripts/validate", f.handleScriptValidate)
+	mux.HandleFunc("POST /scripts/dry-run", f.handleScriptDryRun)
+	mux.HandleFunc("GET /scripts/{id}", f.handleScriptGet)
+	mux.HandleFunc("PUT /scripts/{id}", f.handleScriptUpdate)
+	mux.HandleFunc("DELETE /scripts/{id}", f.handleScriptDelete)
+	mux.HandleFunc("POST /scripts/{id}/enable", func(w http.ResponseWriter, r *http.Request) { f.handleScriptEnabled(w, r, true) })
+	mux.HandleFunc("POST /scripts/{id}/disable", func(w http.ResponseWriter, r *http.Request) { f.handleScriptEnabled(w, r, false) })
+	mux.HandleFunc("POST /scripts/{id}/recover", f.handleScriptRecover)
 	return mux
 }
 
@@ -267,13 +319,19 @@ func (f *Fake) status(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.advance()
+	enabled := 0
+	for _, script := range f.scripts {
+		if script.enabled {
+			enabled++
+		}
+	}
 	var st kam.Status
 	st.APIVersion, st.Epoch, st.Now, st.StartedAt, st.NodeName = 1, f.epoch, f.now().UTC(), f.started.UTC(), "kam"
 	st.Modem.Link, st.Modem.DeviceName, st.Modem.FirmwareVersion = "up", "Emmen KISS", 1
 	st.Radio = kam.Radio{FrequencyHz: 868_000_000, BandwidthHz: 125_000, SpreadingFactor: 8, CodingRate: 5, TxPowerDBm: ptr(uint8(14)), Source: "modem_echo"}
 	st.DutyCycle.ConfiguredPercent, st.DutyCycle.UsedMS, st.DutyCycle.WindowS = 1.0, 21600, 3600
 	st.Rooms.Enabled, st.Rooms.Count = true, 1
-	st.Automation.Enabled, st.Automation.ScriptsEnabled = true, 2
+	st.Automation.Enabled, st.Automation.ScriptsEnabled = f.automationOn, enabled
 	st.EventRing.Capacity, st.EventRing.FirstSeq, st.EventRing.LastSeq = ringSize, f.firstSeq(), f.seq
 	writeJSON(w, st)
 }

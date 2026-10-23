@@ -41,6 +41,7 @@ type Poll struct {
 	Status    time.Duration `yaml:"status"`
 	Rooms     time.Duration `yaml:"rooms"`
 	Channels  time.Duration `yaml:"channels"`
+	Scripts   time.Duration `yaml:"scripts"`
 	Timeout   time.Duration `yaml:"timeout"`
 	NotServed time.Duration `yaml:"not_served"`
 }
@@ -52,6 +53,7 @@ func (p Poll) Every() map[string]time.Duration {
 		"status":   p.Status,
 		"rooms":    p.Rooms,
 		"channels": p.Channels,
+		"scripts":  p.Scripts,
 	}
 }
 
@@ -83,7 +85,7 @@ func defaults() Config {
 	return Config{
 		Listen:           ":8080",
 		KamMonitorURL:    "http://127.0.0.1:8766",
-		Poll:             Poll{Events: time.Second, Status: 2 * time.Second, Rooms: 10 * time.Second, Channels: 30 * time.Second, Timeout: 3 * time.Second, NotServed: 10 * time.Minute},
+		Poll:             Poll{Events: time.Second, Status: 2 * time.Second, Rooms: 10 * time.Second, Channels: 30 * time.Second, Scripts: 10 * time.Second, Timeout: 3 * time.Second, NotServed: 10 * time.Minute},
 		Freshness:        Freshness{StaleAfter: 10 * time.Second, DownAfter: 2 * time.Minute}, // store's FreshFor/StaleFor (MON-DS-13)
 		SessionIdleHours: 8,
 	}
@@ -135,6 +137,7 @@ func (c *Config) normalize() error {
 		{"poll.status", c.Poll.Status},
 		{"poll.rooms", c.Poll.Rooms},
 		{"poll.channels", c.Poll.Channels},
+		{"poll.scripts", c.Poll.Scripts},
 		{"poll.timeout", c.Poll.Timeout},
 		{"poll.not_served", c.Poll.NotServed},
 		{"freshness.stale_after", c.Freshness.StaleAfter},

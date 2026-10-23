@@ -1,0 +1,139 @@
+{{define "content"}}
+<div class="script-layout">
+  <div class="script-master">
+    {{template "script-list" .Content}}
+    {{if .Content.CanEdit}}<a class="text-button script-new" href="/automations?new=1">New script</a>{{end}}
+  </div>
+  <section class="script-detail" aria-label="Script editor">
+    {{if .Content.Editor.Open}}
+      {{if .Content.Editor.LoadError}}
+        <p class="notice">{{.Content.Editor.LoadError}}</p>
+      {{else if .Content.Editor.NotConnected}}
+        <p class="notice">KAMmon is not connected to KAM.</p>
+      {{else}}
+        {{template "script-editor" .Content.Editor}}
+      {{end}}
+    {{else if .Content.Editor.LoadError}}
+      <p class="notice">{{.Content.Editor.LoadError}}</p>
+    {{else}}
+      <p class="muted">Select a script{{if .Content.CanEdit}}, or start a new one,{{end}} to see it here.</p>
+    {{end}}
+  </section>
+</div>
+{{end}}
+
+{{define "script-list"}}<nav class="resource-list" aria-label="Scripts" id="script-list" hx-get="/ui/script-list" hx-trigger="every 10s" hx-swap="outerHTML">
+  {{range .Scripts}}<a class="resource-item{{if .Selected}} selected{{end}}" href="/automations?script={{urlquery .ID}}"{{if .Selected}} aria-current="page"{{end}}>
+      <span class="resource-item-top"><strong>{{.Name}}</strong><span class="mono">rev {{.Revision}}</span></span>
+      <span class="small muted">{{if .Dot}}<i class="dot {{.Dot}}" aria-hidden="true"></i> {{end}}{{.State}}{{if .RunsNote}} · {{.RunsNote}}{{end}}</span>
+      {{if .RunInfo}}<span class="small muted mono">{{.RunInfo}}</span>{{end}}
+      {{if .Error}}<span class="small warn">{{.Error}}</span>{{end}}
+    </a>{{else}}<p class="muted small">{{.EmptyMessage}}</p>{{end}}
+  {{if .TruncatedNote}}<p class="small muted">{{.TruncatedNote}}</p>{{end}}
+</nav>{{end}}
+
+{{define "script-list-oob"}}<nav class="resource-list" aria-label="Scripts" id="script-list" hx-swap-oob="true" hx-get="/ui/script-list" hx-trigger="every 10s">
+  {{range .Scripts}}<a class="resource-item{{if .Selected}} selected{{end}}" href="/automations?script={{urlquery .ID}}"{{if .Selected}} aria-current="page"{{end}}>
+      <span class="resource-item-top"><strong>{{.Name}}</strong><span class="mono">rev {{.Revision}}</span></span>
+      <span class="small muted">{{if .Dot}}<i class="dot {{.Dot}}" aria-hidden="true"></i> {{end}}{{.State}}{{if .RunsNote}} · {{.RunsNote}}{{end}}</span>
+      {{if .RunInfo}}<span class="small muted mono">{{.RunInfo}}</span>{{end}}
+      {{if .Error}}<span class="small warn">{{.Error}}</span>{{end}}
+    </a>{{else}}<p class="muted small">{{.EmptyMessage}}</p>{{end}}
+  {{if .TruncatedNote}}<p class="small muted">{{.TruncatedNote}}</p>{{end}}
+</nav>{{end}}
+
+{{define "script-editor"}}
+<form class="script-editor" id="script-editor" method="post" action="/ui/script-save">
+  <input type="hidden" name="id" id="script-id" value="{{.ID}}">
+  <input type="hidden" name="revision" id="script-revision" value="{{.Revision}}">
+  <input type="hidden" name="enabled" id="script-enabled" value="{{if .Enabled}}true{{else}}false{{end}}">
+  <div class="section-head">
+    <div>
+      <h2 id="script-title">{{if .New}}New script{{else}}{{.Name}}{{end}}</h2>
+      <p class="small muted mono" id="script-rev-label">{{if .New}}Not on KAM yet · revision 0{{else}}Revision {{.Revision}} · {{.StateName}}{{end}}</p>
+    </div>
+  </div>
+  {{if .RunSummary}}<p class="small muted mono" id="script-run">{{.RunSummary}}</p>{{end}}
+  <div class="script-tools">
+    <button type="button" hx-post="/ui/script-validate" hx-target="#console" hx-swap="outerHTML">Validate</button>
+    {{if .DryRunSupported}}<button type="button" hx-post="/ui/script-dry-run" hx-target="#console" hx-swap="outerHTML" hx-include="#fixture-form">Dry run</button>
+    {{else}}<span class="small muted">Needs a newer KAM.</span>{{end}}
+    <button type="button" hx-post="/ui/script-save" hx-target="#console" hx-swap="outerHTML">Save</button>
+    <span id="unsaved-note" class="small warn" hidden>Unsaved changes</span>
+  </div>
+  <div class="editor"><textarea id="script-source" name="source" spellcheck="false" aria-label="Script source">{{.Source}}</textarea></div>
+  <div class="script-settings">
+    <label class="check" for="script-enabled-box"><input type="checkbox" id="script-enabled-box" name="enabled-box"{{if .Enabled}} checked{{end}} hx-post="/ui/script-toggle" hx-target="#console" hx-swap="outerHTML"> Enabled</label>
+    <label for="script-timeout">Timeout <input type="number" id="script-timeout" name="timeout" value="{{.TimeoutMS}}" min="1" step="1" size="6"> ms</label>
+    <span class="small muted" id="timeout-note" hidden>A script this slow blocks the other scripts: KAM runs one at a time.</span>
+  </div>
+  {{template "console" .Console}}
+  {{if .Frozen}}
+  <div class="script-recover">
+    <p class="small warn">KAM paused this script: {{.LastError}}</p>
+    <label for="recover-timeout">New timeout <input type="number" id="recover-timeout" name="recover_timeout" value="{{.TimeoutMS}}" min="1" step="1" size="6"> ms</label>
+    <button type="button" hx-post="/ui/script-recover" hx-target="#console" hx-swap="outerHTML">Recover</button>
+    <p class="small muted">Recover lets KAM run a paused script again. Leave the field as it is to keep this timeout.</p>
+  </div>
+  {{end}}
+  {{if not .New}}
+  <div class="script-danger">
+    <button type="button" class="danger-button" hx-delete="/ui/script" hx-confirm="Delete {{.Name}}? This cannot be undone." hx-target="#console" hx-swap="outerHTML">Delete</button>
+    <span class="small muted">Removes the script from KAM. The list refreshes and this editor closes.</span>
+  </div>
+  {{end}}
+  <p class="small muted script-caption">Replies are real radio transmissions and count against the duty cycle.</p>
+</form>
+<div class="script-side">
+  {{template "script-fixture"}}
+  {{template "script-reference"}}
+</div>
+{{end}}
+
+{{define "script-fixture"}}
+<form class="script-fixture" id="fixture-form">
+  <div class="section-head"><h3>Test message</h3><button type="reset" class="text-button">Reset</button></div>
+  <p class="small muted">A dry run runs the editor's text against this made-up message and shows the replies.</p>
+  <div class="fixture-grid">
+    <label for="fx-channel">Channel <input id="fx-channel" name="fx_channel" value="#emmen"></label>
+    <label for="fx-sender">Sender <input id="fx-sender" name="fx_sender" value="PA3M"></label>
+    <label for="fx-body">Text <input id="fx-body" name="fx_body" value="!ping"></label>
+    <label for="fx-hops">Hops <input type="number" id="fx-hops" name="fx_hops" value="2" min="0" max="255" size="4"></label>
+    <label for="fx-snr">SNR (dB) <input id="fx-snr" name="fx_snr" value="8.5" size="6"></label>
+    <label for="fx-rssi">RSSI (dBm) <input type="number" id="fx-rssi" name="fx_rssi" value="-97" size="6"></label>
+    <label for="fx-drift">Clock drift (s) <input type="number" id="fx-drift" name="fx_drift" value="0" size="4"></label>
+    <label for="fx-timeout">Test timeout (ms) <input type="number" id="fx-timeout" name="fx_timeout" value="500" min="1" max="3000" size="6"></label>
+  </div>
+  <p class="small muted">A filled SNR or RSSI tells the script the message heard the sender: the fixture says so.</p>
+</form>
+{{end}}
+
+{{define "script-reference"}}
+<details class="script-reference">
+  <summary>What a script can do</summary>
+  <p>A script defines <code>on_group_text(message)</code>. KAM runs it for every text it hears on the channels the script reacts to.</p>
+  <div class="table-scroll"><table><thead><tr><th>Field of <code>message</code></th><th>Meaning</th></tr></thead><tbody>
+    <tr><td><code>channel</code></td><td>Normalised name such as <code>#emmen</code></td></tr>
+    <tr><td><code>sender</code></td><td>Sender name</td></tr>
+    <tr><td><code>body</code></td><td>Message text</td></tr>
+    <tr><td><code>timestamp_unix</code></td><td>Sender's timestamp</td></tr>
+    <tr><td><code>hop_count</code>, <code>hop_stations</code></td><td>How far it travelled and the one-byte path hashes</td></tr>
+    <tr><td><code>has_rx_meta</code>, <code>snr_quarter_db</code>, <code>rssi_dbm</code></td><td>Signal data; SNR is in quarter dB (divide by 4)</td></tr>
+    <tr><td><code>time_drift_seconds</code></td><td>Difference between sender and KAM clocks</td></tr>
+  </tbody></table></div>
+  <p><code>reply(channel, text)</code> queues a reply. That is all a script can do: it cannot reach the radio, the files or the network.</p>
+  <p class="small muted">The dry run uses KAM's own engine and the same timeout rules, but it cannot reproduce load. A test captures at most 16 replies or 4096 bytes.</p>
+</details>
+{{end}}
+
+{{define "console"}}<div id="console" class="script-console" role="status" aria-live="polite"{{if .Saved}} data-saved="true"{{end}}>{{range .Lines}}<p{{if ne .Class ""}} class="{{.Class}}"{{end}}>{{.Text}}</p>{{else}}<p class="muted">Validate, test and save write their result here.</p>{{end}}</div>{{end}}
+
+{{define "script-state-oob"}}
+<input type="hidden" name="id" value="{{.ID}}" id="script-id" hx-swap-oob="true">
+<input type="hidden" name="revision" value="{{.Revision}}" id="script-revision" hx-swap-oob="true">
+<input type="hidden" name="enabled" value="{{if .Enabled}}true{{else}}false{{end}}" id="script-enabled" hx-swap-oob="true">
+<h2 id="script-title" hx-swap-oob="true">{{.Title}}</h2>
+<p class="small muted mono" id="script-rev-label" hx-swap-oob="true">Revision {{.Revision}} · {{.Words}}</p>
+<input type="checkbox" id="script-enabled-box" name="enabled-box"{{if .Enabled}} checked{{end}} hx-post="/ui/script-toggle" hx-target="#console" hx-swap="outerHTML" hx-swap-oob="true">
+<input type="number" id="script-timeout" name="timeout" value="{{.Timeout}}" min="1" step="1" size="6" aria-label="Timeout in milliseconds" hx-swap-oob="true">
+{{end}}
