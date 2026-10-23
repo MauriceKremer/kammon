@@ -150,6 +150,20 @@ th:first-child, td:first-child { padding-left: 0; }
 .tag.ack { color: var(--success); background: color-mix(in srgb, var(--success) 9%, var(--bg-0)); }
 .tag.repeat { color: var(--text-secondary); background: var(--bg-2); }
 
+/* A click on a traffic row opens or closes the detail line under it (MON-TR-14). */
+.traffic-row { cursor: pointer; }
+.traffic-row:hover, .traffic-row.open { background: var(--bg-2); }
+.row-toggle { padding: 2px; margin-right: 6px; border: 0; background: transparent; color: var(--text-muted); }
+.row-toggle:hover { color: var(--text-secondary); }
+.row-toggle[aria-expanded="true"] .icon { transform: rotate(90deg); }
+tr.traffic-detail > td { padding: 2px 12px 12px 0; }
+/* Three label-value pairs per line keep the detail line low (MON-TR-14): one flat grid of
+   six tracks, the items flow dt,dd,dt,dd,dt,dd row by row, so every line repeats the pair
+   label-value three times, with the values of each column aligned across the lines. */
+.row-detail { display: grid; grid-template-columns: repeat(3, minmax(min-content, max-content) minmax(max-content, 1fr)); gap: 3px 20px; margin: 0; white-space: normal; align-items: baseline; }
+.row-detail dt { color: var(--text-muted); }
+.row-detail dd { margin: 0; font-family: var(--font-code); overflow-wrap: anywhere; }
+
 /* Traffic filter bar (MON-TR-5): the controls in one row, wrap on narrow screens. */
 .filters { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; }
 .filters form { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; flex: 1 1 auto; }

@@ -28,7 +28,8 @@
   <div class="table-scroll">
     <table>
       <thead><tr><th>Time</th><th>Dir</th><th>Type</th><th>Source / destination</th><th>Route</th><th>Est. airtime</th></tr></thead>
-      <tbody>{{range .Rows}}<tr><td class="mono muted">{{.Time}}</td><td>{{.Dir}}{{if .Repeat}} <span class="tag repeat">repeat</span>{{end}}</td><td><span class="tag {{.TypeClass}}">{{.Type}}</span></td><td>{{.Label}}</td><td class="mono">{{.Route}}</td><td class="mono">{{.Airtime}}</td></tr>
+      <tbody>{{range .Rows}}<tr class="traffic-row" data-key="{{.Seq}}:{{.Time}}"><td class="mono muted"><button type="button" class="row-toggle" aria-expanded="false" aria-controls="detail-{{.Seq}}" title="Show or hide packet details"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#chevron-right"></use></svg></button>{{.Time}}</td><td>{{.Dir}}{{if .Repeat}} <span class="tag repeat">repeat</span>{{end}}</td><td><span class="tag {{.TypeClass}}">{{.Type}}</span></td><td>{{.Label}}</td><td class="mono">{{.Route}}</td><td class="mono">{{.Airtime}}</td></tr>
+      <tr class="traffic-detail" id="detail-{{.Seq}}" hidden><td colspan="6"><dl class="row-detail">{{range .Details}}<dt>{{.Label}}</dt><dd>{{.Value}}</dd>{{end}}</dl></td></tr>
       {{else}}<tr><td colspan="6" class="muted">No packets match this filter.</td></tr>{{end}}</tbody>
     </table>
   </div>

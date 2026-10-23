@@ -1,6 +1,6 @@
 # KAMmon Requirements: Traffic Page
 
-**Status:** Requirements only. Nothing is built.
+**Status:** Phase 2 page implemented; the row detail line (MON-TR-14) is covered by `internal/web` tests.
 **Scope:** A live table of what the radio hears and sends, with its type, route, strength and airtime. It answers "what kind of messages are being sent?". Design: [DESIGN.md](../DESIGN.md) §4.2 (filter and table). Data: [DataStore.md](DataStore.md).
 
 ## 1. Summary
@@ -29,7 +29,7 @@ Plain words: **route** says how a packet travels. A *flood* is repeated by every
 |---|---|
 | **Filter bar** | Search box (source or destination), packet type select, direction select (all, RX, TX), "Hide repeats" toggle, Export CSV. |
 | **Type summary** | One line per packet type in the current filter: count and percentage. |
-| **Table** | Time, direction, type tag, source / destination, route and hops, estimated airtime. Repeats are marked "repeat". |
+| **Table** | Time, direction, type tag, source / destination, route and hops, estimated airtime. Repeats are marked "repeat". A click on a row opens a detail line under it with the full record of the packet; clicking it again closes the line (MON-TR-14). |
 | **Footnote** | "Observed packets only. Unattributed or undecryptable payloads keep their visible packet type." |
 
 ### 3.1 Source and destination text
@@ -60,6 +60,7 @@ Plain words: **route** says how a packet travels. A *flood* is repeated by every
 | MON-TR-11 | In CSV, a value that starts with `=`, `+`, `-` or `@` gets a leading apostrophe, because names come from the radio. | MUST |
 | MON-TR-12 | The page shows "History starts at HH:MM" when the store holds fewer events than the user asked for. | MUST |
 | MON-TR-13 | The table sits in a scroll region; the page never scrolls sideways. | MUST |
+| MON-TR-14 | A click on a row opens a detail line under it; a click on a row with open details closes it. Each row has a keyboard-reachable toggle. The line shows the full record: source / destination, event number, the time with its date, type, packet length, route and hops, estimated airtime, repeat, channel, for KAM's own sends the origin and result (sent, failed or abandoned), and the advert role, destination hash or room when the event carries them. Rows open independently and an open line survives the live refresh. The details never show SNR or RSSI (D19) and never show a sender's name beyond the row label (§6). | MUST |
 
 ## 5. What KAMmon needs from KAM
 
@@ -88,6 +89,7 @@ Hidden senders show as "Sender hidden". Filtering by text never matches hidden f
 - Viewer view model: hidden sender, unmatched search.
 - CSV: escaping, formula guard, viewer columns.
 - Store with fewer events than requested; paging control.
+- Row details: the full record for `rx` and `tx`, hidden senders stay hidden, SNR and RSSI stay out (MON-TR-14).
 
 ## 8. Open points
 

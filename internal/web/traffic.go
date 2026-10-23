@@ -1,6 +1,8 @@
 // traffic.go builds the Traffic page from the store's event ring alone (docs/requirements/Traffic.md,
 // MON-TR-1). The filter combines free text on the rendered source / destination text, packet type,
 // direction and a hide-repeats toggle; the state lives in the URL query string (MON-TR-5, 6).
+// Each row carries the full record of its packet as the detail that a click opens under the row
+// (MON-TR-14); the templates stay dumb and detail.js only shows or hides it.
 package web
 
 import (
@@ -22,9 +24,14 @@ const rowsPerLoad = 100 // MON-TR-2
 
 type typeCount struct{ Name, Count, Percent string }
 
+// detailField is one label-value line in the expandable detail under a row (MON-TR-14).
+type detailField struct{ Label, Value string }
+
 type trafficRow struct {
 	Time, Dir, Type, TypeClass, Label, Route, Airtime string
 	Repeat                                            bool
+	Seq                                               uint64
+	Details                                           []detailField
 }
 
 type trafficData struct {
@@ -108,11 +115,13 @@ func (s *Server) trafficMatches(role config.Role, allow []string, f trafficFilte
 }
 
 func (s *Server) trafficRowFor(role config.Role, allow []string, ev kam.Event) trafficRow {
+	roomName := s.roomNames()
+	label := view.PacketLabel(role, allow, ev, roomName)
 	row := trafficRow{
 		Time:    ev.At.Local().Format("15:04:05"),
 		Dir:     "RX",
 		Type:    orDash(ev.PayloadType),
-		Label:   view.PacketLabel(role, allow, ev, s.roomNames()),
+		Label:   label,
 		Route:   routeText(ev),
 		Airtime: "—",
 	}
@@ -126,6 +135,8 @@ func (s *Server) trafficRowFor(role config.Role, allow []string, ev kam.Event) t
 		row.Airtime = fmt.Sprintf("%s ms", thousands(*ev.AirtimeMS))
 	}
 	row.Repeat = ev.Duplicate
+	row.Seq = ev.Seq
+	row.Details = eventDetails(label, ev, roomName)
 	return row
 }
 
@@ -142,6 +153,105 @@ func routeText(ev kam.Event) string {
 	default:
 		return ev.Route
 	}
+}
+
+// eventDetails is the full record behind one traffic row (docs/requirements/Traffic.md §4,
+// MON-TR-14). It repeats the row's own values so the detail reads on its own and adds what the
+// table does not show: the event number, the exact time with the date, the packet length, the
+// hashes and, for KAM's own sends, the origin and result. It never shows SNR or RSSI (D19) and
+// never adds a sender's name beyond the row label, so the viewer rules keep holding (MON-AX-14).
+func eventDetails(label string, ev kam.Event, roomName func(id string) string) []detailField {
+	when := "Received"
+	if ev.Kind == kam.KindTX {
+		when = "Sent"
+	}
+	d := []detailField{
+		{"Source / destination", label},
+		{"Event number", fmt.Sprintf("%d", ev.Seq)},
+		// The non-breaking space keeps date and time together in the three-column detail.
+		{when, strings.ReplaceAll(ev.At.Local().Format("2006-01-02 15:04:05"), " ", "\u00a0")},
+		{"Type", orDash(ev.PayloadType)},
+		{"Packet length", bytesDetail(ev.Len)},
+		{"Route", routeText(ev)},
+	}
+	if ev.AirtimeMS != nil {
+		d = append(d, detailField{"Est. airtime", fmt.Sprintf("%s ms", thousands(*ev.AirtimeMS))})
+	}
+	d = append(d, detailField{"Repeat", yesNo(ev.Duplicate)})
+	if ev.Channel != "" {
+		d = append(d, detailField{"Channel", ev.Channel})
+	}
+	if ev.Kind == kam.KindTX {
+		d = append(d, detailField{"Send result", sendResult(ev.OK)})
+		if ev.Origin != "" {
+			d = append(d, detailField{"Send origin", originDetail(ev.Origin)})
+		}
+	}
+	if ev.PayloadType == "ADVERT" && ev.AdvertRole != "" {
+		d = append(d, detailField{"Advert role", ev.AdvertRole})
+	}
+	if ev.DestHash != "" {
+		d = append(d, detailField{"Destination hash", ev.DestHash})
+	}
+	if ev.Room != "" {
+		d = append(d, detailField{"Room", roomDetail(ev.Room, roomName)})
+	}
+	return d
+}
+
+// bytesDetail says "87 bytes", or a dash when the event carries no length: zero is never used to
+// mean unknown (MON-TR-8).
+func bytesDetail(n int) string {
+	if n == 0 {
+		return "—"
+	}
+	return fmt.Sprintf("%d bytes", n)
+}
+
+func yesNo(b bool) string {
+	if b {
+		return "Yes"
+	}
+	return "No"
+}
+
+// sendResult reads the tx `ok` flag the way the contract defines it (docs/kam-api §6.2): the modem
+// reported TxDone, the send failed, or the writer gave up before the modem answered.
+func sendResult(ok *bool) string {
+	switch {
+	case ok == nil:
+		return "Abandoned"
+	case *ok:
+		return "Sent"
+	default:
+		return "Failed"
+	}
+}
+
+// originDetail is who made KAM send: `automation`, `room`, `advert` or `other`. Unknown values
+// carry as they are, like every other protocol value.
+func originDetail(origin string) string {
+	switch origin {
+	case "automation":
+		return "Automation"
+	case "room":
+		return "Room"
+	case "advert":
+		return "Advert"
+	case "other":
+		return "Other"
+	default:
+		return origin
+	}
+}
+
+// roomDetail resolves the room id against the room snapshot, like the row label does; an unknown
+// id carries as it is (Traffic.md §3.1).
+func roomDetail(id string, roomName func(id string) string) string {
+	if roomName != nil && roomName(id) != "" {
+		return roomName(id)
+	}
+	return id
 }
 
 func typeClass(payload string) string {

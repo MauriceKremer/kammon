@@ -27,6 +27,7 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 ## Slice 2: Traffic
 
 - [x] Filtered table from the event ring, paging, pause, CSV export (MON-TR-1..13)
+- [x] A click on a row opens or closes its detail line (MON-TR-14)
 
 ## Slice 3: Channels and Rooms
 

@@ -690,6 +690,65 @@ func TestTrafficCSVFormulaGuard(t *testing.T) {
 	}
 }
 
+// MON-TR-14: every row carries a hidden detail line with the full record of the packet. The
+// details never show SNR or RSSI (D19) and never show more of a sender's name than the row label
+// does, so a viewer sees the same hidden senders here as everywhere else (MON-AX-14).
+func TestTrafficRowDetails(t *testing.T) {
+	h := newHarness(t)
+	events := []kam.Event{
+		{Seq: 6, At: t0.Add(-2 * time.Second), Kind: kam.KindRX, PayloadType: "GRP_TXT", Route: "flood", Hops: 2,
+			Len: 87, AirtimeMS: ptr(312), Duplicate: true, Channel: "#emmen", Name: "SecretSender", SNRdB: ptr(8.5), RSSIdBm: ptr(-97)},
+		{Seq: 7, At: t0.Add(-time.Second), Kind: kam.KindTX, PayloadType: "ACK", Route: "direct", Len: 8, AirtimeMS: ptr(74), OK: ptr(true), Origin: "automation"},
+		{Seq: 8, At: t0, Kind: kam.KindTX, PayloadType: "GRP_TXT", Route: "flood", Len: 70, OK: ptr(false), Origin: "other"},
+	}
+	h.st.ApplyEvents(kam.EventsResponse{Epoch: "e1", FirstSeq: 6, LastSeq: 8, Events: events}, t0)
+
+	viewer := h.login(t, "viewer", "viewer")
+	_, body, _ := get(t, viewer, h.ts.URL+"/traffic")
+	for _, want := range []string{
+		`class="row-toggle" aria-expanded="false" aria-controls="detail-6"`,
+		`<tr class="traffic-detail" id="detail-6" hidden>`,
+		`<dt>Source / destination</dt><dd>Sender hidden → #emmen</dd>`,
+		`<dt>Channel</dt><dd>#emmen</dd>`,
+		`<dt>Packet length</dt><dd>87 bytes</dd>`,
+		`<dt>Route</dt><dd>flood · 2 hops</dd>`,
+		`<dt>Est. airtime</dt><dd>312 ms</dd>`,
+		`<dt>Repeat</dt><dd>Yes</dd>`,
+		`<dt>Send result</dt><dd>Abandoned</dd>`, // the TX with no result recorded
+		`<dt>Send origin</dt><dd>Room</dd>`,
+		`<dt>Room</dt><dd>Emmen local</dd>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the row details are missing %q", want)
+		}
+	}
+	if strings.Contains(body, "SecretSender") {
+		t.Error("the viewer reads a hidden sender from the row details")
+	}
+	if strings.Contains(body, "<dt>Sender</dt>") {
+		t.Error("the row details add a sender line the row label does not show")
+	}
+
+	admin := h.login(t, "admin", "admin")
+	_, body, _ = get(t, admin, h.ts.URL+"/traffic")
+	for _, want := range []string{
+		"SecretSender → #emmen", // admins see the sender in the label, as before
+		`<dt>Send result</dt><dd>Sent</dd>`,
+		`<dt>Send result</dt><dd>Failed</dd>`,
+		`<dt>Send origin</dt><dd>Automation</dd>`,
+		`<dt>Send origin</dt><dd>Other</dd>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the admin's row details are missing %q", want)
+		}
+	}
+	for _, banned := range []string{"SNR", "RSSI", "dBm", "8.5", "-97"} {
+		if strings.Contains(body, banned) {
+			t.Errorf("%q shows in the row details, but SNR and RSSI are never displayed (D19)", banned)
+		}
+	}
+}
+
 // MON-AX-6: the fifth failed login starts delaying answers by two seconds; a same-host key
 // survives changing ports.
 func TestLoginSlowdownAfterFiveFailures(t *testing.T) {
