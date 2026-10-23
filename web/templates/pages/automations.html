@@ -73,17 +73,17 @@
     <p class="small muted">Recover lets KAM run a paused script again. Leave the field as it is to keep this timeout.</p>
   </div>
   {{end}}
-  <div class="script-actions">
-    <button type="button" hx-post="/ui/script-save" hx-target="#console" hx-swap="outerHTML">Save</button>
-    <span id="unsaved-note" class="small warn" hidden>Unsaved changes</span>
-    {{if not .New}}<button type="button" class="danger-button" hx-delete="/ui/script" hx-confirm="Delete {{.Name}}? This cannot be undone." hx-target="#console" hx-swap="outerHTML">Delete</button>
-    <span class="small muted">Removes the script from KAM. The list refreshes and this editor closes.</span>{{end}}
-  </div>
   <p class="small muted script-caption">Replies are real radio transmissions and count against the duty cycle.</p>
 </form>
 <div class="script-side">
   {{template "script-fixture" .}}
   {{template "script-reference"}}
+</div>
+<div class="script-actions" id="script-actions">
+  <button type="button" hx-post="/ui/script-save" hx-include="#script-editor" hx-target="#console" hx-swap="outerHTML">Save</button>
+  <span id="unsaved-note" class="small warn" hidden>Unsaved changes</span>
+  {{if not .New}}<button type="button" class="danger-button" hx-delete="/ui/script" hx-include="#script-editor" hx-confirm="Delete {{.Name}}? This cannot be undone." hx-target="#console" hx-swap="outerHTML">Delete</button>
+  <span class="small muted">Removes the script from KAM. The list refreshes and this editor closes.</span>{{end}}
 </div>
 {{end}}
 

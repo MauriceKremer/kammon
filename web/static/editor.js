@@ -67,10 +67,11 @@
 
   // The server's answers always swap; these statuses are the ones that never reached it: the
   // guard refused the request, or KAMmon did not get through. Say so, keep the editor untouched.
-  // The dry run's button lives in the test-message form, outside the editor form, but its
-  // failures belong to the same console.
+  // All of the editor's controls write to the same console, and two of them live outside the
+  // editor form itself: the dry run's button in the test-message form, and the Save and Delete
+  // row at the bottom of the page.
   function actionOrigin(elt) {
-    return !!(elt && elt.closest && (elt.closest("#script-editor") || elt.closest("#fixture-form")));
+    return !!(elt && elt.closest && (elt.closest("#script-editor") || elt.closest("#fixture-form") || elt.closest("#script-actions")));
   }
 
   function writeFail(text) {

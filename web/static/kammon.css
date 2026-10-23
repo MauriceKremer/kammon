@@ -251,7 +251,7 @@ body.login-page { display: block; }
 .script-console .fail { color: var(--danger); }
 .script-recover { border-top: 1px solid var(--border-default); margin-top: 18px; padding-top: 14px; display: grid; gap: 8px; justify-items: start; }
 .script-recover button { justify-self: start; }
-.script-actions { border-top: 1px solid var(--border-default); margin-top: 18px; padding-top: 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.script-actions { border-top: 1px solid var(--border-default); padding-top: 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .danger-button { color: var(--danger); border-color: var(--danger); }
 .script-caption { border-top: 1px solid var(--border-subtle); margin-top: 16px; padding-top: 10px; }
 .script-side { margin-top: 24px; display: grid; gap: 20px; }

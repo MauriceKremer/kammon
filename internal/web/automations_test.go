@@ -159,9 +159,8 @@ func TestAutomationsAdminOpensEditorWithSource(t *testing.T) {
 	}
 }
 
-// The editor's button order (Automations.md §3): Validate sits under the script source, Save and
-// Delete sit at the bottom of the editor, and the dry run sits at the bottom of the test-message
-// form it sends.
+// The editor's button order (Automations.md §3): Validate sits under the script source, and
+// Save and Delete sit at the bottom of the page, after the test-message form and the reference.
 func TestAutomationsEditorButtonPlacement(t *testing.T) {
 	h := newScriptHarness(t)
 	h.login(t, "admin", "admin")
@@ -172,24 +171,32 @@ func TestAutomationsEditorButtonPlacement(t *testing.T) {
 		{"validate", `>Validate</button>`},
 		{"the settings row", `id="script-name"`},
 		{"the console", `id="console"`},
-		{"save", `>Save</button>`},
-		{"delete", `>Delete</button>`},
 		{"the test-message form", `id="fixture-form"`},
 		{"the fixture's text field", `name="fx_body"`},
 		{"the dry run", `>Dry run</button>`},
+		{"save", `>Save</button>`},
+		{"delete", `>Delete</button>`},
 	} {
 		at := strings.Index(body, want.mark)
 		if at < 0 {
 			t.Fatalf("the editor misses %s", want.name)
 		}
 		if at < last {
-			t.Errorf("%s comes before %s; the order is source, Validate, settings, console, Save, Delete, test message, Dry run (Automations.md §3)", want.name, lastName)
+			t.Errorf("%s comes before %s; the order is source, Validate, settings, console, test message, Dry run, Save, Delete (Automations.md §3)", want.name, lastName)
 		}
 		last, lastName = at, want.name
 	}
+	// Save and Delete live outside the editor form: each carries the form's values explicitly,
+	// so a save and a delete carry the text, name, revision and timeout (MON-AU-8, MON-AU-12).
 	// The dry run sends its own form and the editor's unsaved source (MON-AU-15).
-	if !strings.Contains(body, `hx-include="#script-source"`) {
-		t.Errorf("the dry run misses the editor's source: %s", body)
+	for _, want := range []string{
+		`hx-post="/ui/script-save" hx-include="#script-editor"`,
+		`hx-delete="/ui/script" hx-include="#script-editor"`,
+		`hx-include="#script-source"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the editor misses %s: %s", want, body)
+		}
 	}
 }
 

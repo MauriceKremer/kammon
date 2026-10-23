@@ -36,9 +36,9 @@ A script can only do what KAM's `reply(channel, text)` allows. It cannot reach t
 | **Settings row** | Script name, enabled checkbox, timeout in milliseconds. |
 | **Console** | Result of the last Validate, Dry run or Save, as plain text; save tells the new revision ("Saved revision 4"). |
 | **Last run** | "Last run 14:59:48 · 2 ms · 1 reply" from the `run` object. |
-| **Actions row** | At the bottom of the editor: Save, with the "Unsaved changes" note, and Delete. |
 | **Fixture form** | A small form for the dry run: channel, sender, text, hops, SNR, RSSI, clock drift, test timeout; the Dry run button at its bottom. Sensible defaults. |
 | **Reference** | A collapsed panel: the `on_group_text(message)` signature, the fields of `message`, and `reply(channel, text)`. |
+| **Actions row** | At the bottom of the page, after the test message and the reference: Save, with the "Unsaved changes" note, and Delete. |
 | **Recover** | For a FROZEN script: the last error and a Recover button. |
 
 ### 3.1 What a script receives
