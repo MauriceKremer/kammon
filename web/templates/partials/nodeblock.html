@@ -1,7 +1,8 @@
 {{define "nodeblock"}}<div class="node" id="node-block" hx-swap-oob="true">
   <strong><span class="dot{{if .LinkClass}} {{.LinkClass}}{{end}}"></span>{{.Name}}</strong>
   {{.LinkText}}<br>
-  <span class="mono">{{.Radio}}</span><br>
+  <span class="mono">{{.Frequency}}</span><br>
+  {{if .Radio}}<span class="mono">{{.Radio}}</span><br>{{end}}
   {{.Uptime}}
   {{if .Mode}}<span class="proto">{{.Mode}}</span>{{end}}
   {{if .KamTime}}<br><span class="small muted">KAM time {{.KamTime}}{{if .ClockNote}} · {{.ClockNote}}{{end}}</span>{{end}}

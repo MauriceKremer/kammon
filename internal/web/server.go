@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
+	"strconv"
 	"time"
 
 	"kammon.bytecoder.nl/internal/auth"
@@ -301,8 +302,8 @@ type staleBar struct {
 }
 
 type nodeBlock struct {
-	Name, LinkText, LinkClass, Radio, Uptime, Mode string
-	KamTime, ClockNote                             string
+	Name, LinkText, LinkClass, Frequency, Radio, Uptime, Mode string
+	KamTime, ClockNote                                        string
 }
 
 type placeholderData struct{ Text, Slice, Doc string }
@@ -364,7 +365,7 @@ func (s *Server) nodeBlock() nodeBlock {
 	// Link truth lives in the status snapshot: a stream of events alone proves KAM's ring, not
 	// that the modem and duty cycle are current (MON-DS-13 per snapshot, MON-DS-17).
 	f, _ := s.store.SnapshotFreshness("status", now)
-	nb := nodeBlock{Name: "KAM", LinkText: "Waiting for KAM", Radio: "—"}
+	nb := nodeBlock{Name: "KAM", LinkText: "Waiting for KAM", Frequency: "Freq.: —"}
 	if s.demo {
 		nb.Mode = "DEMO · GENERATED DATA"
 	}
@@ -382,7 +383,8 @@ func (s *Server) nodeBlock() nodeBlock {
 	case store.Down:
 		nb.LinkClass, nb.LinkText = "down", "KAM not answering"
 	}
-	nb.Radio = fmt.Sprintf("%.3f MHz · SF%d / BW%d", float64(st.Radio.FrequencyHz)/1e6, st.Radio.SpreadingFactor, st.Radio.BandwidthHz/1000)
+	nb.Frequency = fmt.Sprintf("Freq.: %.3f MHz", float64(st.Radio.FrequencyHz)/1e6)
+	nb.Radio = fmt.Sprintf("SF%d / BW%s / CR%d", st.Radio.SpreadingFactor, bandkHz(st.Radio.BandwidthHz), st.Radio.CodingRate)
 	nb.Uptime = uptime(st.Now.Sub(st.StartedAt))
 	// KAM time on every screen: our clock corrected by the measured offset (MON-DS-15).
 	if !st.Now.IsZero() {
@@ -397,6 +399,13 @@ func (s *Server) nodeBlock() nodeBlock {
 		}
 	}
 	return nb
+}
+
+// bandkHz turns the stored Hertz into kHz for the radio summary (contract §5.2:
+// KAMmon converts for display). 62500 Hz is "62.5", 125000 Hz is "125": whole
+// values keep no trailing decimal.
+func bandkHz(hz uint32) string {
+	return strconv.FormatFloat(float64(hz)/1000, 'f', -1, 64)
 }
 
 func absDuration(d time.Duration) time.Duration {

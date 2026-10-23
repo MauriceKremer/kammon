@@ -435,6 +435,36 @@ func TestNodeBlockShowsKamTime(t *testing.T) {
 	}
 }
 
+// The radio summary is two lines: frequency on its own, then SF, BW and CR.
+// It keeps the fraction of a non-whole kHz bandwidth (62500 Hz is "62.5", not
+// "62") and shows the coding rate from the status (contract §7.1). Without a
+// status snapshot it shows "Freq.: —" and no radio settings.
+func TestNodeBlockRadioShowsBandwidthFractionAndCodingRate(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer", "viewer")
+
+	_, body, _ := get(t, c, h.ts.URL+"/")
+	if !strings.Contains(body, "Freq.: 868.000 MHz") || !strings.Contains(body, "SF8 / BW125 / CR5") {
+		t.Fatalf("a whole kHz keeps no trailing decimal: %s", body)
+	}
+
+	st, then := h.st.Status()
+	st.Radio = kam.Radio{FrequencyHz: 869_618_000, BandwidthHz: 62_500, SpreadingFactor: 7, CodingRate: 5}
+	h.st.SetStatus(st, then)
+	_, body, _ = get(t, c, h.ts.URL+"/")
+	for _, want := range []string{"Freq.: 869.618 MHz", "SF7 / BW62.5 / CR5"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("radio summary missing %q: %s", want, body)
+		}
+	}
+
+	h.st.SetStatus(kam.Status{}, then)
+	_, body, _ = get(t, c, h.ts.URL+"/")
+	if !strings.Contains(body, "Freq.: —") || strings.Contains(body, "SF7 / BW62.5 / CR5") {
+		t.Fatalf("waiting state shows no radio settings: %s", body)
+	}
+}
+
 // Fonts and the icon sprite are self-hosted: no CDN reference anywhere in the assets (slice 1).
 func TestAssetsAreVendoredAndServed(t *testing.T) {
 	h := newHarness(t)
