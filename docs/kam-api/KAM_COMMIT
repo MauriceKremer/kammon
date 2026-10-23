@@ -1,2 +1,2 @@
-base commit: 7da79de51b1380472f10a8a727d1966af1966d6c
-copy: KAM working tree after phase-2 implementation, 2026-10-12
+base commit: 76b54c39aa3615fc50538a2a8b9e8e358bdaae90
+copy: KAM working tree with the unified listener and the rename to FeatureKamApi.md (KAM D19, uncommitted), 2026-10-23

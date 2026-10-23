@@ -1,13 +1,13 @@
 # Pinned KAM contract
 
-[FeatureMonitorApi.md](FeatureMonitorApi.md) is an identical copy of the document in the KAM repository (`docs/FeatureMonitorApi.md`). KAM owns it. `KAM_COMMIT` records the KAM commit it was copied from.
+[FeatureKamApi.md](FeatureKamApi.md) is an identical copy of the document in the KAM repository (`docs/FeatureKamApi.md`, the former `FeatureMonitorApi.md`). KAM owns it. `KAM_COMMIT` records the KAM commit it was copied from.
 
-Links inside the copy point into the KAM repository and resolve there, not here.
+Links inside the copy point into the KAM repository and resolve there, not here. In particular its supersession notes about the unified listener point at KAM's `FeatureUnifiedApi.md`, and the shipped endpoints at `APIdetails.md`; both live in KAM and are not pinned here.
 
 ## Check for drift
 
 ```sh
-diff ../kam/docs/FeatureMonitorApi.md docs/kam-api/FeatureMonitorApi.md
+diff ../kam/docs/FeatureKamApi.md docs/kam-api/FeatureKamApi.md
 ```
 
 ## Update
@@ -18,4 +18,4 @@ diff ../kam/docs/FeatureMonitorApi.md docs/kam-api/FeatureMonitorApi.md
 
 ## Fixtures
 
-`testdata/kam/*.json` are example responses written by hand from the contract. When KAM ships the monitor API, replace them with recorded responses from a real node.
+`testdata/kam/*.json` are example responses written by hand from the contract. Replace them with recorded responses from a real node when you can capture its traffic.

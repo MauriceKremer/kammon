@@ -1,14 +1,14 @@
-# Feature: Monitor API for KAMmon
+# Feature: KAM API
 
 **Status:** Phases 1-2 implemented (2026-10-12): loopback status/events, bounded RX/TX/room event ring, read-only channel and room resources, persisted signal metadata and client last-heard times. Phases 3-5 remain planned. Real-radio capture and hardware timing verification remain pending.
-**Scope:** The REST interface KAM offers on the local device so KAMmon, a separate web monitor running on the same computer, can read live radio, channel, room and script data, manage room clients, and change the KISS modem radio settings.
+**Scope:** The REST interface KAM offers on the local device — the **KAM API** — for any local program. KAMmon, a separate web monitor running on the same computer, is the initial consumer: it reads live radio, channel, room and script data, manages room clients, and changes the KISS modem radio settings.
 **Written from:** KAMmon's point of view. The feature needs are in `tmp/KAMmon_Req_*.md`; the UI is shown in `tmp/kammon-prototype.html`. KAMmon is a separate Go project and never opens KAM's SQLite file.
 
 ## 1. Summary
 
 ### Phase 1 Delivery
 
-Only `GET /v1/status` and `GET /v1/events` are available on the monitoring listener.
+Only `GET /v1/status` and `GET /v1/events` are available on the listener.
 RX observations include duplicate and unhandled packets with nullable RxMeta;
 TX observations capture submission settings/time and completion or abandonment.
 Existing room address hashes provide probable attribution; collisions remain null.
@@ -18,7 +18,7 @@ Status reports existing runtime counters and cached startup identity. Optional
 identity and disabled automation measurements may be null. Room-post/script-event
 streams and the remaining resource endpoints are not part of this delivery.
 
-Tests are in `internal/monitor/api_test.go`, `internal/kiss/monitor_test.go`,
+Tests are in `internal/api/api_test.go`, `internal/kiss/monitor_test.go`,
 `internal/models/monitor_test.go` and `internal/node/monitor_test.go`. No new
 dependency, client registry, event database or event-processing worker is added.
 
@@ -32,13 +32,15 @@ counters; last-heard timestamps are persisted through the existing batched
 client writes. Room activity events feed the same bounded event ring. The API
 remains read-only for these resources; client removal stays in phase 4.
 
-KAM has a Local Management API on `127.0.0.1:8765` that manages Starlark scripts. Phases 1-2 add status, recent RX/TX/room events and read-only channel/room resources on port 8766. Later phases provide modem control and client removal. Existing adverts and group texts remain in SQLite, and room client activity follows the existing room-service rules; the monitoring ring is not a persistent packet archive.
+KAM has a Local Management API on `127.0.0.1:8765` that manages Starlark scripts. Phases 1-2 add status, recent RX/TX/room events and read-only channel/room resources on port 8766. Later phases provide modem control and client removal. Existing adverts and group texts remain in SQLite, and room client activity follows the existing room-service rules; the event ring is not a persistent packet archive.
+
+> **Superseded by [FeatureUnifiedApi.md](FeatureUnifiedApi.md) D1:** one listener on `monitor.listen` (default 8766) serves monitoring and script management; port 8765 is closed.
 
 This plan adds one small package, `internal/monitor`, with three parts:
 
 1. **An event ring.** A fixed-size, in-memory list of recent events (packets heard, packets sent, room activity, script runs). Each event has a sequence number. Nothing is written to SQLite.
 2. **A second loopback listener** (default `127.0.0.1:8766`) with read endpoints for status, events, channels, rooms and the modem, and write endpoints for room clients and the modem radio.
-3. **Small additions to the script API on port 8765:** a dry run and in-memory run information.
+3. **Small additions to the script routes (now on the unified listener):** a dry run and in-memory run information.
 
 KAMmon polls `GET /v1/events?after=N` every one to two seconds, keeps its own in-memory history, and serves its own web pages. KAM never pushes and never authenticates anyone: it stays loopback only. KAMmon adds the web login.
 
@@ -58,7 +60,7 @@ Plain words for the terms used below:
 - GL-2. KAMmon recovers by itself after a restart of either program.
 - GL-3. Every write goes through the part of KAM that already owns that data (room worker, radio client, config writer, script runtime).
 - GL-4. The API never returns a secret: channel keys, room passwords and room identity seeds stay in KAM.
-- GL-5. Monitoring adds only short, bounded recording work to packet ingestion; no HTTP or storage operation runs under the event-ring lock.
+- GL-5. Event recording adds only short, bounded work to packet ingestion; no HTTP or storage operation runs under the event-ring lock.
 - GL-6. KAM behaves exactly as it does today when no client is connected, when a client is slow, and when a client disappears without saying goodbye.
 - GL-7. The API describes KAM's own things (channels, rooms, the modem, scripts), not KAMmon's pages. No field exists only to suit one client.
 
@@ -101,7 +103,7 @@ Recorded 2026-10-11 from the planning questions.
 | D1 | How KAMmon receives live data | **Cursor pull over REST.** `GET /v1/events?after=N`, polled every 1-2 s. No streaming. |
 | D2 | What survives a KAMmon restart | **Nothing on disk.** KAMmon backfills from the KAM event ring and labels its history start. |
 | D3 | Local admin versus web viewer | **One listener, roles by user**, in KAMmon. Admin actions are accepted only from loopback. Not a KAM concern. |
-| D4 | Where the endpoints live | **A separate monitoring listener** on KAM, default `127.0.0.1:8766`. The script routes stay on 8765. |
+| D4 | Where the endpoints live | **A separate monitoring listener** on KAM, default `127.0.0.1:8766`. The script routes stay on 8765. *(Superseded by [FeatureUnifiedApi.md](FeatureUnifiedApi.md) D1: one listener serves both.)* |
 | D5 | Modem changes | **Apply, then save to `kam.yml`.** One source of truth; the reset probe reuses the saved values. |
 | D6 | Room client management | **List and remove clients.** Existing password-granted radio roles are shown read-only; no add-by-key or role-editing API. Revised during clarification. |
 | D7 | What web viewers see | **Per-channel allow list** in KAMmon. KAM always returns full data; KAMmon filters. |
@@ -116,10 +118,13 @@ Recorded 2026-10-11 from the planning questions.
 | D16 | Signal reporting | **Always enabled**, as today. Read-only status; no new YAML field or editable switch. |
 | D17 | Recording cost | **Short lock, bounded copy.** Encode JSON and write responses after releasing it; test contention rather than promise zero waiting. |
 | D18 | Dry runs | **Synchronous and bounded:** 500 ms default, 3000 ms maximum, one at a time, at most 16 replies and 4096 UTF-8 bytes in captured channel names and text. |
+| D19 | Naming | **KAM API.** The API is not limited to KAMmon: any local program may use it, so it is named after KAM, not after its first client. Earlier text and file names said "Monitor API for KAMmon"; renamed 2026-10-23. |
 
 **Consequences of the decisions that go beyond the recommendation or change existing text**
 
 - **D4 versus [FeatureRoomServer.md](FeatureRoomServer.md) RS-OPS-2.** RS-OPS-2 expected room endpoints on the Local Management API. They are on the monitoring listener instead. KAMmon therefore holds two base URLs: scripts on 8765, everything else on 8766. The two listeners share no code path other than the guards in §5.
+
+  *(Superseded by [FeatureUnifiedApi.md](FeatureUnifiedApi.md) D1: one base URL on `monitor.listen`; room endpoints and scripts share the listener.)*
 - **D5 versus [FeatureKissModem.md](FeatureKissModem.md) D8 and the hot-reload non-goal.** Both said "no HTTP surface" and "radio settings stay startup-only". This plan replaces them. `APP_STRUCTURE.md` must be updated when it ships.
 - **D5 and comments.** `models.SaveKamConfig` rewrites `kam.yml` and drops comments. Channel upserts already do this. The manual must say so.
 - **D11 preserves RS-AUTH-10.** The earlier pinned-role proposal is superseded. Room roles still come from existing radio login rules, not from a KAMmon web role.
@@ -161,11 +166,11 @@ These rules keep KAM independent of any client.
 
 | Rule | Meaning in practice |
 |---|---|
-| **No client, no change** | With the monitor off, or on but unused, KAM behaves as before. Existing tests pass unchanged. |
+| **No client, no change** | With the API off, or on but unused, KAM behaves as before. Existing tests pass unchanged. |
 | **KAM stays in charge** | KAM validates every request itself. A client's own checks only give friendlier messages. A client can never put KAM into a state its own config file could not. |
 | **Stateless requests** | Each request stands alone. KAM keeps nothing per client; a poller that disappears leaves nothing behind. The cursor (`after`) lives in the client. |
 | **Bounded cost** | A request has a deadline and a response size limit, and only a few run at once. A client that reads slowly or never reads cannot hold a lock, a queue slot or a goroutine for long. |
-| **Failure stays inside the monitor** | A panic, a full ring or a listener error is logged and contained. It never reaches the route loop, the writer, the room worker or the script worker. |
+| **Failure stays inside the API** | A panic, a full ring or a listener error is logged and contained. It never reaches the route loop, the writer, the room worker or the script worker. |
 | **Generic and documented** | Names follow KAM's own concepts. The API is described in the README next to the script API and works with `curl`. |
 | **Web authentication is the client's job** | KAM has no REST users or tokens. KAMmon authenticates web users. Existing MeshCore room password checks and radio client roles remain KAM's responsibility. |
 
@@ -229,6 +234,12 @@ Field notes:
 - Optional measurements and attribution are explicitly `null` when unknown. For a matching room-address collision, set `room: null` rather than selecting an arbitrary room. Names are at most 64 UTF-8 bytes and error summaries at most 256 bytes; truncate at a character boundary. Error summaries must not include message bodies or secrets.
 
 ## 7. Endpoints
+
+Implemented endpoints from this section are documented with parameters and
+responses in [APIdetails.md](APIdetails.md), and each listener serves a
+self-describing index at `GET /`. Update APIdetails.md and the index lists when
+an endpoint ships; this section keeps the whole plan, including parts still
+planned (§7.5, the §7.6 additions).
 
 ### 7.1 Status
 
@@ -380,7 +391,7 @@ Query responses always include `command`, `at`, `duration_ms`, `supported`, and 
 6. On any failure after touching the modem, including cancellation, try restoring the previous radio, TX power, signal reporting and CSMA settings. Leave `kam.yml` unchanged. Report the failed step and recovery outcome. A confirmed radio/power echo plus sent CSMA settings permits TX to resume; CSMA is still not independently verified.
 7. If recovery fails, retain the previous saved configuration as the desired state, mark current radio state uncertain, keep TX paused and continue RX. Log the error and expose it through `GET /v1/modem`. Do not let the reset probe silently clear this state. A later successful explicit apply, or a KAM restart that successfully reapplies saved startup settings, clears the pause.
 
-Normal monitor requests have a 5 s deadline. The radio apply is the bounded exception: at most 10 s for waiting/applying/saving and a separate maximum 5 s for recovery, independent of a disconnected HTTP caller. No job registry or client session is introduced. Clients allow at least 15 s for apply; after a disconnect they read the snapshot instead of automatically retrying. The snapshot's `last_change` records the most recent operation only, in memory.
+Normal API requests have a 5 s deadline. The radio apply is the bounded exception: at most 10 s for waiting/applying/saving and a separate maximum 5 s for recovery, independent of a disconnected HTTP caller. No job registry or client session is introduced. Clients allow at least 15 s for apply; after a disconnect they read the snapshot instead of automatically retrying. The snapshot's `last_change` records the most recent operation only, in memory.
 
 Preview returns `{"preview":true,"steps":[...]}` with the ordered command names and details, and performs validation but no send, pause or save. The actual apply revalidates; preview is not a reservation.
 
@@ -413,7 +424,7 @@ Failed-change examples (returned at the relevant error status, and also stored i
 
 `applied: true` means the entire requested change succeeded, not merely that some commands reached the modem. File-write failure is `500`; echo mismatch or modem rejection is `502`; timeout is `504`. Failure responses expose best-known state, never promise that interrupted changes did nothing.
 
-### 7.6 Scripts (existing port 8765)
+### 7.6 Scripts (now on the unified listener, [FeatureUnifiedApi.md](FeatureUnifiedApi.md))
 
 The routes `GET/POST /scripts`, `GET/PUT/DELETE /scripts/{id}`, `POST /scripts/validate` and `POST /scripts/{id}/enable|disable|recover` stay exactly as they are, with the same revision checks (`expected_revision`, `409` when stale). Two additions, both backward compatible:
 
@@ -557,7 +568,7 @@ IDs are stable. "From" lists the KAMmon feature document that needs the item (`t
 
 - With `monitor.enabled: false` no second listener is opened and the existing test suite passes unchanged.
 - A client that connects and never reads, and one that sends a slow request, never retain the event-ring lock; benchmark route latency during concurrent page-copy requests.
-- The monitor listener failing to bind leaves ingestion, rooms and scripts running.
+- The API listener failing to bind leaves ingestion, rooms and scripts running.
 - Table tests for the cursor: first poll, pagination without skipping, empty ring, caught up, gap, wrong epoch, ring wrap, invalid and future cursor.
 - A router test that proves duplicates and unhandled payload types produce `rx` events.
 - Handler tests with a fake room worker and fake radio client: busy, echo mismatch, save failure, successful restoration, failed restoration with TX pause, disconnect, concurrent config edit, invalid field and link down.
