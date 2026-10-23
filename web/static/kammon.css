@@ -240,7 +240,7 @@ body.login-page { display: block; }
 .editor textarea { width: 100%; min-height: 320px; resize: vertical; border: 0; background: transparent; color: var(--text-primary); padding: 4px; font-family: var(--font-code); font-size: 13px; line-height: 1.6; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
 .editor textarea:focus { outline: none; }
 .editor:focus-within { border-color: var(--signal); }
-.script-tools { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.script-validate { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
 .script-settings { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
 .script-settings label, .script-recover label { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; color: var(--text-secondary); }
 .script-settings input[type="number"], .script-recover input[type="number"] { width: 7em; }
@@ -251,12 +251,13 @@ body.login-page { display: block; }
 .script-console .fail { color: var(--danger); }
 .script-recover { border-top: 1px solid var(--border-default); margin-top: 18px; padding-top: 14px; display: grid; gap: 8px; justify-items: start; }
 .script-recover button { justify-self: start; }
-.script-danger { border-top: 1px solid var(--border-default); margin-top: 18px; padding-top: 14px; display: flex; gap: 12px; align-items: center; }
+.script-actions { border-top: 1px solid var(--border-default); margin-top: 18px; padding-top: 14px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .danger-button { color: var(--danger); border-color: var(--danger); }
 .script-caption { border-top: 1px solid var(--border-subtle); margin-top: 16px; padding-top: 10px; }
 .script-side { margin-top: 24px; display: grid; gap: 20px; }
 .fixture-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 16px; margin: 12px 0 4px; }
 .fixture-grid label { display: grid; gap: 4px; font-size: 13px; color: var(--text-secondary); min-width: 0; }
+.fixture-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
 .script-reference { margin-top: 4px; }
 .script-reference summary { cursor: pointer; font-size: 13px; color: var(--signal); padding: 4px 0; }
 .script-reference p { margin: 10px 0; max-width: 760px; }

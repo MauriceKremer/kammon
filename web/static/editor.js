@@ -67,6 +67,12 @@
 
   // The server's answers always swap; these statuses are the ones that never reached it: the
   // guard refused the request, or KAMmon did not get through. Say so, keep the editor untouched.
+  // The dry run's button lives in the test-message form, outside the editor form, but its
+  // failures belong to the same console.
+  function actionOrigin(elt) {
+    return !!(elt && elt.closest && (elt.closest("#script-editor") || elt.closest("#fixture-form")));
+  }
+
   function writeFail(text) {
     var consoleBox = document.getElementById("console");
     if (!consoleBox) return;
@@ -80,7 +86,7 @@
 
   document.body.addEventListener("htmx:responseError", function (evt) {
     var elt = (evt.detail && evt.detail.requestConfig && evt.detail.requestConfig.elt) || null;
-    if (!elt || !elt.closest || !elt.closest("#script-editor")) return;
+    if (!actionOrigin(elt)) return;
     var status = (evt.detail.xhr && evt.detail.xhr.status) || 0;
     if (status === 403) {
       writeFail("This page is for the administrator on this computer.");
@@ -92,7 +98,7 @@
   });
   document.body.addEventListener("htmx:sendError", function (evt) {
     var elt = (evt.detail && evt.detail.requestConfig && evt.detail.requestConfig.elt) || null;
-    if (!elt || !elt.closest || !elt.closest("#script-editor")) return;
+    if (!actionOrigin(elt)) return;
     writeFail("KAMmon could not reach KAM. Nothing was changed. Try again.");
   });
 })();

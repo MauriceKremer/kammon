@@ -159,6 +159,40 @@ func TestAutomationsAdminOpensEditorWithSource(t *testing.T) {
 	}
 }
 
+// The editor's button order (Automations.md §3): Validate sits under the script source, Save and
+// Delete sit at the bottom of the editor, and the dry run sits at the bottom of the test-message
+// form it sends.
+func TestAutomationsEditorButtonPlacement(t *testing.T) {
+	h := newScriptHarness(t)
+	h.login(t, "admin", "admin")
+	_, body := h.get(t, "/automations?script=echo")
+	last, lastName := -1, ""
+	for _, want := range []struct{ name, mark string }{
+		{"the script source", `id="script-source"`},
+		{"validate", `>Validate</button>`},
+		{"the settings row", `id="script-name"`},
+		{"the console", `id="console"`},
+		{"save", `>Save</button>`},
+		{"delete", `>Delete</button>`},
+		{"the test-message form", `id="fixture-form"`},
+		{"the fixture's text field", `name="fx_body"`},
+		{"the dry run", `>Dry run</button>`},
+	} {
+		at := strings.Index(body, want.mark)
+		if at < 0 {
+			t.Fatalf("the editor misses %s", want.name)
+		}
+		if at < last {
+			t.Errorf("%s comes before %s; the order is source, Validate, settings, console, Save, Delete, test message, Dry run (Automations.md §3)", want.name, lastName)
+		}
+		last, lastName = at, want.name
+	}
+	// The dry run sends its own form and the editor's unsaved source (MON-AU-15).
+	if !strings.Contains(body, `hx-include="#script-source"`) {
+		t.Errorf("the dry run misses the editor's source: %s", body)
+	}
+}
+
 func TestAutomationsValidateShowsKamVerbatim(t *testing.T) {
 	h := newScriptHarness(t)
 	h.login(t, "admin", "admin")

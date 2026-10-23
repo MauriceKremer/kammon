@@ -54,14 +54,10 @@
     </div>
   </div>
   {{if .RunSummary}}<p class="small muted mono" id="script-run">{{.RunSummary}}</p>{{end}}
-  <div class="script-tools">
-    <button type="button" hx-post="/ui/script-validate" hx-target="#console" hx-swap="outerHTML">Validate</button>
-    {{if .DryRunSupported}}<button type="button" hx-post="/ui/script-dry-run" hx-target="#console" hx-swap="outerHTML" hx-include="#fixture-form">Dry run</button>
-    {{else}}<span class="small muted">Needs a newer KAM.</span>{{end}}
-    <button type="button" hx-post="/ui/script-save" hx-target="#console" hx-swap="outerHTML">Save</button>
-    <span id="unsaved-note" class="small warn" hidden>Unsaved changes</span>
-  </div>
   <div class="editor"><textarea id="script-source" name="source" spellcheck="false" aria-label="Script source">{{.Source}}</textarea></div>
+  <div class="script-validate">
+    <button type="button" hx-post="/ui/script-validate" hx-target="#console" hx-swap="outerHTML">Validate</button>
+  </div>
   <div class="script-settings">
     <label for="script-name">Name <input type="text" id="script-name" name="name" value="{{.Name}}" spellcheck="false" autocomplete="off" placeholder="pinger.star"></label>
     <label class="check" for="script-enabled-box"><input type="checkbox" id="script-enabled-box" name="enabled-box"{{if .Enabled}} checked{{end}} hx-post="/ui/script-toggle" hx-target="#console" hx-swap="outerHTML"> Enabled</label>
@@ -77,16 +73,16 @@
     <p class="small muted">Recover lets KAM run a paused script again. Leave the field as it is to keep this timeout.</p>
   </div>
   {{end}}
-  {{if not .New}}
-  <div class="script-danger">
-    <button type="button" class="danger-button" hx-delete="/ui/script" hx-confirm="Delete {{.Name}}? This cannot be undone." hx-target="#console" hx-swap="outerHTML">Delete</button>
-    <span class="small muted">Removes the script from KAM. The list refreshes and this editor closes.</span>
+  <div class="script-actions">
+    <button type="button" hx-post="/ui/script-save" hx-target="#console" hx-swap="outerHTML">Save</button>
+    <span id="unsaved-note" class="small warn" hidden>Unsaved changes</span>
+    {{if not .New}}<button type="button" class="danger-button" hx-delete="/ui/script" hx-confirm="Delete {{.Name}}? This cannot be undone." hx-target="#console" hx-swap="outerHTML">Delete</button>
+    <span class="small muted">Removes the script from KAM. The list refreshes and this editor closes.</span>{{end}}
   </div>
-  {{end}}
   <p class="small muted script-caption">Replies are real radio transmissions and count against the duty cycle.</p>
 </form>
 <div class="script-side">
-  {{template "script-fixture"}}
+  {{template "script-fixture" .}}
   {{template "script-reference"}}
 </div>
 {{end}}
@@ -106,6 +102,10 @@
     <label for="fx-timeout">Test timeout (ms) <input type="number" id="fx-timeout" name="fx_timeout" value="500" min="1" max="3000" size="6"></label>
   </div>
   <p class="small muted">A filled SNR or RSSI tells the script the message heard the sender: the fixture says so.</p>
+  <div class="fixture-actions">
+    {{if .DryRunSupported}}<button type="button" hx-post="/ui/script-dry-run" hx-target="#console" hx-swap="outerHTML" hx-include="#script-source">Dry run</button>
+    {{else}}<span class="small muted">Needs a newer KAM.</span>{{end}}
+  </div>
 </form>
 {{end}}
 
