@@ -13,6 +13,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -147,8 +148,13 @@ func (h *HTTP) ValidateScript(ctx context.Context, id, source string, timeoutMS 
 }
 
 // CreateScript posts to /scripts; KAM ignores expected_revision on a create (revision 0 is what
-// a create means) and answers 201.
+// a create means) and answers 201. KAM's create takes the id from the body as well (its
+// APIdetails example carries id and name): a script without an id goes out with the name as
+// its id (D32).
 func (h *HTTP) CreateScript(ctx context.Context, script Script) (Script, error) {
+	if strings.TrimSpace(script.ID) == "" {
+		script.ID = script.Name
+	}
 	return h.scriptRequest(ctx, http.MethodPost, "", scriptMutation{Script: script})
 }
 

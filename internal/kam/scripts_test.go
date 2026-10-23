@@ -86,7 +86,7 @@ func TestHTTPScriptActionsSendAndMap(t *testing.T) {
 	})
 	mux.HandleFunc("POST /scripts", func(w http.ResponseWriter, r *http.Request) {
 		check(w, r, "/scripts")
-		if script, ok := body["script"].(map[string]any); !ok || script["name"] != "new.star" {
+		if script, ok := body["script"].(map[string]any); !ok || script["name"] != "new.star" || script["id"] != "new.star" {
 			t.Errorf("create body = %v", body)
 		}
 		if body["expected_revision"] != float64(0) {

@@ -130,9 +130,21 @@ func TestFakeScriptSaveAndRevisionRules(t *testing.T) {
 	if err != nil || created.Revision != 1 || created.ID != "ping.star" || created.Source != Starter {
 		t.Fatalf("create = %+v, %v", created, err)
 	}
-	// A second script with the same name is a conflict (409).
-	if _, err := admin.CreateScript(ctx, kam.Script{Name: "ping.star", Source: Starter, TimeoutMS: 500}); !conflictOf(err) {
+	// A second script with the same id, and one with the same name but a fresh id, are both
+	// conflicts, in KAM's own words: its answers say 409 when the id or name is already in use.
+	if _, err := admin.CreateScript(ctx, kam.Script{ID: "ping.star", Name: "ping.star", Source: Starter, TimeoutMS: 500}); !conflictOf(err) || !strings.Contains(err.Error(), "revision conflict") {
 		t.Fatalf("duplicate create = %v", err)
+	}
+	if _, err := admin.CreateScript(ctx, kam.Script{ID: "ping-2", Name: "ping.star", Source: Starter, TimeoutMS: 500}); !conflictOf(err) || !strings.Contains(err.Error(), "name already in use") {
+		t.Fatalf("name-taken create = %v", err)
+	}
+	// A create takes its id from the body: KAM answers its own refusal without one (D32).
+	status, body := h.call(http.MethodPost, "/scripts", map[string]any{
+		"script":            map[string]any{"name": "no-id.star", "source": Starter, "timeout_ms": 500},
+		"expected_revision": 0,
+	})
+	if status != http.StatusUnprocessableEntity || body["error"] != "script id and name are required" {
+		t.Fatalf("create without an id: %d %v", status, body)
 	}
 
 	saved, err := admin.UpdateScript(ctx, kam.Script{ID: "ping.star", Name: "ping.star", Source: "def on_group_text(message):\n    pass\n", TimeoutMS: 400}, 1)

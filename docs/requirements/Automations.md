@@ -80,8 +80,8 @@ def on_group_text(message):
 |---|---|---|
 | MON-AU-6 | Opening a script loads it with `GET /scripts/{id}` and remembers its `revision`. | MUST |
 | MON-AU-7 | Validate sends `POST /scripts/validate` with the current text and timeout and shows KAM's message verbatim (it contains line and column). | MUST |
-| MON-AU-8 | Save sends the name, text, timeout, enabled state and `expected_revision`. Creating sends `expected_revision` 0 or none. | MUST |
-| MON-AU-9 | A `409` shows "Changed elsewhere. Reload to see the latest version." and keeps the user's text in the editor so nothing is lost. | MUST |
+| MON-AU-8 | Save sends the name, text, timeout, enabled state and `expected_revision`; a create also carries the id, the name as typed (D32). Creating sends `expected_revision` 0 or none. | MUST |
+| MON-AU-9 | A `409` shows "Changed elsewhere. Reload to see the latest version." and keeps the user's text in the editor so nothing is lost. A create has no stale revision: its `409` (the id or the name is already in use) shows KAM's own words. | MUST |
 | MON-AU-10 | Save does not enable a script by itself. Enabled is an explicit checkbox and uses the enable and disable endpoints with the current revision. | MUST |
 | MON-AU-11 | Recover sends `POST /scripts/{id}/recover` with the revision and optional new timeout. | MUST |
 | MON-AU-12 | Delete asks for confirmation and sends `DELETE /scripts/{id}?revision=N`. | MUST |

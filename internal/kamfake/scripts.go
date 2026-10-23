@@ -250,18 +250,28 @@ func (f *Fake) fakeSave(w http.ResponseWriter, id string, incoming kam.Script, e
 		writeFakeError(w, http.StatusUnprocessableEntity, text)
 		return
 	}
-	if incoming.Name == "" {
-		writeFakeError(w, http.StatusUnprocessableEntity, "name is required")
-		return
-	}
-	if f.nameTaken(incoming.Name, id) {
-		writeFakeError(w, http.StatusConflict, "a script with that name already exists")
+	if strings.TrimSpace(incoming.ID) == "" || strings.TrimSpace(incoming.Name) == "" {
+		// KAM's own required check and words: its create takes the id from the body too (D32).
+		writeFakeError(w, http.StatusUnprocessableEntity, "script id and name are required")
 		return
 	}
 	if id == "" {
-		// A create: revision 0 is what a create means (wire contract).
+		for _, script := range f.scripts {
+			if script.id == incoming.ID {
+				writeFakeError(w, http.StatusConflict, "automation script revision conflict")
+				return
+			}
+		}
+	}
+	if f.nameTaken(incoming.Name, id) {
+		writeFakeError(w, http.StatusConflict, "automation script name already in use")
+		return
+	}
+	if id == "" {
+		// A create: revision 0 is what a create means (wire contract); the id is the client's,
+		// KAMmon's is the name as typed (D32).
 		f.scripts = append(f.scripts, fakeScript{
-			id: incoming.Name, name: incoming.Name, source: incoming.Source, enabled: incoming.Enabled,
+			id: incoming.ID, name: incoming.Name, source: incoming.Source, enabled: incoming.Enabled,
 			timeoutMS: incoming.TimeoutMS, status: kam.StatusREADY, revision: 1,
 			createdAt: f.now().Unix(), updatedAt: f.now().Unix(),
 		})
@@ -330,7 +340,6 @@ func (f *Fake) handleScriptCreate(w http.ResponseWriter, r *http.Request) {
 	if f.scriptsDisabled(w) {
 		return
 	}
-	mutation.Script.ID = ""
 	f.fakeSave(w, "", mutation.Script, 0)
 }
 

@@ -655,7 +655,8 @@ func (s *Server) scriptSaveSubmit(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	var saved kam.Script
 	var err error
-	if loaded.ID == "" || loaded.Revision == "0" {
+	isCreate := loaded.ID == "" || loaded.Revision == "0"
+	if isCreate {
 		saved, err = s.kam.CreateScript(ctx, script)
 	} else {
 		rev, revErr := strconv.ParseInt(loaded.Revision, 10, 64)
@@ -666,7 +667,7 @@ func (s *Server) scriptSaveSubmit(w http.ResponseWriter, r *http.Request) {
 		saved, err = s.kam.UpdateScript(ctx, script, rev)
 	}
 	if err != nil {
-		s.writeScriptReply(w, r, scriptReply{Console: saveErrorConsole(err)})
+		s.writeScriptReply(w, r, scriptReply{Console: saveErrorConsole(err, isCreate)})
 		return
 	}
 	reply := scriptReply{
@@ -676,7 +677,7 @@ func (s *Server) scriptSaveSubmit(w http.ResponseWriter, r *http.Request) {
 		SelectedID: saved.ID,
 		Fresh:      &saved,
 	}
-	if loaded.ID == "" || loaded.Revision == "0" {
+	if isCreate {
 		// The script is on KAM now: the editor becomes an editor of it, so no second Save can
 		// create a duplicate.
 		reply.Replace = "/automations?script=" + url.QueryEscape(saved.ID)
@@ -684,12 +685,13 @@ func (s *Server) scriptSaveSubmit(w http.ResponseWriter, r *http.Request) {
 	s.writeScriptReply(w, r, reply)
 }
 
-// saveErrorConsole is the console of a save that failed (MON-AU-9): a 409 is changed elsewhere;
-// the other statuses carry KAM's text verbatim and leave the editor as it is.
-func saveErrorConsole(err error) scriptConsole {
+// saveErrorConsole is the console of a save that failed (MON-AU-9): an update's 409 is changed
+// elsewhere; a create has no revision to be stale, so its 409 is KAM's own words about a taken
+// id or name (D32). The other statuses carry KAM's text verbatim and leave the editor as it is.
+func saveErrorConsole(err error, isCreate bool) scriptConsole {
 	var se *kam.StatusError
 	switch {
-	case errors.As(err, &se) && se.Status == http.StatusConflict:
+	case !isCreate && errors.As(err, &se) && se.Status == http.StatusConflict:
 		return scriptConsole{Lines: []consoleLine{{Text: "Changed elsewhere. Reload to see the latest version.", Class: "fail"}}}
 	}
 	text, _ := kamErrorWords(err)
@@ -793,7 +795,7 @@ func (s *Server) scriptRecoverSubmit(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	saved, err := s.kam.RecoverScript(ctx, loaded.ID, newTimeout, rev)
 	if err != nil {
-		s.writeScriptReply(w, r, scriptReply{Console: saveErrorConsole(err), List: true, SelectedID: loaded.ID})
+		s.writeScriptReply(w, r, scriptReply{Console: saveErrorConsole(err, false), List: true, SelectedID: loaded.ID})
 		return
 	}
 	reply := scriptReply{
@@ -847,7 +849,7 @@ func (s *Server) scriptDeleteSubmit(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), kamActionTimeout)
 	defer cancel()
 	if err := s.kam.DeleteScript(ctx, loaded.ID, rev); err != nil {
-		s.writeScriptReply(w, r, scriptReply{Console: saveErrorConsole(err), List: true, SelectedID: loaded.ID})
+		s.writeScriptReply(w, r, scriptReply{Console: saveErrorConsole(err, false), List: true, SelectedID: loaded.ID})
 		return
 	}
 	s.writeScriptReply(w, r, scriptReply{Console: scriptConsole{}, Redirect: "/automations"})

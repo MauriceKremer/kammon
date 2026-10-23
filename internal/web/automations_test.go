@@ -201,6 +201,12 @@ func TestAutomationsSaveCreatesUpdatesAndKeepsTextOnConflict(t *testing.T) {
 	if !strings.Contains(body, `name="id" value="pinger.star"`) {
 		t.Error("the editor must become the created script's editor, so no second save creates a duplicate")
 	}
+	// A create is not changed elsewhere: no revision can be stale, so its 409 is KAM's own words
+	// about a taken id (MON-AU-9, D32).
+	_, body, _ = h.formPost(t, http.MethodPost, "/ui/script-save", create)
+	if !strings.Contains(body, "revision conflict") || strings.Contains(body, "Changed elsewhere") {
+		t.Errorf("duplicate create: %s", body)
+	}
 	saved, err := h.kam.Scripts(t.Context())
 	if err != nil {
 		t.Fatal(err)
