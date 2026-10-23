@@ -86,19 +86,11 @@ button.primary { background: var(--signal); color: var(--bg-0); border-color: va
 .brand { font: 700 21px/1.25 var(--font-heading); color: var(--text-primary); white-space: nowrap; }
 .brand .mon { color: var(--signal); font-size: 16px; }
 .brand small { display: block; margin-top: 8px; font: 500 13px var(--font-body); color: var(--text-muted); }
-.nav-label { margin: 0 12px 10px; font-size: 12px; color: var(--text-muted); text-transform: uppercase; }
 .nav { display: grid; gap: 4px; min-width: 0; max-width: 100%; }
 .nav a { padding: 10px 12px; border-radius: 0 6px 6px 0; color: var(--text-muted); text-decoration: none; font-size: 14px; }
 .nav a:hover { background: var(--highlight); color: var(--text-primary); }
 .nav a[aria-current="page"] { background: var(--highlight); color: var(--text-primary); font-weight: 600; box-shadow: inset 2px 0 var(--text-secondary); }
-
-/* collapsible sidebar section (Workspace) */
-.sidebar > div, .sidebar > details { min-width: 0; }
-.nav-section summary.nav-label { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; }
-.nav-section summary.nav-label::-webkit-details-marker { display: none; }
-.nav-section summary.nav-label:hover { color: var(--text-secondary); }
-.nav-section summary.nav-label::after { content: "+"; margin-left: auto; color: var(--text-muted); font: 14px var(--font-code); }
-.nav-section[open] > summary.nav-label::after { content: "-"; }
+.sidebar > div, .sidebar > nav { min-width: 0; }
 .node { margin-top: auto; padding: 20px 8px 0; border-top: 1px solid var(--border-default); font-size: 13px; color: var(--text-muted); }
 .node strong { display: block; margin-bottom: 6px; color: var(--text-secondary); }
 .dot { display: inline-block; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: var(--success); }

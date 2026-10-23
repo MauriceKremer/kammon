@@ -61,7 +61,7 @@ flowchart LR
 ```text
 +-----------+--------------------------------------------------+
 | KAM mon   |  Emmen / home node    [theme] user  [role] [out] |  top bar
-| Workspace +--------------------------------------------------+
++-----------+--------------------------------------------------+
 | Overview  |  Page title                    [range] [pause]   |  page heading
 | Traffic   |  one-line subtitle                               |
 | Channels  +--------------------------------------------------+

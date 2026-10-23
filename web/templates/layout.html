@@ -9,18 +9,12 @@
 <script src="/static/htmx.min.js?v={{.StaticVersion}}" defer></script>
 <script src="/static/theme.js?v={{.StaticVersion}}" defer></script>
 <script src="/static/live.js?v={{.StaticVersion}}" defer></script>
-<script src="/static/nav.js?v={{.StaticVersion}}" defer></script>
 </head>
 <body>
 <a class="skip-link" href="#content">Skip to content</a>
 <aside class="sidebar" aria-label="Main navigation">
   <div class="brand">KAM<span class="mon">mon</span><small>MeshCore observatory</small></div>
-  <div>
-    <details class="nav-section" name="sidebar" open>
-      <summary class="nav-label">Workspace</summary>
-      <nav class="nav">{{range .Nav}}<a href="{{.Path}}"{{if eq .Key $.Active}} aria-current="page"{{end}}>{{.Title}}</a>{{end}}</nav>
-    </details>
-  </div>
+  <nav class="nav">{{range .Nav}}<a href="{{.Path}}"{{if eq .Key $.Active}} aria-current="page"{{end}}>{{.Title}}</a>{{end}}</nav>
   {{template "nodeblock" .Node}}
 </aside>
 <main id="content">

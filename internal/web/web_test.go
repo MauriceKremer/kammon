@@ -327,15 +327,6 @@ func TestEveryPageLinksTheSharedStylesheetVersion(t *testing.T) {
 			t.Errorf("%s: Cache-Control = %q, want no-store", target, header.Get("Cache-Control"))
 		}
 	}
-	// The nav sections listener ships with the rest of the static set; its
-	// cache header stays public and it must carry the pageshow restore.
-	status, nav, header := get(t, h.client(t), h.ts.URL+"/static/nav.js")
-	if status != http.StatusOK || header.Get("Cache-Control") != "public, max-age=14400" {
-		t.Errorf("nav.js: %d %q", status, header.Get("Cache-Control"))
-	}
-	if !strings.Contains(nav, "pageshow") {
-		t.Error("nav.js must put the served section state back on a restored page")
-	}
 }
 
 // firstUndefaultedStaticRef finds the first `src="/static/..."` without a `?v=`
@@ -755,17 +746,19 @@ func TestLoginSlowdownAfterFiveFailures(t *testing.T) {
 	}
 }
 
-// The manuals left the interface (D23): the sidebar lists only the Workspace
-// pages, nothing links to /manuals/, and no route serves them — including the
-// login page. The retired theme initializer is gone with them.
+// The manuals left the interface (D23): nothing links to /manuals/ and no
+// route serves them — including the login page, whose retired theme initializer
+// is gone with them. The sidebar is one plain list of the navigation items (D26):
+// no collapsible section, no Workspace or Help label.
 func TestManualsAreGoneFromTheInterface(t *testing.T) {
 	h := newHarness(t)
 	_, body, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/")
-	if n := strings.Count(body, `<details class="nav-section" name="sidebar"`); n != 1 {
-		t.Errorf("the app sidebar has %d collapsible sections, want one", n)
+	if n := strings.Count(body, `<nav class="nav">`); n != 1 {
+		t.Errorf("the app sidebar has %d navigation lists, want one", n)
 	}
 	for _, gone := range []string{
-		`<summary class="nav-label">Help</summary>`,
+		`<details class="nav-section"`,
+		"nav-label",
 		"nav-manuals",
 		"/manuals/",
 	} {

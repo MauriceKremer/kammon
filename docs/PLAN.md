@@ -52,7 +52,7 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 
 ## Slice 4b: Manuals
 
-Removed (D23, 2026-10-18): the manuals, their public `/manuals/` route and the sidebar Help section left the interface; the app sidebar carries the Workspace section only, and the pinned copies of KAM's manuals went with them.
+Removed (D23, 2026-10-18): the manuals, their public `/manuals/` route and the sidebar Help section left the interface; the app sidebar carries only its navigation list (one plain list, D26), and the pinned copies of KAM's manuals went with them.
 
 ## Open points
 
