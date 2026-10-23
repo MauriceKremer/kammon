@@ -239,7 +239,7 @@ Implemented endpoints from this section are documented with parameters and
 responses in [APIdetails.md](APIdetails.md), and each listener serves a
 self-describing index at `GET /`. Update APIdetails.md and the index lists when
 an endpoint ships; this section keeps the whole plan, including parts still
-planned (§7.5, the §7.6 additions).
+planned (the §7.6 additions).
 
 ### 7.1 Status
 
@@ -560,7 +560,7 @@ IDs are stable. "From" lists the KAMmon feature document that needs the item (`t
 |---|---|---|---|
 | 1 (implemented; hardware verification pending) | `internal/monitor` package, listener, `/v1/status`, event ring, `rx` and `tx` events, `epoch`/`next_after` | Overview, Traffic, DataStore | Automated transport/HTTP/cursor/lifecycle tests pass; real-radio acceptance remains pending |
 | 2 (implemented) | Channels endpoints; room list, clients, posts, `room` events, per-room counters, persisted `last_heard_at` | Channels, Rooms | Focused repository, handler, worker-snapshot and race tests pass |
-| 3 | Modem snapshot, query and `PUT /v1/modem/radio` with save | KissModem | A change survives a KAM restart and a simulated modem reset |
+| 3 (implemented; hardware verification pending) | Modem snapshot, query and `PUT /v1/modem/radio` with save | KissModem | A change survives a KAM restart and a simulated modem reset; automated handler and recovery tests pass |
 | 4 | Client removal endpoint; protocol roles remain read-only | RoomAccounts | Removal cannot resurrect a client via batch persistence; existing room-login tests remain unchanged |
 | 5 | Script `run` info and dry run | Automations | A dry run never transmits and cannot freeze a live script |
 
