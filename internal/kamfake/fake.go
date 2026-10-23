@@ -1,5 +1,5 @@
-// Package kamfake is a fake KAM monitor API with generated traffic. It backs -demo mode and the tests.
-// It follows docs/kam-api/FeatureMonitorApi.md: event ring, sequence numbers, epoch and reset.
+// Package kamfake is a fake KAM API with generated traffic. It backs -demo mode and the tests.
+// It follows docs/kam-api/FeatureKamApi.md: event ring, sequence numbers, epoch and reset.
 package kamfake
 
 import (
@@ -141,7 +141,7 @@ func (f *Fake) firstSeq() uint64 {
 	return f.ring[0].Seq
 }
 
-// Handler serves the monitor API.
+// Handler serves the KAM API.
 func (f *Fake) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/status", f.status)

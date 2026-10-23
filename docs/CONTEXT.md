@@ -6,8 +6,8 @@ Use these words in code, tests, docs and screens.
 |---|---|
 | **KAM** | The Go service that connects a MeshCore KISS radio to SQLite and Starlark. The open system of record. |
 | **KAMmon** | This project: the web monitor and login layer in front of KAM. |
-| **Monitor API** | KAM's local REST API for KAMmon (`127.0.0.1:8766`). Contract: [kam-api/FeatureMonitorApi.md](kam-api/FeatureMonitorApi.md). |
-| **Script API** | KAM's existing Local Management API for Starlark scripts (`127.0.0.1:8765`). |
+| **KAM API** | KAM's local REST API that KAMmon talks to (`127.0.0.1:8766`). One listener serves monitoring and the script routes (KAM unified them, 2026-10-23). KAMmon's docs say KAM API, so the name cannot be read as KAMmon's own. Contract: [kam-api/FeatureKamApi.md](kam-api/FeatureKamApi.md). |
+| **Script API** | KAM's routes for Starlark scripts (`/scripts`...): list, create, validate, save, enable, disable, recover, delete. Served by the same listener as the KAM API since the unified listener; they had their own port 8765 before. |
 | **Event** | One record in KAM's event ring: a packet heard (`rx`), a packet sent (`tx`), room activity (`room`), a script run (`script`) or a modem event (`modem`). Never carries payload text. |
 | **Event ring** | KAM's fixed-size, in-memory list of recent events. |
 | **Epoch** | A random id KAM creates at start. A new epoch means KAM restarted. |

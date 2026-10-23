@@ -1,13 +1,13 @@
 # Decisions
 
-Recorded 2026-10-11 during planning. Reasons are in [DESIGN.md](DESIGN.md) §13 and [kam-api/FeatureMonitorApi.md](kam-api/FeatureMonitorApi.md) §4.
+Recorded 2026-10-11 during planning. Reasons are in [DESIGN.md](DESIGN.md) §13 and [kam-api/FeatureKamApi.md](kam-api/FeatureKamApi.md) §4.
 
 | ID | Decision | Outcome | Why |
 |---|---|---|---|
 | D1 | Live data from KAM | Cursor pull over REST, polled every 1-2 s | Plain REST, no streaming, easy recovery |
 | D2 | After a KAMmon restart | Memory only; backfill from KAM's ring; history start is labelled | No database or files to maintain |
 | D3 | Admin versus web viewer | One listener, roles by user; admin power needs a request from the same computer | One port, no way for a remote visitor to reach admin routes |
-| D4 | KAM endpoints | A separate monitoring listener (8766); scripts stay on 8765 | The existing script API stays untouched |
+| D4 | KAM endpoints | A separate monitoring listener (8766); scripts stayed on 8765. Superseded 2026-10-23, see D28 | The existing script API stays untouched |
 | D5 | Modem changes | Apply, then save to `kam.yml` | One source of truth; the reset probe reuses saved values |
 | D6 | Room clients | List and remove; protocol role is read-only | No new radio-side permission model |
 | D7 | What viewers see | Per-channel allow list for text | Public channels may be shared, private ones stay private |
@@ -29,4 +29,6 @@ Recorded 2026-10-11 during planning. Reasons are in [DESIGN.md](DESIGN.md) §13 
 | D23 | Manuals removed | The manuals, their public `/manuals/` route and the sidebar Help section are gone from the interface: the sidebar keeps only its navigation list, `web/manuals/`, `internal/manuals` and the theme initializer for cached manual pages are deleted, and the static cache-buster lives in `internal/web` | The manual display cluttered the app; the simplest thing is a screens-only monitor, and the plain-words explanation stays in README.md and docs/ (2026-10-18) |
 | D24 | Poll and age knobs in kammon.yml | `poll:` sets how often the poller reads KAM (`events`, `status`, `rooms`, `channels`), each read's `timeout`, and the pause after a 404 (`not_served`); `freshness:` sets `stale_after` and `down_after` (MON-DS-13); missing lines keep the defaults: the §5 intervals, 3 s, 10 minutes, 10 s, 2 min | Some nodes want a slower poll, and the old-data labels should match a poll that is slower or faster than the default bands (2026-10-18) |
 | D26 | Sidebar navigation | One standard list of navigation items in the sidebar: no Workspace or Help section labels and no collapsible groups; the section state-restore script (`web/static/nav.js`) went with them | With Help gone (D23) the single collapsible section grouped nothing and only added a label and a toggle; the plain list is the simplest thing (2026-10-23) |
+| D27 | Term for the API on 8766 | KAMmon's docs call it the KAM API; the phrase "KAM monitor API" is out of prose. KAM's contract has taken the same name (KAM's D19, same day); only the `kam_monitor_url` key keeps the old word | "KAM monitor API" reads as the API of KAMmon, the KickAss MeshCore Monitor (2026-10-23) |
+| D28 | One KAM address | KAM serves script routes on the same listener as the KAM API (8766); `kam_scripts_url` is removed from `kammon.yml` and the coming scripts client will use `kam_monitor_url` | KAM closed port 8765 with its unified listener (its D1); a second URL knob would name nothing (2026-10-23) |
 | A3 | Repositories | KAM and KAMmon are separate repositories | KAM must work without KAMmon; KAM's packages are `internal/` |

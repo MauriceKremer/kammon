@@ -1,5 +1,5 @@
-// Package kam holds the types and HTTP reader for KAM's local monitor API.
-// The contract is docs/kam-api/FeatureMonitorApi.md. KAM code is never imported.
+// Package kam holds the types and HTTP reader for the KAM API.
+// The contract is docs/kam-api/FeatureKamApi.md. KAM code is never imported.
 package kam
 
 import "time"

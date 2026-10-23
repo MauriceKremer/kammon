@@ -1,7 +1,7 @@
 # KAMmon Requirements: In-Memory Data Store and Poller
 
 **Status:** Requirements only. Nothing is built.
-**Scope:** How KAMmon keeps the data it shows, so that its pages never depend on KAM's API speed or on SQLite. Design context: [DESIGN.md](../DESIGN.md). KAM side: [docs/kam-api/FeatureMonitorApi.md](../kam-api/FeatureMonitorApi.md) (`API-EV-*`, `API-ST-1`).
+**Scope:** How KAMmon keeps the data it shows, so that its pages never depend on KAM's API speed or on SQLite. Design context: [DESIGN.md](../DESIGN.md). KAM side: [docs/kam-api/FeatureKamApi.md](../kam-api/FeatureKamApi.md) (`API-EV-*`, `API-ST-1`).
 
 ## 1. Summary
 
@@ -37,7 +37,7 @@ Plain words: a **bucket** is the total of one minute of events, kept so charts d
 | **Modem snapshot** | Latest `/v1/modem` | One | Poll every 10 s |
 | **Channel list** | Latest `/v1/channels` | One | Poll every 30 s |
 | **Room list and clients** | Latest `/v1/rooms` and per-room `/clients` | Up to 4 rooms, 100 clients each | Poll every 10 s |
-| **Script list** | Latest `GET /scripts` (port 8765) | One | Poll every 10 s |
+| **Script list** | Latest `GET /scripts` (the KAM API listener, 8766) | One | Poll every 10 s |
 | **Text cache** | Newest page of channel messages and room posts, for admin pages | 10 pages, 5 s lifetime | On demand |
 | **Command log** | Lines from modem commands | 200 lines | Admin actions |
 | **History marks** | "history starts at", "KAM restarted at", "gap from, to" | 50 marks | Poller |

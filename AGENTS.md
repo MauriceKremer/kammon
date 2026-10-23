@@ -14,7 +14,7 @@ KAMmon is for enthusiasts, like KAM: pragmatism and easy setup come before stric
 ## Rules
 
 1. **KAM is open.** KAMmon never needs KAM to remember anything for it, never asks KAM to know about KAMmon, and keeps working (marked out of date) when KAM is slow or gone.
-2. **Never import KAM code.** KAM's packages are `internal/`. The contract is [docs/kam-api/FeatureMonitorApi.md](docs/kam-api/FeatureMonitorApi.md); KAMmon defines its own types in `internal/kam`.
+2. **Never import KAM code.** KAM's packages are `internal/`. The contract is [docs/kam-api/FeatureKamApi.md](docs/kam-api/FeatureKamApi.md); KAMmon defines its own types in `internal/kam`.
 3. **Pages read the store, never KAM.** One poller writes `internal/store`; handlers only read it. Admin actions are the only calls from a request to KAM.
 4. **The server decides access.** Every route is registered with a required role. Visibility rules live in `internal/view` only; templates never decide who sees what.
 5. **Radio text is untrusted.** Names, senders, message text and labels are escaped by `html/template`. Never use `template.HTML` except for numbers-only SVG in `internal/web/chart.go` (a test enforces this).
@@ -27,8 +27,8 @@ KAM sits next to KAMmon at `../kam`. The knowledge is one-way: KAM's code, docs 
 
 | Path | What |
 |---|---|
-| `../kam/docs/FeatureMonitorApi.md` | Source of truth for the contract; its §10 phases say what is spec'd when. Check its Status header — it may lag KAM's code. |
-| `../kam/internal/monitor/` | KAM's implementation of the API; check `../kam/main.go` for whether it is wired in. |
+| `../kam/docs/FeatureKamApi.md` | Source of truth for the contract; its §10 phases say what is spec'd when. Check its Status header — it may lag KAM's code. |
+| `../kam/internal/api/` | KAM's implementation of the API; check `../kam/main.go` for whether it is wired in. |
 | `../kam/AGENTS.md` | KAM's method for MeshCore research and feature docs; useful when reading KAM, silent about KAMmon. |
 | `docs/kam-api/` | KAMmon's pinned copy, `KAM_COMMIT` and the drift check; see its README. |
 
@@ -41,7 +41,7 @@ go run ./cmd/kammon -demo          # fake KAM with generated data; login admin/a
 go run ./cmd/kammon -config kammon.yml
 go test -race ./...
 go vet ./... && gofmt -l .
-diff ../kam/docs/FeatureMonitorApi.md docs/kam-api/FeatureMonitorApi.md   # contract drift check
+diff ../kam/docs/FeatureKamApi.md docs/kam-api/FeatureKamApi.md   # contract drift check
 ```
 
 ## Layout
@@ -67,6 +67,7 @@ diff ../kam/docs/FeatureMonitorApi.md docs/kam-api/FeatureMonitorApi.md   # cont
 - Requirements have stable ids (`MON-OV-3`, `API-EV-2`). Cite them in tests and commits.
 - Test first for logic (the store cursor, visibility, auth). Check screens in a browser in demo mode.
 - Work in vertical slices in the order of [docs/PLAN.md](docs/PLAN.md); tick the plan when a slice is done.
+- When a requirement is finished, commit and push it, citing its ids (`MON-...`, `D...`) in the message; do not leave finished work uncommitted.
 - Change the contract in the KAM repository first, then refresh `docs/kam-api/` and `testdata/kam/`.
 - UI work follows the [kammon-ui-style skill](.github/skills/kammon-ui-style/SKILL.md).
 - Use the terms in [docs/CONTEXT.md](docs/CONTEXT.md). Record decisions in [docs/DECISIONS.md](docs/DECISIONS.md).

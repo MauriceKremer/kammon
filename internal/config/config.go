@@ -65,7 +65,6 @@ type Freshness struct {
 type Config struct {
 	Listen             string    `yaml:"listen"`
 	KamMonitorURL      string    `yaml:"kam_monitor_url"`
-	KamScriptsURL      string    `yaml:"kam_scripts_url"`
 	Poll               Poll      `yaml:"poll"`
 	Freshness          Freshness `yaml:"freshness"`
 	SessionIdleHours   int       `yaml:"session_idle_hours"`
@@ -84,7 +83,6 @@ func defaults() Config {
 	return Config{
 		Listen:           ":8080",
 		KamMonitorURL:    "http://127.0.0.1:8766",
-		KamScriptsURL:    "http://127.0.0.1:8765",
 		Poll:             Poll{Events: time.Second, Status: 2 * time.Second, Rooms: 10 * time.Second, Channels: 30 * time.Second, Timeout: 3 * time.Second, NotServed: 10 * time.Minute},
 		Freshness:        Freshness{StaleAfter: 10 * time.Second, DownAfter: 2 * time.Minute}, // store's FreshFor/StaleFor (MON-DS-13)
 		SessionIdleHours: 8,
@@ -120,7 +118,7 @@ func Load(path string) (Config, error) {
 }
 
 func (c *Config) normalize() error {
-	for _, raw := range []struct{ name, value string }{{"kam_monitor_url", c.KamMonitorURL}, {"kam_scripts_url", c.KamScriptsURL}} {
+	for _, raw := range []struct{ name, value string }{{"kam_monitor_url", c.KamMonitorURL}} {
 		u, err := url.Parse(raw.value)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			return fmt.Errorf("%s must be an http or https URL, got %q", raw.name, raw.value)

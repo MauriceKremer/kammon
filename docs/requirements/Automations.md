@@ -1,11 +1,11 @@
 # KAMmon Requirements: Automations (Starlark Workspace)
 
 **Status:** Requirements only. Nothing is built.
-**Scope:** Creating, testing, saving and managing the Starlark scripts that KAM runs when it hears a channel message. Design: [DESIGN.md](../DESIGN.md) §4.2 (master-detail). KAM side: [docs/kam-api/FeatureMonitorApi.md](../kam-api/FeatureMonitorApi.md) §7.6. Language and runtime: [docs/FeatureStarlark.md](../../../kam/docs/FeatureStarlark.md).
+**Scope:** Creating, testing, saving and managing the Starlark scripts that KAM runs when it hears a channel message. Design: [DESIGN.md](../DESIGN.md) §4.2 (master-detail). KAM side: [docs/kam-api/FeatureKamApi.md](../kam-api/FeatureKamApi.md) §7.6. Language and runtime: [docs/FeatureStarlark.md](../../../kam/docs/FeatureStarlark.md).
 
 ## 1. Summary
 
-**Starlark** is a small scripting language that looks like Python. A script reacts to a channel message and may send a reply. KAM already has a Local Management API on `127.0.0.1:8765` to list, create, validate, save, enable, disable, recover and delete scripts, with revision checks. KAMmon becomes the screen for it.
+**Starlark** is a small scripting language that looks like Python. A script reacts to a channel message and may send a reply. KAM's script routes list, create, validate, save, enable, disable, recover and delete scripts, with revision checks; they are served by the same listener as the KAM API on `127.0.0.1:8766` since KAM merged its listeners (2026-10-23). KAMmon becomes the screen for it.
 
 KAMmon adds two things the API lacked: a **dry run**, which runs a script against a made-up message and shows what it would have said without sending anything, and **run information** (how often a script ran, how long the last run took, how many replies it queued).
 
@@ -68,7 +68,7 @@ def on_group_text(message):
 
 | ID | Requirement | Level |
 |---|---|---|
-| MON-AU-1 | The script list is read from `GET /scripts` (port 8765) every 10 s and when the page opens. | MUST |
+| MON-AU-1 | The script list is read from `GET /scripts` (the KAM API listener, 8766) every 10 s and when the page opens. | MUST |
 | MON-AU-2 | The list shows `runtime_status` in words. A FROZEN script shows the last error and a Recover button; a BROKEN script shows the last error. | MUST |
 | MON-AU-3 | When `run` is present the page shows last run time, duration and reply count; otherwise it shows nothing in its place. | MUST |
 | MON-AU-4 | Viewers see names, state, revision and run information. They never see source, and no source is fetched for them. | MUST |
@@ -119,7 +119,7 @@ def on_group_text(message):
 | Queue depth and dropped events | `GET /v1/status` (`automation`) | API-AU-5 |
 | Script run events | `script` events | API-EV-6 |
 
-KAMmon uses two base URLs: scripts on port 8765, everything else on 8766.
+KAMmon uses one base URL, `kam_monitor_url` (8766); the script routes share it (D28).
 
 ## 6. Visibility
 

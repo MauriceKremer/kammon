@@ -32,7 +32,7 @@ type HTTP struct {
 	hc   *http.Client
 }
 
-// NewHTTP returns a reader for the monitor API at base, for example http://127.0.0.1:8766.
+// NewHTTP returns a reader for the KAM API at base, for example http://127.0.0.1:8766.
 // Each request has its own timeout (MON-DS-2).
 func NewHTTP(base string, timeout time.Duration) *HTTP {
 	return &HTTP{base: base, hc: &http.Client{Timeout: timeout}}

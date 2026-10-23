@@ -19,7 +19,7 @@ Open <http://127.0.0.1:8080>. Sign in as `admin` / `admin` (local administrator)
 ## Run against a real KAM
 
 1. Copy [kammon.yml](kammon.yml) to `kammon.local.yml` and change the passwords.
-2. Start KAM with its monitoring listener on (a planned KAM feature, see [docs/kam-api/FeatureMonitorApi.md](docs/kam-api/FeatureMonitorApi.md)).
+2. Start KAM. Its KAM API listens on loopback (port `8766` by default; see [docs/kam-api/FeatureKamApi.md](docs/kam-api/FeatureKamApi.md)).
 3. Run `go run ./cmd/kammon -config kammon.local.yml`.
 
 Passwords are plain text in the config file, like channel keys in KAM. An `admin` user has admin power only on a request from the same computer; from anywhere else the admin is a view-only user.

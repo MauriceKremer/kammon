@@ -1,7 +1,7 @@
 # KAMmon Requirements: Room Accounts
 
 **Status:** Requirements only. Nothing is built.
-**Scope:** Inspecting and removing remembered MeshCore room clients. Protocol roles are read-only. KAMmon web users and web permissions belong to [Access.md](Access.md), not this page. Design: [DESIGN.md](../DESIGN.md). KAM side: [docs/kam-api/FeatureMonitorApi.md](../kam-api/FeatureMonitorApi.md) §7.3 and §7.4.
+**Scope:** Inspecting and removing remembered MeshCore room clients. Protocol roles are read-only. KAMmon web users and web permissions belong to [Access.md](Access.md), not this page. Design: [DESIGN.md](../DESIGN.md). KAM side: [docs/kam-api/FeatureKamApi.md](../kam-api/FeatureKamApi.md) §7.3 and §7.4.
 
 ## 1. Summary
 

@@ -1,7 +1,7 @@
 # KAMmon Requirements: KISS Modem
 
 **Status:** Requirements only. Nothing is built.
-**Scope:** Seeing the state of the KISS modem, running read-only diagnostic commands, and changing the radio settings. Design: [DESIGN.md](../DESIGN.md) §4.2 (form plus snapshot). KAM side: [docs/kam-api/FeatureMonitorApi.md](../kam-api/FeatureMonitorApi.md) §7.5. Protocol and firmware behaviour: [docs/FeatureKissModem.md](../../../kam/docs/FeatureKissModem.md) and [manuals/FeatureKissModem.html](../../../kam/manuals/FeatureKissModem.html).
+**Scope:** Seeing the state of the KISS modem, running read-only diagnostic commands, and changing the radio settings. Design: [DESIGN.md](../DESIGN.md) §4.2 (form plus snapshot). KAM side: [docs/kam-api/FeatureKamApi.md](../kam-api/FeatureKamApi.md) §7.5. Protocol and firmware behaviour: [docs/FeatureKissModem.md](../../../kam/docs/FeatureKissModem.md) and [manuals/FeatureKissModem.html](../../../kam/manuals/FeatureKissModem.html).
 
 ## 1. Summary
 

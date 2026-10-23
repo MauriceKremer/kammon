@@ -1,7 +1,7 @@
 # KAMmon Design
 
 **Status:** Design pattern taken from the clickable prototype [prototype/kammon-prototype.html](../prototype/kammon-prototype.html). The prototype uses sample data only and is thrown away after the build.
-**Scope:** How KAMmon looks, how it is built, and how it behaves. What each page must do is in the files in [requirements/](requirements/). What KAM must offer is in [docs/kam-api/FeatureMonitorApi.md](kam-api/FeatureMonitorApi.md).
+**Scope:** How KAMmon looks, how it is built, and how it behaves. What each page must do is in the files in [requirements/](requirements/). What KAM must offer is in [docs/kam-api/FeatureKamApi.md](kam-api/FeatureKamApi.md).
 
 ## 1. Purpose
 
@@ -30,9 +30,8 @@ flowchart LR
     Browser["Browser<br/>pages and htmx refresh"] -->|"HTTPS or HTTP, login"| Web["KAMmon web layer<br/>templates, sessions, role check"]
     Web --> Store[("In-memory store<br/>event history, buckets, snapshots")]
     Poller["Poller<br/>every 1-2 s"] --> Store
-    Poller -->|"GET /v1/events, /v1/status, ..."| KAM["KAM monitor API<br/>127.0.0.1:8766"]
+    Poller -->|"GET /v1/events, /v1/status, ..."| KAM["KAM API<br/>127.0.0.1:8766"]
     Web -->|"admin actions only"| KAM
-    Web -->|"script actions"| Scripts["KAM script API<br/>127.0.0.1:8765"]
     KAM --- Radio["KISS modem and radio"]
 ```
 
@@ -40,7 +39,7 @@ flowchart LR
 - **Store.** Memory only (see [requirements/DataStore.md](requirements/DataStore.md)). Pages read from the store, not from KAM, so a page view never waits on KAM.
 - **Web layer.** Server-rendered pages. A browser asks for a whole page once; htmx then refreshes small parts of it.
 - **Actions.** Changes (room-client removal, modem radio, scripts) go straight to KAM, one request each, and the answer is shown on screen. They are never automatically retried.
-- **Two KAM addresses.** `kam_monitor_url` (default `http://127.0.0.1:8766`) and `kam_scripts_url` (default `http://127.0.0.1:8765`).
+- **One KAM address.** `kam_monitor_url` (default `http://127.0.0.1:8766`). KAM serves monitoring and the script routes on this one listener (D28).
 - **KAMmon owns web users and web permissions:** login passwords, browser sessions, the viewer allow list, view rules, theme, and its in-memory history. KAM still owns MeshCore room passwords and radio client sessions; these are separate from KAMmon web users. KAM keeps no state for KAMmon, and a slow or restarting KAM leaves every page usable, marked as out of date.
 
 ### 3.1 Roles
@@ -259,7 +258,6 @@ kammon/
 # kammon.yml
 listen: ":8080"
 kam_monitor_url: "http://127.0.0.1:8766"
-kam_scripts_url: "http://127.0.0.1:8765"
 poll:
   events: 1s      # how often the poller reads KAM (DataStore.md §5)
   status: 2s
@@ -300,7 +298,7 @@ viewer_text_channels: ["#public"]
 | D1 | Live data from KAM | Cursor pull over REST, polled every 1-2 s |
 | D2 | After a KAMmon restart | Memory only; backfill from KAM; history start is labelled |
 | D3 | Admin versus web viewer | One listener, roles by user; admin power needs a loopback request |
-| D4 | KAM endpoints | A separate monitoring listener (8766); scripts stay on 8765 |
+| D4 | KAM endpoints | One listener (8766) for monitoring and scripts since KAM's unified listener (2026-10-23, D28); scripts stayed on 8765 before |
 | D5 | Modem changes | Apply, then save to `kam.yml` |
 | D6 | Room clients | List and remove; protocol roles are read-only |
 | D7 | What viewers see | Per-channel allow list for text |
@@ -340,4 +338,4 @@ viewer_text_channels: ["#public"]
 | [requirements/KissModem.md](requirements/KissModem.md) | KISS modem page |
 | [requirements/Access.md](requirements/Access.md) | Login, roles, visibility |
 | [requirements/DataStore.md](requirements/DataStore.md) | In-memory store and poller |
-| [docs/kam-api/FeatureMonitorApi.md](kam-api/FeatureMonitorApi.md) | KAM side: the REST API KAMmon needs |
+| [docs/kam-api/FeatureKamApi.md](kam-api/FeatureKamApi.md) | KAM side: the REST API KAMmon needs |

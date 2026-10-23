@@ -1,6 +1,6 @@
 # Plan
 
-Build in vertical slices. Each slice: test first for the logic, check the screen in demo mode, tick the box. Requirement ids are in [requirements/](requirements/); KAM ids (`API-*`) are in [kam-api/FeatureMonitorApi.md](kam-api/FeatureMonitorApi.md).
+Build in vertical slices. Each slice: test first for the logic, check the screen in demo mode, tick the box. Requirement ids are in [requirements/](requirements/); KAM ids (`API-*`) are in [kam-api/FeatureKamApi.md](kam-api/FeatureKamApi.md).
 
 Status legend: `[x]` done in this scaffold, `[ ]` open.
 
