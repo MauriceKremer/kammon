@@ -128,6 +128,7 @@ func TestAutomationsAdminOpensEditorWithSource(t *testing.T) {
 	}
 	for _, want := range []string{
 		"echo.star", `id="script-source"`, "on_group_text", "Revision 4",
+		`name="name" value="echo.star"`,
 		`hx-post="/ui/script-validate"`, ">Save</button>", ">Dry run</button>",
 		`name="fx_channel" value="#emmen"`, `name="fx_body" value="!ping"`,
 		"Delete", "Reset",
@@ -148,9 +149,13 @@ func TestAutomationsAdminOpensEditorWithSource(t *testing.T) {
 		t.Errorf("the broken script shows the wrong console: %s", broken)
 	}
 	// ?new=1 is the starter editor with nothing of the delete row (Automations.md §3.1, MON-AU-8).
+	// The name field is here, empty: the save names the script (MON-AU-8).
 	_, starter := h.get(t, "/automations?new=1")
 	if !strings.Contains(starter, `id="script-source"`) || !strings.Contains(starter, "!ping") || strings.Contains(starter, "hx-delete") {
 		t.Errorf("the starter editor is not a new script: %s", starter)
+	}
+	if !strings.Contains(starter, `id="script-name"`) {
+		t.Errorf("the starter editor misses the name field (MON-AU-8): %s", starter)
 	}
 }
 

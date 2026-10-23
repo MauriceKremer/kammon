@@ -63,6 +63,7 @@
   </div>
   <div class="editor"><textarea id="script-source" name="source" spellcheck="false" aria-label="Script source">{{.Source}}</textarea></div>
   <div class="script-settings">
+    <label for="script-name">Name <input type="text" id="script-name" name="name" value="{{.Name}}" spellcheck="false" autocomplete="off" placeholder="pinger.star"></label>
     <label class="check" for="script-enabled-box"><input type="checkbox" id="script-enabled-box" name="enabled-box"{{if .Enabled}} checked{{end}} hx-post="/ui/script-toggle" hx-target="#console" hx-swap="outerHTML"> Enabled</label>
     <label for="script-timeout">Timeout <input type="number" id="script-timeout" name="timeout" value="{{.TimeoutMS}}" min="1" step="1" size="6"> ms</label>
     <span class="small muted" id="timeout-note" hidden>A script this slow blocks the other scripts: KAM runs one at a time.</span>

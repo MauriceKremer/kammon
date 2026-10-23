@@ -244,6 +244,7 @@ body.login-page { display: block; }
 .script-settings { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
 .script-settings label, .script-recover label { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; color: var(--text-secondary); }
 .script-settings input[type="number"], .script-recover input[type="number"] { width: 7em; }
+.script-settings input[type="text"] { width: 16em; }
 .script-settings .check input { width: auto; }
 .script-console { border-top: 1px solid var(--border-default); margin-top: 16px; padding-top: 10px; min-height: 1.5em; }
 .script-console p { font-size: 13px; padding: 2px 0; color: var(--text-secondary); overflow-wrap: anywhere; }

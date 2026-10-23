@@ -33,7 +33,7 @@ A script can only do what KAM's `reply(channel, text)` allows. It cannot reach t
 |---|---|
 | **Script list** (left) | Name, state (READY, disabled, FROZEN, BROKEN), revision, a state dot, and a new-script button (admin). |
 | **Editor** | Title with revision; toolbar with Validate, Dry run, Save; a monospace text area. |
-| **Settings row** | Enabled checkbox, timeout in milliseconds, save state ("Saved revision 4", "Unsaved changes"). |
+| **Settings row** | Script name, enabled checkbox, timeout in milliseconds, save state ("Saved revision 4", "Unsaved changes"). |
 | **Console** | Result of the last Validate, Dry run or Save, as plain text. |
 | **Last run** | "Last run 14:59:48 · 2 ms · 1 reply" from the `run` object. |
 | **Fixture form** | A small form for the dry run: channel, sender, text, hops, SNR, RSSI, clock drift. Sensible defaults. |
@@ -80,7 +80,7 @@ def on_group_text(message):
 |---|---|---|
 | MON-AU-6 | Opening a script loads it with `GET /scripts/{id}` and remembers its `revision`. | MUST |
 | MON-AU-7 | Validate sends `POST /scripts/validate` with the current text and timeout and shows KAM's message verbatim (it contains line and column). | MUST |
-| MON-AU-8 | Save sends the text, timeout, enabled state and `expected_revision`. Creating sends `expected_revision` 0 or none. | MUST |
+| MON-AU-8 | Save sends the name, text, timeout, enabled state and `expected_revision`. Creating sends `expected_revision` 0 or none. | MUST |
 | MON-AU-9 | A `409` shows "Changed elsewhere. Reload to see the latest version." and keeps the user's text in the editor so nothing is lost. | MUST |
 | MON-AU-10 | Save does not enable a script by itself. Enabled is an explicit checkbox and uses the enable and disable endpoints with the current revision. | MUST |
 | MON-AU-11 | Recover sends `POST /scripts/{id}/recover` with the revision and optional new timeout. | MUST |
