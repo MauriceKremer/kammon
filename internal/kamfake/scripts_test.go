@@ -286,13 +286,14 @@ func TestFakeScriptDryRunLimitsAndOlderKAM(t *testing.T) {
 		t.Fatalf("unknown field: %d", status)
 	}
 
-	// An older KAM has no dry-run route (MON-AU-20).
+	// An older KAM has no dry-run route; its /scripts/{id} routes cover the path, so the mux
+	// answers the method (MON-AU-20, D30).
 	h.fake.SetDryRun(false)
-	if status, _ := raw(kam.DryRunRequest{Source: Starter, Message: fixture}); status != http.StatusNotFound {
+	if status, _ := raw(kam.DryRunRequest{Source: Starter, Message: fixture}); status != http.StatusMethodNotAllowed {
 		t.Fatalf("older KAM: %d", status)
 	}
-	if err := h.admin().ProbeDryRun(context.Background()); !errors.Is(err, kam.ErrNotFound) {
-		t.Fatalf("probe on the old fake = %v", err)
+	if err := h.admin().ProbeDryRun(context.Background()); err == nil {
+		t.Fatal("probe reports support on the old fake: the button would lie (MON-AU-20)")
 	}
 }
 

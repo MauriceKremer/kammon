@@ -98,7 +98,7 @@ def on_group_text(message):
 | MON-AU-17 | The console says "Nothing was sent." on every dry run. | MUST |
 | MON-AU-18 | The fixture form keeps its values while the page is open and has a reset button. | SHOULD |
 | MON-AU-19 | The reference panel states that a dry run uses the same engine and the same timeout rules but cannot reproduce load. | SHOULD |
-| MON-AU-20 | While KAM answers `404` for the dry-run route, the button is absent and a line says "Needs a newer KAM". | MUST |
+| MON-AU-20 | While KAM has no dry-run route (a `404`, or a `405` from an older KAM whose `/scripts/{id}` routes cover the path), the button is absent and a line says "Needs a newer KAM". | MUST |
 
 ### 4.4 Honesty
 

@@ -201,4 +201,16 @@ func TestProbeDryRunDetectsAnOlderKAM(t *testing.T) {
 	if err := NewHTTP(srv.URL, time.Second).ProbeDryRun(context.Background()); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("probe on an older KAM = %v, want ErrNotFound", err)
 	}
+	// An older KAM with the scripts API covers the path with its /scripts/{id} routes: the mux
+	// answers 405 before any route can. The probe must read the status, or the button shows and
+	// every test answers raw status 405 (MON-AU-20, D30).
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /scripts/{id}", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"id":"echo"}`))
+	})
+	srv = httptest.NewServer(mux)
+	defer srv.Close()
+	if err := NewHTTP(srv.URL, time.Second).ProbeDryRun(context.Background()); err == nil {
+		t.Fatal("probe reports support when KAM answers 405: the button would lie (MON-AU-20)")
+	}
 }

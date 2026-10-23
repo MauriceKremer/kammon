@@ -320,11 +320,14 @@ func TestAutomationsDryRunConsole(t *testing.T) {
 
 func TestAutomationsDryRunNeedsNewerKam(t *testing.T) {
 	h := newScriptHarness(t)
+	// The fake's older KAM answers 405, like a real older KAM whose /scripts/{id} routes cover
+	// the dry-run path (MON-AU-20, D30); a bare older KAM's 404 is pinned in internal/kam.
 	h.fake.SetDryRun(false)
 	h.login(t, "admin", "admin")
-	// Opening the editor probes the route: the button is absent and a line says why (MON-AU-20).
+	// Opening the editor probes the route: the button and its result box are absent and a line
+	// says why (MON-AU-20).
 	_, body := h.get(t, "/automations?script=echo")
-	if strings.Contains(body, ">Dry run</button>") {
+	if strings.Contains(body, ">Dry run</button>") || strings.Contains(body, `id="dry-run-result"`) {
 		t.Error("an older KAM must not be offered the dry run button (MON-AU-20)")
 	}
 	if !strings.Contains(body, "Needs a newer KAM.") {

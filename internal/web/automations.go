@@ -622,11 +622,16 @@ func (s *Server) scriptDryRunSubmit(w http.ResponseWriter, r *http.Request) {
 }
 
 // dryRunErrorConsole is the console of a dry run that could not run at all: an older KAM misses
-// the route (MON-AU-20, D30) and a busy KAM says one test at a time (§7.6.1).
+// the route — 404, or 405 from an older KAM whose /scripts/{id} routes cover the path
+// (MON-AU-20, D30) — and a busy KAM says one test at a time (§7.6.1).
 func dryRunErrorConsole(err error) scriptConsole {
 	var se *kam.StatusError
+	missing := errors.Is(err, kam.ErrNotFound)
+	if !missing && errors.As(err, &se) {
+		missing = se.Status == http.StatusNotFound || se.Status == http.StatusMethodNotAllowed
+	}
 	switch {
-	case errors.Is(err, kam.ErrNotFound):
+	case missing:
 		return scriptConsole{Lines: []consoleLine{{Text: "Needs a newer KAM. This KAM has no dry-run interface.", Class: "fail"}}}
 	case errors.As(err, &se) && (se.Status == http.StatusUnprocessableEntity || se.Status == http.StatusBadRequest):
 		return scriptConsole{Lines: []consoleLine{{Text: "KAM refused the test: " + se.Text, Class: "fail"}}}

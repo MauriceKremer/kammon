@@ -113,7 +113,8 @@ type Admin interface {
 	RecoverScript(ctx context.Context, id string, timeoutMS, expectedRevision int64) (Script, error)
 	DryRun(ctx context.Context, test DryRunRequest) (DryRunResponse, error)
 	// ProbeDryRun reports whether KAM offers POST /scripts/dry-run. It sends an empty object:
-	// a KAM with the route answers 400 or 422 (nothing is executed), an older one 404 (MON-AU-20).
+	// a KAM with the route answers 400 or 422 (nothing is executed); an older one answers 404,
+	// or 405 when its /scripts/{id} routes cover the path (MON-AU-20).
 	ProbeDryRun(ctx context.Context) error
 }
 
@@ -213,12 +214,14 @@ func (h *HTTP) DryRun(ctx context.Context, test DryRunRequest) (DryRunResponse, 
 }
 
 // ProbeDryRun sends an empty body: a KAM with the dry-run route cannot execute anything without
-// a fixture and answers 400 or 422; an older KAM answers 404 (MON-AU-20). Any other error is a
-// problem of its own and is returned as such.
+// a fixture and answers 400 or 422; a KAM without the route answers 404, or 405 when its
+// /scripts/{id} routes cover the path (MON-AU-20). Only these two answers hide the button; any
+// other error is a problem of its own and is returned as such, so the button never lies but a
+// busy or disabled KAM still says so on the click.
 func (h *HTTP) ProbeDryRun(ctx context.Context) error {
 	err := h.request(ctx, http.MethodPost, "/scripts/dry-run", struct{}{}, nil)
 	var se *StatusError
-	if err == nil || (errors.As(err, &se) && se.Status != http.StatusNotFound) {
+	if err == nil || (errors.As(err, &se) && se.Status != http.StatusNotFound && se.Status != http.StatusMethodNotAllowed) {
 		return nil
 	}
 	return err

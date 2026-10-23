@@ -69,7 +69,8 @@ func (f *Fake) SetScriptsAPI(on bool) {
 	f.automationOn = on
 }
 
-// SetDryRun turns the phase-5 dry-run route on or off; off, an older KAM answers 404 (MON-AU-20).
+// SetDryRun turns the phase-5 dry-run route on or off; off, an older KAM answers 405 from the
+// /scripts/{id} routes that cover the path (MON-AU-20).
 func (f *Fake) SetDryRun(on bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -476,10 +477,11 @@ func (f *Fake) handleScriptDryRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !f.dryRunOn {
-		// An older KAM has no dry-run route at all (MON-AU-20).
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(`{"error":"no such route"}`))
+		// An older KAM registers no dry-run route; its /scripts/{id} routes cover the path, so
+		// the mux answers the method itself, with plain words and no JSON (MON-AU-20).
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_, _ = w.Write([]byte("Method Not Allowed\n"))
 		return
 	}
 	if f.dryRunBusy {
