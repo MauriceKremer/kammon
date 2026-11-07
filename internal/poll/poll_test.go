@@ -180,7 +180,11 @@ func TestRunStopsWhenTheContextEnds(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { p.Run(ctx); close(done) }()
-	time.Sleep(50 * time.Millisecond)
+	for end := time.Now().Add(2 * time.Second); time.Now().Before(end); time.Sleep(5 * time.Millisecond) {
+		if epoch, _ := p.Store.Cursor(); epoch != "" {
+			break
+		}
+	}
 	cancel()
 	select {
 	case <-done:
