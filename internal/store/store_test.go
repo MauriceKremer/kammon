@@ -295,10 +295,11 @@ func TestFutureEventsStayOutOfBuckets(t *testing.T) {
 	}
 }
 
-// MON-DS-18: room snapshot limits are hard: 4 rooms, 100 clients each.
+// MON-DS-18: room snapshot limits are hard: MaxRooms rooms (KAM's own limit, 4→10 on
+// 2026-11-06), 100 clients each.
 func TestRoomSnapshotLimits(t *testing.T) {
 	s := New()
-	rooms := make([]kam.Room, 6)
+	rooms := make([]kam.Room, MaxRooms+2)
 	clients := map[string][]kam.RoomClient{}
 	for i := range rooms {
 		id := fmt.Sprintf("r%d", i)

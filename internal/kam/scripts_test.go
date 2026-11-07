@@ -24,6 +24,9 @@ func TestScriptFixturesDecodeStrictly(t *testing.T) {
 		if script.Run != nil {
 			t.Fatalf("today's list carries no run object: %+v", script)
 		}
+		if script.TimerInterval != 15 {
+			t.Fatalf("timer interval = %d, want the fixture's 15", script.TimerInterval)
+		}
 	}
 
 	var withRun []Script

@@ -8,7 +8,8 @@
     "runtime_status": "READY",
     "revision": 4,
     "created_at": 1760700000,
-    "updated_at": 1760882400
+    "updated_at": 1760882400,
+    "timer_interval_minutes": 15
   },
   {
     "id": "status",
@@ -19,7 +20,8 @@
     "runtime_status": "READY",
     "revision": 1,
     "created_at": 1760700000,
-    "updated_at": 1760700000
+    "updated_at": 1760700000,
+    "timer_interval_minutes": 15
   },
   {
     "id": "broken",
@@ -31,6 +33,7 @@
     "last_error": "SyntaxError: line 1, column 26: expected ':'",
     "revision": 3,
     "created_at": 1760700000,
-    "updated_at": 1760880000
+    "updated_at": 1760880000,
+    "timer_interval_minutes": 15
   }
 ]

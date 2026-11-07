@@ -36,7 +36,7 @@ Plain words: a **bucket** is the total of one minute of events, kept so charts d
 | **Status snapshot** | Latest `/v1/status` | One | Poll every 2 s |
 | **Modem snapshot** | Latest `/v1/modem` | One | Poll every 10 s |
 | **Channel list** | Latest `/v1/channels` | One | Poll every 30 s |
-| **Room list and clients** | Latest `/v1/rooms` and per-room `/clients` | Up to 4 rooms, 100 clients each | Poll every 10 s |
+| **Room list and clients** | Latest `/v1/rooms` and per-room `/clients` | Up to 10 rooms (KAM's limit, MON-DS-18), 100 clients each | Poll every 10 s |
 | **Script list** | Latest `GET /scripts` (the KAM API listener, 8766): names, states, revisions and run information. The script's source never rides along: the editor loads it straight from KAM when it opens, and a viewer is never sent source (Automations.md §6) | 64 scripts + a note saying the list was truncated | Poll every 10 s |
 | **Text cache** | Newest page of channel messages and room posts, for admin pages | 10 pages, 5 s lifetime | On demand |
 | **Command log** | Lines from modem commands | 200 lines | Admin actions |

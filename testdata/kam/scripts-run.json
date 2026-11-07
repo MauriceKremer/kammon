@@ -15,7 +15,8 @@
       "last_run_at": "2026-10-23T14:59:48.000Z",
       "last_duration_ms": 2,
       "last_replies": 1
-    }
+    },
+    "timer_interval_minutes": 15
   },
   {
     "id": "welcome",
@@ -26,6 +27,7 @@
     "runtime_status": "READY",
     "revision": 2,
     "created_at": 1760700000,
-    "updated_at": 1760700000
+    "updated_at": 1760700000,
+    "timer_interval_minutes": 15
   }
 ]

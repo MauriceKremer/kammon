@@ -16,8 +16,9 @@ const (
 	FreshFor      = 10 * time.Second // a snapshot older than this is no longer fresh (MON-DS-13)
 	StaleFor      = 2 * time.Minute  // a snapshot older than this counts as down (MON-DS-13)
 
-	// Hard limits from docs/requirements/DataStore.md §3 (MON-DS-18).
-	MaxRooms              = 4
+	// Hard limits from docs/requirements/DataStore.md §3 (MON-DS-18). MaxRooms follows
+	// KAM's own limit (its internal/models MaxRooms, raised 4→10 on 2026-11-06).
+	MaxRooms              = 10
 	MaxClientsPerRoom     = 100
 	MaxRoomNamesPerBucket = 64
 	MaxScripts            = 64 // a hobby node holds a handful; the snapshot truncates and says so

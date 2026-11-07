@@ -113,7 +113,7 @@
 {{define "script-reference"}}
 <details class="script-reference">
   <summary>What a script can do</summary>
-  <p>A script defines <code>on_group_text(message)</code>. KAM runs it for every text it hears on the channels the script reacts to.</p>
+  <p>A script defines <code>on_group_text(message)</code>. KAM runs it for every text it hears on the channels the script reacts to. It may instead, or also, run on a timer (see below).</p>
   <div class="table-scroll"><table><thead><tr><th>Field of <code>message</code></th><th>Meaning</th></tr></thead><tbody>
     <tr><td><code>channel</code></td><td>Normalised name such as <code>#emmen</code></td></tr>
     <tr><td><code>sender</code></td><td>Sender name</td></tr>
@@ -123,7 +123,9 @@
     <tr><td><code>has_rx_meta</code>, <code>snr_quarter_db</code>, <code>rssi_dbm</code></td><td>Signal data; SNR is in quarter dB (divide by 4)</td></tr>
     <tr><td><code>time_drift_seconds</code></td><td>Difference between sender and KAM clocks</td></tr>
   </tbody></table></div>
-  <p><code>reply(channel, text)</code> queues a reply. That is all a script can do: it cannot reach the radio, the files or the network.</p>
+  <p><code>reply(channel, text)</code> queues a reply on a channel. <code>room_post(room_id, text)</code> posts into one of KAM's own rooms, as the room itself. <code>rest_get(url)</code> fetches a page over HTTP, for a script that keeps an eye on a web feed; it returns the body and the HTTP status, and KAM caps the body.</p>
+  <p>A script may also run on a timer: the line <code>timer_interval_minutes = 15</code> at the top of the source makes KAM call <code>on_timer(message)</code> about every 15 minutes with a one-field message, <code>{"timestamp_unix": ...}</code>. A timer script can send and fetch like any other.</p>
+  <p>That is what a script can reach: replies, room posts and HTTP reads. It cannot touch the radio settings, the files or KAM's configuration.</p>
   <p class="small muted">The dry run uses KAM's own engine and the same timeout rules, but it cannot reproduce load. A test captures at most 16 replies or 4096 bytes.</p>
 </details>
 {{end}}

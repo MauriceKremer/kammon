@@ -19,6 +19,8 @@ import (
 
 // Script is one automation script as KAM serves it. CreatedAt and UpdatedAt are Unix seconds.
 // Run is present only on a KAM with the phase-5 additions; it lives in KAM's memory.
+// TimerIntervalMinutes describes a periodic script and is read-only here: the script's source
+// decides it (KAM ignores what a write asks for), and 0 means the script has no timer.
 type Script struct {
 	ID            string     `json:"id"`
 	Name          string     `json:"name"`
@@ -27,6 +29,7 @@ type Script struct {
 	TimeoutMS     int64      `json:"timeout_ms"`
 	RuntimeStatus string     `json:"runtime_status"`
 	LastError     string     `json:"last_error,omitempty"`
+	TimerInterval int64      `json:"timer_interval_minutes"`
 	Revision      int64      `json:"revision"`
 	CreatedAt     int64      `json:"created_at"`
 	UpdatedAt     int64      `json:"updated_at"`

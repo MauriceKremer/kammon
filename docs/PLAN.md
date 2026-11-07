@@ -39,7 +39,7 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 - [x] Failed-login slowdown (MON-AX-6), Origin and htmx header checks on every change route (MON-AX-17, 18), optional TLS (MON-AX-21)
 - [x] Theme cookie read by the server (design §7.3)
 
-## Slice 5: KISS modem (needs KAM API phase 3)
+## Slice 5: KISS modem (KAM API phase 3 has shipped; see docs/kam-api/KAM_COMMIT)
 
 - [ ] Snapshot, queries, form, preview, apply, log (MON-MD-1..22)
 
