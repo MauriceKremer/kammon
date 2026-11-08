@@ -18,6 +18,7 @@
   <div class="brand">KAM<span class="mon">mon</span><small>MeshCore observatory</small></div>
   <nav class="nav">{{range .Nav}}<a href="{{.Path}}"{{if eq .Key $.Active}} aria-current="page"{{end}}>{{.Title}}</a>{{end}}</nav>
   {{template "nodeblock" .Node}}
+  {{if .Server}}{{template "serverstats" .Server}}{{end}}
 </aside>
 <main id="content">
   <div class="topbar">

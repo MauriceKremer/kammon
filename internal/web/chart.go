@@ -89,6 +89,24 @@ func sparkSVG(class string, values []int) chartMarkup {
 	return chartMarkup(b.String())
 }
 
+// gaugeSVG draws the used/free bar of the server block: the used share as a red segment, the rest
+// in the signal colour. Like the other charts the markup is built from numbers only, so this stays
+// inside the template.HTML exception (a test enforces that); the aria-label is the text
+// alternative. preserveAspectRatio="none" lets one drawn bar fit the block's every width.
+func gaugeSVG(usedPercent float64) chartMarkup {
+	pct := min(max(usedPercent, 0), 100)
+	var b strings.Builder
+	fmt.Fprintf(&b, `<svg class="chart-gauge" viewBox="0 0 100 8" preserveAspectRatio="none" role="img" aria-label="%.1f%% used">`, pct)
+	if pct > 0 {
+		fmt.Fprintf(&b, `<rect class="gauge-used" x="0" y="0" width="%.2f" height="8"/>`, pct)
+	}
+	if pct < 100 {
+		fmt.Fprintf(&b, `<rect class="gauge-free" x="%.2f" y="0" width="%.2f" height="8"/>`, pct, 100-pct)
+	}
+	b.WriteString(`</svg>`)
+	return chartMarkup(b.String())
+}
+
 // squareSparkSVG draws the presence trend under the messages metric: one square per minute that
 // decoded at least one message, resting on the base of the box, height equal to width (MON-CH-2).
 // A quiet minute looks like a quiet minute; how many the minute held lives in the metric's number

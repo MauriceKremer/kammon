@@ -333,7 +333,25 @@ func (f *Fake) status(w http.ResponseWriter, r *http.Request) {
 	st.Rooms.Enabled, st.Rooms.Count = true, 1
 	st.Automation.Enabled, st.Automation.ScriptsEnabled = f.automationOn, enabled
 	st.EventRing.Capacity, st.EventRing.FirstSeq, st.EventRing.LastSeq = ringSize, f.firstSeq(), f.seq
+	st.System = f.system()
 	writeJSON(w, st)
+}
+
+// system is the fake's host snapshot, served just as KAM would with ?system=true (MON-SV-2).
+// The numbers stand in for a small always-on node; only the load averages move, so the demo
+// page's server block shows motion.
+func (f *Fake) system() *kam.SystemStats {
+	loads := func(base float64) *float64 { v := base + f.rng.Float64()*0.4 - 0.2; return &v }
+	const totalBytes, availableBytes = 17179869184, 10091773952 // 16 GB, 9.4 GB
+	return &kam.SystemStats{
+		CollectedAt: f.now().UTC(),
+		Memory: &kam.SystemMemory{TotalBytes: totalBytes, AvailableBytes: availableBytes,
+			UsedBytes: totalBytes - availableBytes, UsedPercent: 41.3},
+		CPU: &kam.SystemCPU{Model: ptr("Apple M4 Pro"), Cores: 14, Load1m: loads(1.6), Load5m: loads(2.1), Load15m: loads(2.4)},
+		Disk: &kam.SystemDisk{Path: "/srv/kam", TotalBytes: 994662589440, AvailableBytes: 407786668032,
+			UsedBytes: 586875921408, UsedPercent: 58.9},
+		Database: &kam.SystemDatabase{Path: "kam.db", SizeBytes: 1245184, WalSizeBytes: ptr(uint64(8192))},
+	}
 }
 
 func (f *Fake) channels(w http.ResponseWriter, r *http.Request) {

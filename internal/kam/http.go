@@ -77,8 +77,10 @@ func (h *HTTP) get(ctx context.Context, path string, query url.Values, out any) 
 }
 
 func (h *HTTP) Status(ctx context.Context) (Status, error) {
+	// system=true asks KAM for its host snapshot; it collects at most once per its configured
+	// interval and serves a cached copy in between (docs/requirements/ServerStats.md).
 	var out Status
-	err := h.get(ctx, "/v1/status", nil, &out)
+	err := h.get(ctx, "/v1/status", url.Values{"system": {"true"}}, &out)
 	return out, err
 }
 
