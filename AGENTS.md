@@ -58,6 +58,7 @@ diff ../kam/docs/FeatureKamApi.md docs/kam-api/FeatureKamApi.md   # contract dri
 | `internal/view` | Visibility rules (what a role may see) |
 | `internal/web` | Routes, handlers, templates, chart |
 | `web/` | Embedded templates and static files (htmx is vendored, no CDN) |
+| `scripts/` | Helper scripts (`kill-kammon.sh` stops stray kammon servers) |
 | `testdata/kam` | Example KAM responses; the contract in machine form |
 | `prototype/` | The clickable HTML prototype, kept as visual reference |
 | `docs/` | Design, requirements, plan, glossary, decisions, pinned KAM contract |

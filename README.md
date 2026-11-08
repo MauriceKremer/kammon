@@ -16,6 +16,8 @@ go run ./cmd/kammon -demo
 
 Open <http://127.0.0.1:8080>. Sign in as `admin` / `admin` (administrator) or `viewer` / `viewer` (view only). Demo mode starts a fake KAM with generated traffic, so no radio is needed.
 
+Stop the demo with `Ctrl-C`. If you lose track of a server you started in the background, `scripts/kill-kammon.sh` stops it.
+
 ## Run against a real KAM
 
 1. Copy [kammon.yml](kammon.yml) to `kammon.local.yml` and change the passwords.
