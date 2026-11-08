@@ -46,8 +46,8 @@ flowchart LR
 
 | Role | How it is recognised | Can do |
 |---|---|---|
-| **Viewer** | A user with `role: viewer` in `kammon.yml`, logged in from anywhere | Look at pages. Channel text only for allow-listed channels. No labels, no room posts. No controls. |
-| **Admin** | A user with `role: admin` in `kammon.yml`, logged in from anywhere | Everything a viewer sees, plus message text, room posts, client labels, and every control. |
+| **Viewer** | A user with `role: viewer` in `kammon.yml`, logged in from anywhere | Look at the Overview, Traffic and Channels pages; channel text only for allow-listed channels. The Rooms, Automations, Accounts and KISS modem pages answer 403 (D34). No labels, no room posts. No controls. |
+| **Admin** | A user with `role: admin` in `kammon.yml`, logged in from anywhere | Every page, plus everything a viewer sees, message text, room posts, client labels, and every control. |
 
 - Roles follow the user. Admin power needs nothing more: KAMmon adds no transport rules (D31). It is written for the enthusiast — an operator who serves KAMmon beyond the LAN owns that setup and puts the proper services (HTTPS through a reverse proxy, or `tls_cert`/`tls_key`) in place first.
 - Controls are not just hidden. Routes that change something are not served at all to a viewer, so a hand-made request fails the same way.
@@ -63,7 +63,7 @@ The technology list is deliberately short: one Go binary from the standard libra
 | Dependencies | `gopkg.in/yaml.v3` | The only entry in `go.mod`: reading `kammon.yml`. |
 | Pages | `html/template` | Server-rendered HTML; radio text is always escaped. The one `template.HTML` exception is the numbers-only SVG in `internal/web/chart.go`, watched by a test. |
 | Live updates | htmx 2.0.4 | One vendored file, `web/static/htmx.min.js`, served from the same origin. It refreshes small page parts; no framework, no build step. |
-| Page scripts | `web/static/*.js` | Hand-written helpers: `live.js` pauses the two-second refresh, `detail.js` keeps traffic row details open (D25), `theme.js` carries the theme cookie. |
+| Page scripts | `web/static/*.js` | Hand-written helpers: `live.js` pauses the two-second refresh, `detail.js` keeps traffic row details open (D25), `editor.js` guards the script editor's unsaved text (MON-AU-14), `theme.js` carries the theme cookie. |
 | Charts | Server-drawn SVG | `internal/web/chart.go` writes `<svg>` from numbers only. No chart library, no drawing in the browser (A3 in §13). |
 | Styling | `web/static/kammon.css` | One stylesheet for dark and light; the colours are CSS custom properties (§5.1). |
 | Fonts and icons | Embedded files | Hanken Grotesk, Roboto Mono and Syncopate as woff2 in `web/static/fonts/`, icons as one SVG sprite. Nothing comes from Google or a CDN. |
@@ -114,7 +114,7 @@ At startup, in order:
 1. **Flags and signals.** `main` takes `-config kammon.yml` or `-demo`. Ctrl-C and SIGTERM cancel one context that every part reads, so a stop is one clean unwind.
 2. **Config.** `-demo` uses `config.Demo()` — fixed users `admin` and `viewer`, loopback only — and starts a fake KAM from `internal/kamfake` (the same fake backs the tests); the fake's own address replaces `kam_monitor_url`. Otherwise `config.Load` reads the YAML, fills the defaults for any line left out (§11), and refuses the invalid: an empty password, a bad duration, `down_after` before `stale_after`.
 3. **Store.** `store.New` builds the empty history: the event ring of 4096 events, 1440 one-minute buckets, the status, room and channel snapshots, and the marks. The freshness limits from `kammon.yml` (MON-DS-13) are handed to the store here.
-4. **Poller.** One goroutine owns a `kam.HTTP` reader and is the only reader of KAM (MON-DS-1). It wakes four times a second and runs five reads on their own intervals: events (backfill, then the cursor), status, rooms plus each enabled room's clients, channels, and the script list. Every read gets the configured timeout (MON-DS-2). Failures back off 1, 2, 4, 8 and then 10 seconds (MON-DS-3); a 404 pauses that read for `poll.not_served` and the pages say "Needs a newer KAM". Text reads — channel messages and room posts — are not on a timer: a page queues a bounded request in the store and the poller services up to four per tick (MON-DS-21). Everything the poller learns is written into the store.
+4. **Poller.** One goroutine owns a `kam.HTTP` reader and is the only reader of KAM (MON-DS-1). It wakes four times a second and runs five reads on their own intervals: events (backfill, then the cursor), status (asking for KAM's opt-in `system` section, D33), rooms plus each enabled room's clients, channels, and the script list. Every read gets the configured timeout (MON-DS-2). Failures back off 1, 2, 4, 8 and then 10 seconds (MON-DS-3); a 404 pauses that read for `poll.not_served` and the pages say "Needs a newer KAM". Text reads — channel messages and room posts — are not on a timer: a page queues a bounded request in the store and the poller services up to four per tick (MON-DS-21). Everything the poller learns is written into the store.
 5. **Web.** `web.New` receives config and store and parses the templates once: layout and partials, then one clone per page. Its handler is a `ServeMux` where every route is registered with the role it needs — public, viewer or admin — wrapped in the guard below; the embedded `web/` directory answers the static files, and a content security policy rides on every answer. Login compares a password against every user in constant time (MON-AX-5) and slows repeated failures from one address (MON-AX-6).
 6. **Listen and stop.** On `listen` (default `:8080`), with HTTPS from Go when `tls_cert` and `tls_key` are set (MON-AX-21). On shutdown the server gets three seconds to finish running requests. Nothing is on disk, so a stop costs only the session logins.
 
@@ -142,11 +142,13 @@ Every request then walks the same short path:
 | Automations|                                                 |
 | KISS modem|                                                  |
 | node info |                                                  |
+| server stats |                                              |
 +-----------+--------------------------------------------------+
 ```
 
 - Left sidebar, 224 px (190 px under 1100 px). Active item: soft fill, 2 px edge on the left, stronger text, `aria-current="page"`.
-- The node block at the bottom of the sidebar shows the node name, link state, radio summary and uptime.
+- Every sidebar item leads with an icon; the four administrator pages (Rooms, Accounts, Automations, KISS modem) close with a grey lock — the lock only marks, the route is the guard (D34, D35).
+- The node block at the bottom of the sidebar shows the node name, link state, radio summary and uptime; under it the server statistics block answers for the box itself — administrator only (D33).
 - Under 768 px the sidebar becomes a top strip with a scrolling row of page buttons.
 - Time range and pause controls appear only on the Overview, the one page that uses them.
 
@@ -217,7 +219,7 @@ Headings are wide letters, so keep them short. Letter spacing stays at zero. Fon
 | Component | Description |
 |---|---|
 | **Metric strip** | Label (12 px muted), value (30 px), caption. Four columns separated by 1 px rules; two columns on phones. |
-| **Airtime chart** | One bar per minute, stacked by packet class, drawn as inline **SVG** by the server. Grid lines at 25 % steps; time labels under the axis; a legend with swatches. Class colours: group text = signal, room traffic = success, adverts = warning, other = muted. |
+| **Channel utilization chart** | One bar per time slot, stacked by packet class, drawn as inline **SVG** by the server. Health zones as background washes (healthy under 10 %, busy 10-20 %, congested over), grid lines every 10 %, a dashed hold-back line at 25 %; the axis never ends under 30 % so the zones always fit (D37). Time labels under the axis; a legend with swatches. Class colours: group text = signal, room traffic = success, adverts = warning, other = muted. |
 | **Posts trend** | A 22 px mini bar chart under the Posts number in the room detail strip: accepted posts per hour over the last 24 hours, bars in the signal colour, server-drawn inline **SVG** that stretches to its box. Labelled "24 h"; a `title` and aria-label carry the text alternative. |
 | **Packet-type tag** | 11 px mono label on a 9 % tint of its colour. |
 | **Packet mix** | A thin 12 px stacked bar and a two-column list with count and percentage. |
@@ -240,7 +242,7 @@ Signal strength is never a column in a table or a footer on a message. KAM usual
 
 ### 7.1 Refresh
 
-- Pages are real URLs that render fully on the server (`/`, `/traffic`, `/channels`, `/rooms`, `/accounts`, `/automations`, `/modem`). Without JavaScript the page is a snapshot that refreshes when the browser reloads.
+- Pages are real URLs that render fully on the server (`/`, `/traffic`, `/channels`, `/rooms`, `/automations`; `/accounts` and `/modem` are placeholders until their slices). Rooms and Automations are administrator pages: other roles get the 403 page (D34). Without JavaScript the page is a snapshot that refreshes when the browser reloads.
 - htmx makes parts of the page refresh by itself, for example `hx-get="/ui/overview/metrics" hx-trigger="every 2s" hx-swap="innerHTML"`. Parts that contain a form or an open editor never refresh themselves.
 - **Pause** (Overview) stops the timers on the page, not the poller.
 - Data older than 10 seconds shows the stale-data bar; the numbers stay on screen.
@@ -287,7 +289,7 @@ Signal strength is never a column in a table or a footer on a message. KAM usual
 ### 8.3 Proposed and simulated
 
 - While KAM lacks a feature, the prototype marks its screens "Sample data" or "Proposed". The real KAMmon shows a control only after the matching KAM endpoint has answered once; when KAM answers `404` for it, the page shows a muted line "Needs a newer KAM" instead.
-- A history shorter than the range shows "History starts at 14:03" in the chart caption (see DataStore).
+- A history shorter than the range says so where the data is read, not on the chart: the Traffic list ("History starts at 14:03.") and the Channels and Rooms metrics (see DataStore).
 
 ## 9. Access, privacy and enforcement
 
@@ -303,7 +305,7 @@ Signal strength is never a column in a table or a footer on a message. KAM usual
 - Tables and the command log scroll inside their own box; the page never scrolls sideways.
 - Text contrast meets WCAG AA in both themes on the surface where it sits.
 - Visible focus (3 px blue outline), full keyboard use, skip link, labelled controls, `aria-pressed` on toggles, `aria-live` on the command log and toasts, real `<table>` markup.
-- The chart has a text alternative: "Observed packet airtime, last hour, average 8.4 %" plus the numbers in the metric strip.
+- The chart has a text alternative: "Observed packet airtime over the last hour: average 8.4 %, busiest bar 19.5 %. Healthy under 10 %, busy 10 to 20 %, congested over 20 %, hold-back line at 25 %. 2 marks." plus the numbers in the metric strip.
 
 ## 11. Project layout
 
@@ -328,18 +330,20 @@ kammon/
 ```
 
 ```yaml
-# kammon.yml
+# kammon.yml — the values shown are the defaults; a line left out keeps its default
 listen: ":8080"
 kam_monitor_url: "http://127.0.0.1:8766"
+session_idle_hours: 8
 poll:
-  events: 5s      # how often the poller reads KAM (DataStore.md §5 has the defaults)
-  status: 5s
+  events: 1s      # how often the poller reads KAM (DataStore.md §5 has the defaults)
+  status: 2s
   rooms: 10s
   channels: 30s
+  scripts: 10s
   timeout: 3s
   not_served: 10m
 freshness:
-  stale_after: 30s
+  stale_after: 10s
   down_after: 2m
 users:
   - { name: maurice, password: "change-me", role: admin }
@@ -410,5 +414,6 @@ viewer_text_channels: ["#public"]
 | [requirements/Automations.md](requirements/Automations.md) | Starlark workspace |
 | [requirements/KissModem.md](requirements/KissModem.md) | KISS modem page (KAM phase 3 shipped 2026-10-23; the slice is open) |
 | [requirements/Access.md](requirements/Access.md) | Login, roles, visibility |
+| [requirements/ServerStats.md](requirements/ServerStats.md) | The sidebar's server statistics block (D33) |
 | [requirements/DataStore.md](requirements/DataStore.md) | In-memory store and poller |
 | [docs/kam-api/FeatureKamApi.md](kam-api/FeatureKamApi.md) | KAM side: the REST API KAMmon needs |

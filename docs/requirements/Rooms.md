@@ -1,6 +1,6 @@
 # KAMmon Requirements: Room Monitor
 
-**Status:** Phase 2 page implemented; worker snapshots, persisted last-heard values and role-filtered views are covered by focused tests.
+**Status:** Built (2026-10-23); administrator only since D34 (2026-11-08). Worker snapshots, persisted last-heard values and role-filtered views are covered by focused tests.
 **Scope:** Watching the room servers KAM hosts: how active each room is, which clients it remembers and when it last heard them, and the posts in it. Managing roles is in [RoomAccounts.md](RoomAccounts.md). Design: [DESIGN.md](../DESIGN.md) §4.2, §8.2. Findings behind the wording: [../research/kam-room-activity.md](../research/kam-room-activity.md).
 
 ## 1. Summary
@@ -71,9 +71,9 @@ Boundaries: under 300 s is Fresh; 300 to 3599 s is Recent; 3600 to 86400 s is Ol
 | MON-RM-9 | Admin only: the room feed is fetched from `GET /v1/rooms/{id}/posts` (20 posts) when the room is opened, then refreshed every 10 s while the room is open — half the 5 s text cache. | MUST |
 | MON-RM-10 | Admin only: a post shows the author's label or short key, time and text. Text is escaped. | MUST |
 | MON-RM-11 | Delivery shows pushes acked and timed out from `room` events, and the number of clients whose `push_state` is `paused`. | SHOULD |
-| MON-RM-12 | A viewer sees the room list, the metric strip, the caption and the legend, and a line "Client activity and posts are visible to the administrator." No client or post data is fetched for a viewer. | MUST |
+| MON-RM-12 | The page is for administrators (D34): any other role's request answers `403`, and no client or post data is ever sent to one. The Overview's rooms block keeps the viewer-visible slice, with its line "Client activity and posts are visible to the administrator." (MON-OV-8). | MUST |
 | MON-RM-13 | A room that is disabled or failed validation in `kam.yml` does not appear. The page says nothing about it. | MUST |
-| MON-RM-14 | When `GET /v1/rooms` answers `503` (rooms disabled), the Rooms navigation item shows "Rooms are not enabled". | MUST |
+| MON-RM-14 | When KAM reports rooms disabled (the status snapshot's `rooms.enabled`), the Rooms page says "Rooms are not enabled" instead of reading as an empty room; the Overview's rooms block says the same. A rooms read that KAM answers `404` says "Needs a newer KAM". | MUST |
 | MON-RM-15 | The Posts metric also shows a small server-drawn bar chart of accepted posts per hour over the last 24 hours, counted like the last-hour figure (matched by room id or name). The chart has a text alternative; while KAMmon holds less than a day of history it says so instead of reading as a quiet day. | MUST |
 | MON-RM-16 | The metric strip (with its chart) and the counts in the room list refresh on their own every 20 seconds — half the 10 s rooms poll — without a reload. The polled partial carries no client or post data, and no page region refreshes faster than once per second. | MUST |
 
@@ -91,18 +91,13 @@ Without API-RM-9, every client reads Unknown after a KAM restart until it is hea
 
 ## 6. Visibility
 
-| Element | Viewer | Admin |
-|---|---|---|
-| Room list, public key, counters, last activity | Yes | Yes |
-| Heard in the last hour (a number) | Yes | Yes |
-| Client table with keys and labels | No | Yes |
-| Room posts | No | Yes |
+The page — list, detail, metrics, caption, legend, clients and posts — is for administrators only (D34): another role's request to `/rooms` and its partials is answered `403`. The viewer-visible slice of rooms is the Overview's rooms block: name, last activity, posts in the last hour, remembered count, and for no viewer any client key or post (MON-OV-8, MON-OV-9).
 
 ## 7. Tests
 
 - Indicator boundaries: 0, 299, 300, 3599, 3600, 86400, 86401 seconds and no time.
 - Unknown is never rendered as Stale.
-- The viewer page does not contain a client key list or a post.
+- A viewer's request to the page and its partials answers `403`, and the Overview rooms block a viewer sees carries no client key list and no post.
 - The metrics partial updates the strip, the chart and the list counts without a reload, and carries no client or post data.
 - Rooms disabled and a room list with zero rooms.
 - A client list with 100 clients renders within the page time budget.

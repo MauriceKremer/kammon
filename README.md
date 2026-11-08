@@ -4,7 +4,7 @@ KAMmon is a web monitor for a [KAM](../kam) node. It shows what the radio hears,
 
 KAM is the open system that does the work and runs fine without KAMmon. KAMmon only adds the screens and the login. It runs on the same computer as KAM and talks to it over KAM's local REST API.
 
-**Status:** early scaffold. The demo mode, login and the Overview page work against a fake KAM. Everything else is planned; see [docs/PLAN.md](docs/PLAN.md).
+**Status:** A working monitor. Demo mode, login, and the Overview, Traffic, Channels, Rooms and Automations pages are built (Rooms and Automations for administrators); the KISS modem and Accounts pages are placeholders for their slices. Progress: [docs/PLAN.md](docs/PLAN.md).
 
 ## Try it
 

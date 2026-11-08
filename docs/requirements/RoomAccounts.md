@@ -53,7 +53,7 @@ Plain words:
 
 | ID | Requirement | Level |
 |---|---|---|
-| MON-RA-1 | The page is for admins on a local request only. It is not in the navigation for viewers and its routes answer `403`. | MUST |
+| MON-RA-1 | The page is for administrators; every route of it answers `403` to any other role (D31: the role alone decides, no transport check; D34). The sidebar offers it only to them. | MUST |
 | MON-RA-2 | The client table reads the named `clients` envelope from `GET /v1/rooms/{id}/clients` when opened and every 10 seconds. Do not refresh while a removal dialog is open. | MUST |
 | MON-RA-3 | A row shows the label when KAM sent one and the short key otherwise; the full key is always reachable. The label is marked "from advert" and is not treated as identity. | MUST |
 | MON-RA-4 | Show the existing protocol role read-only, labelled separately from the signed-in web user's role. No role select or pin marker. | MUST |

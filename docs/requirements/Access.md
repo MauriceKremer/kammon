@@ -1,6 +1,6 @@
 # KAMmon Requirements: Access, Roles and Visibility
 
-**Status:** Requirements only. Nothing is built.
+**Status:** Built: login, sessions, the slowdown and the route guard (`internal/auth`, `internal/view`, `internal/web`); the pages themselves are covered by their own docs.
 **Scope:** Who may use KAMmon, how they log in, what each role may see and do, and how KAMmon enforces it. Design context: [DESIGN.md](../DESIGN.md) §3.1 and §9.
 
 ## 1. Summary
@@ -35,19 +35,21 @@ KAMmon is written for the enthusiast. It imposes no hosting or transport restric
 
 | Item | Viewer | Admin |
 |---|---|---|
-| Overview numbers, airtime chart, packet mix | Yes | Yes |
+| Overview numbers, channel utilization chart, packet mix | Yes | Yes |
 | Traffic table: type, route, hops, airtime | Yes | Yes |
 | Traffic table: names (senders, advert names) | Advert names and names on allow-listed channels | Yes |
 | Channel list, counts, last activity | Yes | Yes |
 | Channel message **text** | Only channels in `viewer_text_channels` | Yes |
-| Room list, counts, last activity, public key | Yes | Yes |
-| Room client list (keys, roles, activity, labels) | No: viewers see room-level numbers only | Yes, with labels |
+| Overview rooms block (names, activity, posts last hour, remembered count) | Yes | Yes |
+| Rooms page (list, public key, room detail) | No: the route answers `403` (D34) | Yes |
+| Room client list (keys, roles, activity, labels) | No | Yes |
 | Room posts | No | Yes |
 | Accounts page (roles) | No | Yes |
-| Script names, status, run information | Yes | Yes |
+| Automations page (script names, state, run information) | No: the route answers `403` (D34) | Yes |
 | Script **source**, dry run, save, delete | No | Yes |
-| Modem snapshot and radio values | Yes | Yes |
+| Modem snapshot and radio values | No: the route answers `403` (D34) | Yes |
 | Modem queries and radio changes | No | Yes |
+| Server statistics block (sidebar, D33) | No | Yes |
 | Theme switch | Yes | Yes |
 
 Anything marked "No" is not rendered and its routes answer `403`.

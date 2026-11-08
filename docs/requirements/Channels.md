@@ -36,7 +36,7 @@ Keys are secrets. KAMmon never shows them and does not edit channels in version 
 | **Metric strip** (3) | Decoded messages in the last hour, with a small per-minute chart of that hour; last decoded message ("2 s ago"); received airtime in the last hour. Strip and channel list refresh on their own every 2 s, the message list every 10 s (MON-CH-13). |
 | **Caption** | "Airtime attributed to decoded RX packets, not total radio occupancy. Messages KAM cannot decrypt are not assigned to a channel here." |
 | **Search box** | Sender or message text. |
-| **Messages** | Newest first: sender, time, text, then route and hops. SNR and RSSI are not shown (D19). |
+| **Messages** | Newest first: received time, sender, text, hop count. SNR and RSSI are not shown (D19). |
 | **Footnote** | "Channel keys and enabled states live in kam.yml. No key material is shown." |
 | **Unreadable** | "N group texts in the last hour could not be decoded (no matching channel key)." |
 
@@ -52,7 +52,7 @@ Keys are secrets. KAMmon never shows them and does not edit channels in version 
 | MON-CH-6 | "Older messages" loads the next 50 with `before_id`. | MUST |
 | MON-CH-7 | Search sends `q` to KAM and shows the result. Empty results say "No messages match this filter." | MUST |
 | MON-CH-8 | For a viewer on a channel that is not allow-listed, the page shows the metrics and a list of rows built from events (time, route, hops) with "Text hidden". No call is made to the messages endpoint. | MUST |
-| MON-CH-9 | SNR and RSSI arrive with the events and stored messages but are not displayed (decision D19: KAM listens through a local repeater, so they describe the hop to KAM, not the sender). A message footer shows the route and hops only. | MUST |
+| MON-CH-9 | SNR and RSSI arrive with the events and stored messages but are not displayed (decision D19: KAM listens through a local repeater, so they describe the hop to KAM, not the sender). A message row shows the hop count beside the text; no route and no signal numbers. | MUST |
 | MON-CH-10 | The unreadable-text line counts `rx` events with `payload_type = GRP_TXT` and no `channel`, per hour. | SHOULD |
 | MON-CH-11 | Message text is escaped when rendered. Names and text from the radio are untrusted. | MUST |
 | MON-CH-12 | When KAM does not answer, the list shows the last cached page with the stale-data bar; with no cache it says "Messages are unavailable right now." | MUST |

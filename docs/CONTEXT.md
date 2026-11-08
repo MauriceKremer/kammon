@@ -19,6 +19,8 @@ Use these words in code, tests, docs and screens.
 | **Packet class** | Group text, adverts, room traffic, other. |
 | **Airtime** | How long a packet occupies the radio channel. In events it is an estimate. |
 | **Observed packet airtime** | Estimated airtime of everything KAM heard or sent. Not total channel occupancy. |
+| **Channel utilization** | What the Overview chart calls the shared channel's observed packet airtime. Its zones: healthy under 10 %, busy 10 to 20 %, congested over 20 % (D37). |
+| **Hold-back line** | The dashed line at 25 % in the utilization chart: past it a LoRa channel's backoffs grow (D37). |
 | **Repeat** | A packet KAM already saw (`duplicate`). It still used airtime. |
 | **Channel** | A shared-key group conversation such as `#public`. Not a room. |
 | **Room** | A message board hosted by KAM with logins and history. |
