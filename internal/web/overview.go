@@ -90,9 +90,9 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 	chart, axisTop := chartSVG(w)
 	data := overviewData{
 		Range: opt.Key, RangeLabel: opt.Label, Chart: chart,
-		AxisTop:  fmt.Sprintf("%.1f%%", axisTop),
+		AxisTop:  fmt.Sprintf("%.0f%%", axisTop),
 		SlotText: fmt.Sprintf("%d bars of %s", len(w.Slots), slotWidthText(w.SlotWidth)),
-		ChartAlt: fmt.Sprintf("Observed packet airtime over the last %s: average %.1f%%, busiest bar %.1f%%. %d marks.", opt.Label, w.AirtimePercent, w.PeakPercent, len(w.Marks)),
+		ChartAlt: fmt.Sprintf("Observed packet airtime over the last %s: average %.1f%%, busiest bar %.1f%%. Healthy under 10%%, busy 10 to 20%%, congested over 20%%, and the hold-back line sits at 25%% of a slot, where a LoRa channel's backoffs grow. %d marks.", opt.Label, w.AirtimePercent, w.PeakPercent, len(w.Marks)),
 	}
 	if evF, evAt := s.store.SnapshotFreshness("events", now); evF != store.Fresh && !evAt.IsZero() {
 		switch evF {

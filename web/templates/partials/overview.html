@@ -22,6 +22,7 @@
         </div>
         <div role="img" aria-label="{{.ChartAlt}}">{{.Chart}}</div>
         <div class="chart-labels" aria-hidden="true">{{range .Labels}}<span>{{.}}</span>{{end}}</div>
+        <p class="small muted">Healthy under 10% · busy 10–20% · congested over 20% · the hold-back line sits at 25%, where a LoRa channel's backoffs grow.</p>
         {{if .HistoryNote}}<p class="small muted">{{.HistoryNote}}</p>{{end}}
         {{range .Marks}}<p class="small warn">{{.}}</p>{{end}}
         <div class="legend">{{range .Classes}}<span><span class="swatch {{.Key}}"></span>{{.Name}}</span>{{end}}</div>

@@ -135,6 +135,12 @@ main { min-width: 0; padding: 0 32px 48px; }
 
 .chart { width: 100%; height: auto; display: block; }
 .chart .grid { stroke: var(--border-subtle); stroke-width: 1; }
+/* The channel's health zones (D37) and the hold-back line at 25 %, where backoffs grow.
+   The bands are washes of the status colours; the words live below the chart. */
+.chart .air-calm { fill: var(--success); fill-opacity: 0.09; }
+.chart .air-busy { fill: var(--warning); fill-opacity: 0.13; }
+.chart .air-congested { fill: var(--danger); fill-opacity: 0.10; }
+.chart .air-hold { stroke: var(--warning); stroke-width: 1.5; stroke-dasharray: 5 4; }
 .c-group { fill: var(--signal); } .c-advert { fill: var(--warning); } .c-room { fill: var(--success); } .c-other { fill: var(--text-muted); }
 .c-posts, .c-msgs { fill: var(--signal); }
 .chart .mark-restart { fill: var(--warning); }

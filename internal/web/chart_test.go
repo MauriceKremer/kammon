@@ -37,6 +37,44 @@ func TestChartSvgIsNumbersOnly(t *testing.T) {
 	}
 }
 
+// TestChartSpansTheHealthZones pins the channel-health bands (D36): the axis ends at 30 % or a whole
+// 10 % band above, the coloured washes sit behind the bars, and the hold-back line runs at 25 %.
+func TestChartSpansTheHealthZones(t *testing.T) {
+	empty := store.Window{Slots: make([]store.Slot, 4), SlotWidth: time.Minute}
+	svg, axisTop := chartSVG(empty)
+	s := string(svg)
+	if axisTop != 30 {
+		t.Fatalf("an empty chart keeps a %v %% axis, want 30", axisTop)
+	}
+	for _, want := range []string{ // the axis spans 0 to 30 % of a slot, so 10 % sits a third of the way up
+		`<rect class="air-calm" x="0" y="106.67" width="600" height="53.33"/>`,
+		`<rect class="air-busy" x="0" y="53.33" width="600" height="53.33"/>`,
+		`<rect class="air-congested" x="0" y="0.00" width="600" height="53.33"/>`,
+		`<line class="air-hold" x1="0" x2="600" y1="26.67" y2="26.67"/>`,
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("the health zones miss %q: %s", want, s)
+		}
+	}
+	// A busy chart grows the axis a whole band, and congested reaches to the top of it.
+	busy := store.Window{Slots: make([]store.Slot, 4), SlotWidth: time.Minute}
+	busy.Slots[2].AirtimeMS[store.ClassGroupText] = 25200 // 42 % of the 60 000 ms slot
+	svg, axisTop = chartSVG(busy)
+	s = string(svg)
+	if axisTop != 50 {
+		t.Fatalf("a 42 %% busy chart keeps a %v %% axis, want 50 (a whole 10 %% band)", axisTop)
+	}
+	if !strings.Contains(s, `<rect class="air-congested" x="0" y="0.00" width="600" height="96.00"/>`) {
+		t.Errorf("congested must reach from 20 pct to the grown axis: %s", s)
+	}
+	if !strings.Contains(s, `<line class="air-hold" x1="0" x2="600" y1="80.00" y2="80.00"/>`) { // 25 % of the slot
+		t.Errorf("the hold-back line must sit at 25 pct of a slot whatever the axis: %s", s)
+	}
+	if !strings.Contains(s, `<rect class="c-group" x="300.50" y="25.60" width="149.00" height="134.40"/>`) {
+		t.Errorf("the busy bar must fill 42 pct of the grown axis: %s", s)
+	}
+}
+
 // TestPostsSparkSvgIsNumbersOnly applies the same rule-5 guard to the room posts mini chart and
 // pins its shape: one bar per hour that has posts, the peak hour at full height, silence otherwise.
 func TestPostsSparkSvgIsNumbersOnly(t *testing.T) {
