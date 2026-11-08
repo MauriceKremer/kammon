@@ -1025,3 +1025,46 @@ func TestManualsAreGoneFromTheInterface(t *testing.T) {
 		t.Errorf("/static/theme-init.js: %d, want 404", status)
 	}
 }
+
+// The server block sits under the node block in the sidebar and is for the administrator alone;
+// a viewer is sent neither the block nor its numbers, on the page or in a live refresh (MON-SV-1).
+func TestServerStatsAreAdminOnly(t *testing.T) {
+	h := newHarness(t)
+	h.st.CountPoll("status", nil, t0)
+
+	_, body, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/")
+	if strings.Contains(body, "server-stats") || strings.Contains(body, "KAM reads") {
+		t.Error("a viewer must not see server statistics")
+	}
+
+	status, body, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/ui/traffic", "HX-Request", "true")
+	if status != http.StatusOK || strings.Contains(body, "server-stats") {
+		t.Errorf("a viewer's live refresh carries %q (status %d)", "server-stats", status)
+	}
+
+	_, body, _ = get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
+	for _, want := range []string{"<strong>Server</strong>", "Up 0m", "Memory ", "goroutines", "KAM reads 1"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the admin's sidebar lacks %q", want)
+		}
+	}
+
+	status, body, _ = get(t, h.login(t, "admin", "admin"), h.ts.URL+"/ui/overview", "HX-Request", "true")
+	if status != http.StatusOK || !strings.Contains(body, `id="server-stats"`) {
+		t.Errorf("the admin's overview refresh lacks the server block (status %d)", status)
+	}
+}
+
+// A failed read is counted and remembered with its age and text; the error is clipped in the
+// store (MON-SV-3).
+func TestServerStatsRememberALastFailedRead(t *testing.T) {
+	h := newHarness(t)
+	h.st.CountPoll("rooms", fmt.Errorf("dial tcp 127.0.0.1:8766: connection refused"), t0)
+
+	_, body, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
+	for _, want := range []string{"KAM reads 0 · 1 failed", "Last error just now: dial tcp 127.0.0.1:8766: connection refused"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the admin's sidebar lacks %q", want)
+		}
+	}
+}

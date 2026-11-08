@@ -265,10 +265,8 @@ func (s *Server) scriptListPartial(w http.ResponseWriter, r *http.Request) {
 	data := s.scriptListData(principalOf(r).Role, r.URL.Query().Get("script"), nil)
 	var buf bytes.Buffer
 	t := s.pages["automations"]
-	for _, part := range []struct {
-		name string
-		data any
-	}{{"script-list", data}, {"stalebar", s.scriptBar()}, {"nodeblock", s.nodeBlock()}} {
+	parts := append([]partial{{"script-list", data}, {"stalebar", s.scriptBar()}}, s.sideParts(r)...)
+	for _, part := range parts {
 		if err := t.ExecuteTemplate(&buf, part.name, part.data); err != nil {
 			http.Error(w, "Template error.", http.StatusInternalServerError)
 			return

@@ -46,6 +46,37 @@ func uptime(d time.Duration) string {
 	}
 }
 
+// runFor is an uptime without the word, for a line that already says what it is: "3d 4h 26m".
+func runFor(d time.Duration) string {
+	if d < 0 {
+		d = 0
+	}
+	days, hours, minutes := int(d/(24*time.Hour)), int(d/time.Hour)%24, int(d/time.Minute)%60
+	switch {
+	case days > 0:
+		return fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
+	case hours > 0:
+		return fmt.Sprintf("%dh %dm", hours, minutes)
+	default:
+		return fmt.Sprintf("%dm", minutes)
+	}
+}
+
+// memSize writes a byte count for people: "512 KB", "21.4 MB", "1.25 GB".
+func memSize(n uint64) string {
+	const kb, mb = 1024, 1024 * 1024
+	switch {
+	case n < kb:
+		return fmt.Sprintf("%d B", n)
+	case n < mb:
+		return fmt.Sprintf("%.0f KB", float64(n)/kb)
+	case n < mb*1024:
+		return fmt.Sprintf("%.1f MB", float64(n)/mb)
+	default:
+		return fmt.Sprintf("%.2f GB", float64(n)/(mb*1024))
+	}
+}
+
 // thousands writes 1284 as "1,284".
 func thousands(n int) string {
 	s := strconv.Itoa(n)

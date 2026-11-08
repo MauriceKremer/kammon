@@ -1,7 +1,9 @@
 package store
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +24,33 @@ func reply(epoch string, first uint64, reset bool, events ...kam.Event) kam.Even
 		last = events[n-1].Seq
 	}
 	return kam.EventsResponse{Epoch: epoch, FirstSeq: first, LastSeq: last, Reset: reset, Events: events}
+}
+
+// The server block's counters (MON-SV-3): successes and failures count, a failure keeps the
+// job, the clipped message and the time, and a later success leaves the last failure alone.
+func TestCountPollRemembersReadsAndClipsErrors(t *testing.T) {
+	s := New()
+	s.CountPoll("status", nil, t0)
+	s.CountPoll("events", nil, t0)
+	s.CountPoll("rooms", errors.New("Get \"http://127.0.0.1:8766/v1/rooms\": connection refused"), t0.Add(time.Second))
+	st := s.PollStats()
+	if st.OK != 2 || st.Failed != 1 || st.LastJob != "rooms" || st.LastErrorAt != t0.Add(time.Second) {
+		t.Fatalf("counters = %+v", st)
+	}
+	if !strings.Contains(st.LastError, "connection refused") {
+		t.Fatalf("last error = %q", st.LastError)
+	}
+	long := strings.Repeat("x", PollErrorLimit+100)
+	s.CountPoll("status", errors.New(long), t0.Add(2*time.Second))
+	st = s.PollStats()
+	if len(st.LastError) != PollErrorLimit {
+		t.Fatalf("error must be clipped to %d bytes, is %d", PollErrorLimit, len(st.LastError))
+	}
+	s.CountPoll("events", nil, t0.Add(3*time.Second))
+	st = s.PollStats()
+	if st.OK != 3 || st.Failed != 2 || st.LastJob != "status" {
+		t.Fatalf("a success changes neither failure nor last error: %+v", st)
+	}
 }
 
 func TestClassify(t *testing.T) {

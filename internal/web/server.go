@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -28,13 +29,16 @@ const (
 // AssetVersion is the cache-buster of the shared static assets (kammon.css and
 // the static scripts). Bump it when one of those files changes, so browsers drop
 // their cached copy instead of running or styling the pages with the old rules.
-const AssetVersion = "kammon-10"
+const AssetVersion = "kammon-11"
 
 type Deps struct {
 	Config config.Config
 	Store  *store.Store
 	Now    func() time.Time
 	Demo   bool
+	// Started is when this KAMmon process began running, for the server block's uptime (MON-SV-2);
+	// zero means web.New's time.
+	Started time.Time
 	// KAM is the client for the admin's script calls; nil keeps the pages reading the store
 	// and the editor saying it is not connected (AGENTS rule 3).
 	KAM kam.Admin
@@ -52,6 +56,7 @@ type Server struct {
 	sleep    func(time.Duration)
 	pages    map[string]*template.Template
 	static   http.Handler
+	started  time.Time
 	// kam is the client of the script calls; pages never use it, only the automations admin
 	// actions do (AGENTS rule 3).
 	kam kam.Admin
@@ -76,11 +81,14 @@ func New(d Deps) (*Server, error) {
 	if d.Now == nil {
 		d.Now = time.Now
 	}
+	if d.Started.IsZero() {
+		d.Started = d.Now()
+	}
 	if d.Sleep == nil {
 		d.Sleep = time.Sleep
 	}
 	s := &Server{
-		cfg: d.Config, store: d.Store, now: d.Now, demo: d.Demo, kam: d.KAM,
+		cfg: d.Config, store: d.Store, now: d.Now, demo: d.Demo, kam: d.KAM, started: d.Started,
 		sessions: auth.NewSessions(d.Config.SessionIdle(), d.Now),
 		slowdown: auth.NewSlowdown(),
 		sleep:    d.Sleep,
@@ -325,6 +333,15 @@ type nodeBlock struct {
 	KamTime, ClockNote                                        string
 }
 
+// statsBlock is the admin-only server summary under the node block (MON-SV-1, MON-SV-2). Every
+// field is already formatted; nil means the viewer gets nothing at all.
+type statsBlock struct {
+	Up, Memory string
+	Polls      string
+	// LastError is "2 minutes ago: dial tcp ...": the poller's newest failure, or empty.
+	LastError string
+}
+
 type placeholderData struct{ Text, Slice, Doc string }
 
 // page is everything the layout needs.
@@ -338,6 +355,7 @@ type page struct {
 	StaticVersion string
 	Stale         staleBar
 	Node          nodeBlock
+	Server        *statsBlock
 	Content       any
 }
 
@@ -352,6 +370,7 @@ func (s *Server) pageFor(r *http.Request, active, title, subtitle string, conten
 	if p.Role == config.RoleAdmin {
 		pg.RoleLabel = "Admin"
 	}
+	pg.Server = s.serverStats(p.Role)
 	return pg
 }
 
@@ -436,15 +455,52 @@ func (s *Server) overviewPage(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, http.StatusOK, "overview", s.pageFor(r, "overview", "Network overview", "Observed packets, airtime and rooms for this node", data))
 }
 
-// overviewPartial is what htmx fetches every 2 seconds (MON-OV-11). The stale bar and node block ride along out of band.
+// partial is one named template in an htmx answer, with its data.
+type partial struct {
+	name string
+	data any
+}
+
+// sideParts are the sidebar pieces a live refresh rides along out of band: the node block and,
+// for admins, the server block (MON-SV-1). A viewer is sent neither the block nor its numbers.
+func (s *Server) sideParts(r *http.Request) []partial {
+	parts := []partial{{"nodeblock", s.nodeBlock()}}
+	if sb := s.serverStats(principalOf(r).Role); sb != nil {
+		parts = append(parts, partial{"serverstats", *sb})
+	}
+	return parts
+}
+
+// serverStats builds the admin-only block under the node block (MON-SV-1): KAMmon's own uptime,
+// its memory and goroutines, and the store's tally of reads of KAM (MON-SV-2, MON-SV-3). nil
+// means the role gets nothing at all.
+func (s *Server) serverStats(role config.Role) *statsBlock {
+	if !view.CanSeeServerStats(role) {
+		return nil
+	}
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	now := s.now()
+	sb := &statsBlock{
+		Up:     runFor(now.Sub(s.started)),
+		Memory: fmt.Sprintf("%s · %d goroutines", memSize(ms.HeapAlloc), runtime.NumGoroutine()),
+	}
+	ps := s.store.PollStats()
+	sb.Polls = thousands(int(ps.OK))
+	if ps.Failed > 0 {
+		sb.Polls += fmt.Sprintf(" · %s failed", thousands(int(ps.Failed)))
+	}
+	if !ps.LastErrorAt.IsZero() {
+		sb.LastError = fmt.Sprintf("%s: %s", ago(now.Sub(ps.LastErrorAt)), ps.LastError)
+	}
+	return sb
+}
 func (s *Server) overviewPartial(w http.ResponseWriter, r *http.Request) {
 	data := s.overview(principalOf(r).Role, r.URL.Query().Get("range"))
 	var buf bytes.Buffer
 	t := s.pages["overview"]
-	for _, part := range []struct {
-		name string
-		data any
-	}{{"overview-live", data}, {"stalebar", s.staleBar()}, {"nodeblock", s.nodeBlock()}} {
+	parts := append([]partial{{"overview-live", data}, {"stalebar", s.staleBar()}}, s.sideParts(r)...)
+	for _, part := range parts {
 		if err := t.ExecuteTemplate(&buf, part.name, part.data); err != nil {
 			http.Error(w, "Template error.", http.StatusInternalServerError)
 			return

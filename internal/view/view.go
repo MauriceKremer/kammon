@@ -119,6 +119,12 @@ func CanEditScripts(role config.Role) bool {
 	return role == config.RoleAdmin
 }
 
+// CanSeeServerStats: KAMmon's own operating numbers are for the administrator; a viewer is never
+// sent them (MON-SV-1).
+func CanSeeServerStats(role config.Role) bool {
+	return role == config.RoleAdmin
+}
+
 // PacketLabel is the source or destination text of a packet event (docs/requirements/Traffic.md §3.1).
 // Sender names on channels a viewer may not read are replaced, and never appear in the page.
 // Events carry room ids, not room names; the caller supplies a resolver against the room snapshot.

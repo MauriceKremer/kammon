@@ -43,6 +43,19 @@ type Mark struct {
 	Note string
 }
 
+// PollStats counts the poller's reads of KAM since KAMmon started (MON-SV-3). The counters only
+// grow; LastError is clipped, so a long failure message cannot grow memory (DataStore.md §3).
+// NotServed (a 404) counts as failed too: the read did not produce data either way.
+type PollStats struct {
+	OK, Failed  uint64
+	LastJob     string
+	LastError   string
+	LastErrorAt time.Time
+}
+
+// PollErrorLimit is the longest error text the server block remembers (MON-SV-3, DataStore.md §3).
+const PollErrorLimit = 200
+
 // Freshness says how old the newest answer from KAM is (MON-DS-13).
 type Freshness int
 
@@ -90,6 +103,7 @@ type Store struct {
 	scripts        []kam.Script
 	scriptsAt      time.Time
 	scriptsMore    int
+	pollStats      PollStats
 }
 
 // Option tunes a Store at construction.
@@ -354,6 +368,32 @@ func (s *Store) SetRooms(rooms []kam.Room, clients map[string][]kam.RoomClient, 
 	}
 	s.roomsAt = now
 	s.mu.Unlock()
+}
+
+// CountPoll remembers one read the poller made of KAM (MON-SV-3). Written by the poller only;
+// the pages read it for the server block. TextRequest reads count here too, under job "texts".
+func (s *Store) CountPoll(job string, err error, now time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err == nil {
+		s.pollStats.OK++
+		return
+	}
+	s.pollStats.Failed++
+	s.pollStats.LastJob = job
+	s.pollStats.LastErrorAt = now
+	msg := err.Error()
+	if len(msg) > PollErrorLimit {
+		msg = msg[:PollErrorLimit]
+	}
+	s.pollStats.LastError = msg
+}
+
+// PollStats returns a copy of the poller's read counters (MON-SV-3).
+func (s *Store) PollStats() PollStats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.pollStats
 }
 
 // MarkNotServed remembers that KAM answered 404 for an endpoint, until the given time (design §8.3).
