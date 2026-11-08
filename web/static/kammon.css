@@ -141,7 +141,12 @@ main { min-width: 0; padding: 0 32px 48px; }
 .chart .air-busy { fill: var(--warning); fill-opacity: 0.13; }
 .chart .air-congested { fill: var(--danger); fill-opacity: 0.10; }
 .chart .air-hold { stroke: var(--warning); stroke-width: 1.5; stroke-dasharray: 5 4; }
-.chart .axis { font: 11px var(--font-code); fill: var(--text-muted); }
+/* The y-axis percents are plain HTML laid over the chart's gutter, so they keep the page's font at
+   every window width (the svg itself scales); one percent rides each 10 % grid line. */
+.chart-wrap { position: relative; }
+.chart-ticks { position: absolute; left: 0; top: 0; width: 6.25%; height: 100%; pointer-events: none; }
+.chart-ticks .tick { position: absolute; right: 4px; transform: translateY(-50%); line-height: 1; font: 11px var(--font-code); color: var(--text-muted); }
+.chart-ticks .base { transform: translateY(-100%); }
 /* The key line: a solid swatch per zone and a dash for the hold-back line. */
 .swatch.air-calm { background: var(--success); }
 .swatch.air-busy { background: var(--warning); }

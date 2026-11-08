@@ -61,20 +61,12 @@ func chartSVG(w store.Window) (chartMarkup, float64) {
 	band(0, 10, "air-calm")
 	band(10, 20, "air-busy")
 	band(20, axisTop, "air-congested")
-	// A 10 % ladder answers the zone words: a grid line and a percent on every step, so the bands
-	// read as numbers. The percents live in the gutter; the 25 % hold line falls between its steps.
+	// A 10 % ladder answers the zone words: a grid line on every step, so the bands read as numbers.
+	// The percents themselves are laid over the gutter by the template in plain HTML, so they keep
+	// the page's font at every window width; the svg itself scales. The hold line falls between steps.
 	for v := 10.0; v <= axisTop; v += 10 {
 		y := toY(v)
 		fmt.Fprintf(&b, `<line class="grid" x1="%.0f" x2="%.0f" y1="%.1f" y2="%.1f"/>`, gutter, width+gutter, y, y)
-	}
-	for v := 0.0; v <= axisTop; v += 10 {
-		yy := toY(v)
-		if v == 0 {
-			yy = height - 3
-		} else {
-			yy += 3.5
-		}
-		fmt.Fprintf(&b, `<text class="axis" x="%.0f" y="%.1f" text-anchor="end">%.0f%%</text>`, gutter-4, yy, v)
 	}
 	// The hold-back line at 25 % (D37): past it a LoRa channel's backoffs grow quickly, so the busy
 	// bars run into a warning border. Its words sit below the chart with the zones'.

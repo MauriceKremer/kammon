@@ -55,12 +55,21 @@ type automationData struct {
 	Line, Queue, LastRun, Note, Age string
 }
 
+// axisTick is one percent label the template lays over the chart's gutter: Top is its height over
+// the chart as a percent, so the label rides its grid line at every window width.
+type axisTick struct {
+	Label string
+	Top   string
+	Base  bool
+}
+
 type overviewData struct {
 	Range, RangeLabel string
 	Ranges            []rangeLink
 	Metrics           []metric
 	Chart             chartMarkup
 	ChartAlt          string
+	YTicks            []axisTick
 	SlotText          string
 	Labels            []string
 	HistoryNote       string
@@ -86,9 +95,17 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 
 	// The event stream answers separately from the status and room jobs (MON-DS-13): say its age
 	// instead of letting the metrics, chart and recent table look current while they are not.
-	chart, _ := chartSVG(w)
+	chart, axisTop := chartSVG(w)
+	var ticks []axisTick
+	for v := 0.0; v <= axisTop; v += 10 {
+		ticks = append(ticks, axisTick{
+			Label: fmt.Sprintf("%.0f%%", v),
+			Top:   fmt.Sprintf("%.2f%%", 100*(1-v/axisTop)),
+			Base:  v == 0,
+		})
+	}
 	data := overviewData{
-		Range: opt.Key, RangeLabel: opt.Label, Chart: chart,
+		Range: opt.Key, RangeLabel: opt.Label, Chart: chart, YTicks: ticks,
 		SlotText: fmt.Sprintf("%d bars of %s", len(w.Slots), slotWidthText(w.SlotWidth)),
 		ChartAlt: fmt.Sprintf("Observed packet airtime over the last %s: average %.1f%%, busiest bar %.1f%%. Healthy under 10%%, busy 10 to 20%%, congested over 20%%, hold-back line at 25%%. %d marks.", opt.Label, w.AirtimePercent, w.PeakPercent, len(w.Marks)),
 	}

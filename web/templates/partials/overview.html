@@ -19,7 +19,7 @@
         <div class="section-head">
           <div><h2 id="airtime-title">Airtime</h2><p class="small muted">Observed packet airtime · {{.SlotText}}</p></div>
         </div>
-        <div role="img" aria-label="{{.ChartAlt}}">{{.Chart}}</div>
+        <div class="chart-wrap" role="img" aria-label="{{.ChartAlt}}">{{.Chart}}<span class="chart-ticks" aria-hidden="true">{{range .YTicks}}<span class="tick{{if .Base}} base{{end}}" style="top:{{.Top}}">{{.Label}}</span>{{end}}</span></div>
         <div class="chart-labels" aria-hidden="true">{{range .Labels}}<span>{{.}}</span>{{end}}</div>
         {{if .HistoryNote}}<p class="small muted">{{.HistoryNote}}</p>{{end}}
         {{range .Marks}}<p class="small warn">{{.}}</p>{{end}}
