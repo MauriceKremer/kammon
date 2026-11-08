@@ -141,7 +141,7 @@ main { min-width: 0; padding: 0 32px 48px; }
 .chart .air-busy { fill: var(--warning); fill-opacity: 0.13; }
 .chart .air-congested { fill: var(--danger); fill-opacity: 0.10; }
 .chart .air-hold { stroke: var(--warning); stroke-width: 1.5; stroke-dasharray: 5 4; }
-.chart .axis { font: 10px var(--font-code); fill: var(--text-muted); }
+.chart .axis { font: 11px var(--font-code); fill: var(--text-muted); }
 /* The key line: a solid swatch per zone and a dash for the hold-back line. */
 .swatch.air-calm { background: var(--success); }
 .swatch.air-busy { background: var(--warning); }
