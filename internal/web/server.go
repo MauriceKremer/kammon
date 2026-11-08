@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
-	"runtime"
 	"strconv"
 	"time"
 
@@ -36,9 +35,6 @@ type Deps struct {
 	Store  *store.Store
 	Now    func() time.Time
 	Demo   bool
-	// Started is when this KAMmon process began running, for the server block's uptime (MON-SV-2);
-	// zero means web.New's time.
-	Started time.Time
 	// KAM is the client for the admin's script calls; nil keeps the pages reading the store
 	// and the editor saying it is not connected (AGENTS rule 3).
 	KAM kam.Admin
@@ -56,7 +52,6 @@ type Server struct {
 	sleep    func(time.Duration)
 	pages    map[string]*template.Template
 	static   http.Handler
-	started  time.Time
 	// kam is the client of the script calls; pages never use it, only the automations admin
 	// actions do (AGENTS rule 3).
 	kam kam.Admin
@@ -81,14 +76,11 @@ func New(d Deps) (*Server, error) {
 	if d.Now == nil {
 		d.Now = time.Now
 	}
-	if d.Started.IsZero() {
-		d.Started = d.Now()
-	}
 	if d.Sleep == nil {
 		d.Sleep = time.Sleep
 	}
 	s := &Server{
-		cfg: d.Config, store: d.Store, now: d.Now, demo: d.Demo, kam: d.KAM, started: d.Started,
+		cfg: d.Config, store: d.Store, now: d.Now, demo: d.Demo, kam: d.KAM,
 		sessions: auth.NewSessions(d.Config.SessionIdle(), d.Now),
 		slowdown: auth.NewSlowdown(),
 		sleep:    d.Sleep,
@@ -333,13 +325,11 @@ type nodeBlock struct {
 	KamTime, ClockNote                                        string
 }
 
-// statsBlock is the admin-only server summary under the node block (MON-SV-1, MON-SV-2). Every
-// field is already formatted; nil means the viewer gets nothing at all.
+// statsBlock is the admin-only summary of KAM's own operating counters, under the node block
+// (MON-SV-1). Every line is already formatted; nil means the role gets nothing at all. The
+// numbers come from the newest status snapshot in the store, never from a page-side request.
 type statsBlock struct {
-	Up, Memory string
-	Polls      string
-	// LastError is "2 minutes ago: dial tcp ...": the poller's newest failure, or empty.
-	LastError string
+	TX, Pipeline, Gate, Ring string
 }
 
 type placeholderData struct{ Text, Slice, Doc string }
@@ -471,29 +461,33 @@ func (s *Server) sideParts(r *http.Request) []partial {
 	return parts
 }
 
-// serverStats builds the admin-only block under the node block (MON-SV-1): KAMmon's own uptime,
-// its memory and goroutines, and the store's tally of reads of KAM (MON-SV-2, MON-SV-3). nil
-// means the role gets nothing at all.
+// serverStats builds the admin-only block under the node block (MON-SV-1) from the status
+// snapshot the poller already fetched: KAM's own counters for its TX pipeline, its persistence
+// rings and its event ring (MON-SV-2). The block reads the store only and is nil while KAM has
+// not answered (MON-SV-3).
 func (s *Server) serverStats(role config.Role) *statsBlock {
 	if !view.CanSeeServerStats(role) {
 		return nil
 	}
-	var ms runtime.MemStats
-	runtime.ReadMemStats(&ms)
-	now := s.now()
-	sb := &statsBlock{
-		Up:     runFor(now.Sub(s.started)),
-		Memory: fmt.Sprintf("%s · %d goroutines", memSize(ms.HeapAlloc), runtime.NumGoroutine()),
+	st, _ := s.store.Status()
+	if st.Epoch == "" {
+		return nil
 	}
-	ps := s.store.PollStats()
-	sb.Polls = thousands(int(ps.OK))
-	if ps.Failed > 0 {
-		sb.Polls += fmt.Sprintf(" · %s failed", thousands(int(ps.Failed)))
+	drops := uint64(0)
+	for _, ring := range st.Persistence {
+		drops += ring.Dropped
 	}
-	if !ps.LastErrorAt.IsZero() {
-		sb.LastError = fmt.Sprintf("%s: %s", ago(now.Sub(ps.LastErrorAt)), ps.LastError)
+	ringEvents := uint64(0)
+	if st.EventRing.LastSeq >= st.EventRing.FirstSeq {
+		ringEvents = st.EventRing.LastSeq - st.EventRing.FirstSeq + 1
 	}
-	return sb
+	return &statsBlock{
+		TX: fmt.Sprintf("%s sent · %s queued", thousands(int(st.TX.Sent)), thousands(int(st.TX.Queued))),
+		Pipeline: fmt.Sprintf("%s rejected · %s evicted · %s deferred",
+			thousands(int(st.TX.Rejected)), thousands(int(st.TX.Evicted)), thousands(int(st.TX.Deferred))),
+		Gate: fmt.Sprintf("%s gate timeouts · %s ring drops", thousands(int(st.TX.GateTimeouts)), thousands(int(drops))),
+		Ring: fmt.Sprintf("%s / %s", thousands(int(ringEvents)), thousands(st.EventRing.Capacity)),
+	}
 }
 func (s *Server) overviewPartial(w http.ResponseWriter, r *http.Request) {
 	data := s.overview(principalOf(r).Role, r.URL.Query().Get("range"))

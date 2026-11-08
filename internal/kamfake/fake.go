@@ -35,6 +35,10 @@ type Fake struct {
 	dryRunOn     bool
 	runInfoOn    bool
 	dryRunBusy   bool
+
+	// KAM's own counters for the status snapshot: sent counts every TX event, the rest move
+	// occasionally so the demo's server block has life in it (MON-SV-2).
+	txSent, txRejected, txEvicted, txDeferred, txGateTimeouts uint64
 }
 
 // New returns a fake whose clock is now. It starts with half an hour of traffic already in the ring.
@@ -56,6 +60,7 @@ func (f *Fake) Restart() {
 func (f *Fake) restart(history time.Duration) {
 	f.epoch = fmt.Sprintf("%016x", f.rng.Uint64())
 	f.seq = 0
+	f.txSent, f.txRejected, f.txEvicted, f.txDeferred, f.txGateTimeouts = 0, 0, 0, 0, 0
 	f.ring = f.ring[:0]
 	f.last = f.now().Add(-history)
 	// Scripts persist in KAM's database over a restart; only the run information, which lives in
@@ -168,6 +173,21 @@ func (f *Fake) emit(ev kam.Event) {
 	ev.Seq = f.seq
 	if ev.Kind == kam.KindRoom {
 		f.lastRoom = ev.At
+	}
+	if ev.Kind == kam.KindTX && ev.OK != nil && *ev.OK {
+		f.txSent++ // the demo's server counters (MON-SV-2)
+		if f.rng.Intn(100) == 0 {
+			switch f.rng.Intn(4) {
+			case 0:
+				f.txRejected++
+			case 1:
+				f.txEvicted++
+			case 2:
+				f.txDeferred++
+			default:
+				f.txGateTimeouts++
+			}
+		}
 	}
 	if len(f.ring) == ringSize {
 		copy(f.ring, f.ring[1:])
@@ -332,6 +352,16 @@ func (f *Fake) status(w http.ResponseWriter, r *http.Request) {
 	st.DutyCycle.ConfiguredPercent, st.DutyCycle.UsedMS, st.DutyCycle.WindowS = 1.0, 21600, 3600
 	st.Rooms.Enabled, st.Rooms.Count = true, 1
 	st.Automation.Enabled, st.Automation.ScriptsEnabled = f.automationOn, enabled
+	st.TX.Sent, st.TX.Completed = f.txSent, f.txSent
+	// A little friction so the demo's server block shows motion: about one rejection, eviction,
+	// deferral or gate timeout per hundred sent packets.
+	st.TX.Rejected, st.TX.Evicted = f.txRejected, f.txEvicted
+	st.TX.Deferred, st.TX.GateTimeouts = f.txDeferred, f.txGateTimeouts
+	st.TX.Queued, st.TX.Submitted = 0, f.txSent
+	st.Persistence = map[string]struct {
+		Depth   int    `json:"depth"`
+		Dropped uint64 `json:"dropped"`
+	}{"adverts": {Depth: 1, Dropped: 3}, "group_texts": {Depth: 5530, Dropped: 7}}
 	st.EventRing.Capacity, st.EventRing.FirstSeq, st.EventRing.LastSeq = ringSize, f.firstSeq(), f.seq
 	writeJSON(w, st)
 }

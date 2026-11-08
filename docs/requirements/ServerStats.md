@@ -1,24 +1,26 @@
 # Server statistics
 
-KAMmon's own operating numbers, in the sidebar under the node block, for the administrator (MON-SV-1). The numbers say what they are: total counters are **since KAMmon started**, and "reads" are the poller's HTTP reads of the KAM API, which is what a page never is.
+KAM's own operating numbers, in the sidebar under the node block, for the administrator (MON-SV-1). The only datasource is the status snapshot the poller already fetches from `GET /v1/status` (contract §7.1); the block never asks KAM anything itself and has nothing to show until KAM has answered.
 
 ## 1. What the block shows
 
 | Line | Meaning |
 |---|---|
 | **Server** | The heading, to tell it apart from the node (KAM) above it. |
-| Up | How long this KAMmon process has been running, from the moment `web.New` began. |
-| Memory | The Go heap in use, plus the number of goroutines, read at render time. |
-| KAM reads | Reads the poller made of KAM since start: `1,284` answered, and `· 3 failed` when some did not. A 404 ("needs a newer KAM") counts as failed too; a read KAMmon cancelled itself (shutdown) counts neither way. |
-| Last error | The newest failed read: its age and the client's error text, clipped to 200 bytes (D33). Empty after a clean start. |
+| TX | `tx.sent` on air and `tx.queued` waiting now. |
+| Pipeline | `tx.rejected`, `tx.evicted`, `tx.deferred`: what the send gate refused, dropped for a full queue, or held back. |
+| Gate | `tx.gate_timeouts`, plus the packets KAM's retention rings dropped (`persistence.adverts.dropped` and `persistence.group_texts.dropped` summed). |
+| Event ring | How many events KAM's ring holds (`last_seq` − `first_seq` + 1) of `capacity`. |
+
+The counters mean what KAM says they mean: they are KAM's running totals, counted on KAM's side, and they may reset when KAM restarts — the node block's epoch mark says when that happened.
 
 ## 2. Requirements
 
 | ID | Requirement | Level | From |
 |---|---|---|---|
 | MON-SV-1 | The sidebar shows the server block below the node block for admins only; a viewer is sent neither the block nor its numbers, on a page or in a live refresh. | MUST | ServerStats |
-| MON-SV-2 | The block shows KAMmon's own uptime, memory in use and goroutines, with honest wording that distinguishes it from the KAM node block. | MUST | ServerStats |
-| MON-SV-3 | The poller counts every read in the store (written by the poller only, read by the pages); counters never grow memory: the last error text is clipped. | MUST | ServerStats |
+| MON-SV-2 | The block shows KAM's own operating counters from the status snapshot: the TX pipeline, the gate, the persistence ring drops and the event ring, with honest wording. | MUST | ServerStats |
+| MON-SV-3 | The block reads only the store's status snapshot: it adds no request to KAM and shows nothing while KAM has not answered yet. | MUST | ServerStats |
 
 ## 3. Access
 

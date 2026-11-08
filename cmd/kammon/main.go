@@ -33,7 +33,6 @@ func main() {
 func run(configPath string, demo bool) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	started := time.Now()
 
 	var cfg config.Config
 	if demo {
@@ -66,7 +65,7 @@ func run(configPath string, demo bool) error {
 	}
 	go poller.Run(ctx)
 
-	srv, err := web.New(web.Deps{Config: cfg, Store: st, Demo: demo, KAM: kamClient, Started: started})
+	srv, err := web.New(web.Deps{Config: cfg, Store: st, Demo: demo, KAM: kamClient})
 	if err != nil {
 		return err
 	}

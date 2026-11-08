@@ -123,9 +123,7 @@ func (p *Poller) TextRequests(ctx context.Context) {
 			err = errors.New("unknown text request")
 		}
 		cancel()
-		now := p.Now()
-		p.Store.CompleteText(request, channel, posts, now, err)
-		p.Store.CountPoll("texts", err, now) // the server block counts every read (MON-SV-3)
+		p.Store.CompleteText(request, channel, posts, p.Now(), err)
 		if err != nil {
 			p.Log.Warn("KAM text read failed", "kind", request.Kind, "error", err)
 		}
@@ -162,15 +160,12 @@ func (p *Poller) runJob(ctx context.Context, j *job) {
 	now := p.Now()
 	switch {
 	case err == nil:
-		p.Store.CountPoll(j.name, nil, now) // the server block counts every read (MON-SV-3)
 		j.failures, j.next = 0, now.Add(j.every)
 	case errors.Is(err, kam.ErrNotFound):
-		p.Store.CountPoll(j.name, err, now)
 		wait := p.notServedWait()
 		p.Store.MarkNotServed(j.name, now.Add(wait))
 		j.failures, j.next = 0, now.Add(wait)
 	case ctx.Err() != nil && errors.Is(err, context.Canceled):
-		// KAMmon stopped the read itself; it says nothing about KAM, so the counters skip it (MON-SV-3).
 		j.next = now.Add(j.every)
 	default:
 		j.failures++

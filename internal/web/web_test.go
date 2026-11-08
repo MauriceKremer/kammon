@@ -1028,12 +1028,21 @@ func TestManualsAreGoneFromTheInterface(t *testing.T) {
 
 // The server block sits under the node block in the sidebar and is for the administrator alone;
 // a viewer is sent neither the block nor its numbers, on the page or in a live refresh (MON-SV-1).
+// Its numbers are KAM's own counters from the status snapshot (MON-SV-2).
 func TestServerStatsAreAdminOnly(t *testing.T) {
 	h := newHarness(t)
-	h.st.CountPoll("status", nil, t0)
+	st, at := h.st.Status()
+	st.TX.Submitted, st.TX.Sent, st.TX.Completed, st.TX.Queued = 2126, 2123, 2123, 2
+	st.TX.Rejected, st.TX.Evicted, st.TX.Deferred, st.TX.GateTimeouts = 3, 1, 2, 5
+	st.Persistence = map[string]struct {
+		Depth   int    `json:"depth"`
+		Dropped uint64 `json:"dropped"`
+	}{"adverts": {Depth: 2, Dropped: 4}, "group_texts": {Depth: 312, Dropped: 6}}
+	st.EventRing.Capacity, st.EventRing.FirstSeq, st.EventRing.LastSeq = 8192, 5931, 8123
+	h.st.SetStatus(st, at)
 
 	_, body, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/")
-	if strings.Contains(body, "server-stats") || strings.Contains(body, "KAM reads") {
+	if strings.Contains(body, "server-stats") || strings.Contains(body, "Event ring") {
 		t.Error("a viewer must not see server statistics")
 	}
 
@@ -1043,7 +1052,13 @@ func TestServerStatsAreAdminOnly(t *testing.T) {
 	}
 
 	_, body, _ = get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
-	for _, want := range []string{"<strong>Server</strong>", "Up 0m", "Memory ", "goroutines", "KAM reads 1"} {
+	for _, want := range []string{
+		"<strong>Server</strong>",
+		"2,123 sent · 2 queued",
+		"3 rejected · 1 evicted · 2 deferred",
+		"5 gate timeouts · 10 ring drops",
+		"Event ring 2,193 / 8,192",
+	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the admin's sidebar lacks %q", want)
 		}
@@ -1055,16 +1070,15 @@ func TestServerStatsAreAdminOnly(t *testing.T) {
 	}
 }
 
-// A failed read is counted and remembered with its age and text; the error is clipped in the
-// store (MON-SV-3).
-func TestServerStatsRememberALastFailedRead(t *testing.T) {
+// Before KAM has answered, the block shows nothing rather than zeroes (MON-SV-3).
+func TestServerStatsWaitForKAM(t *testing.T) {
 	h := newHarness(t)
-	h.st.CountPoll("rooms", fmt.Errorf("dial tcp 127.0.0.1:8766: connection refused"), t0)
+	st, _ := h.st.Status()
+	st.Epoch = ""
+	h.st.SetStatus(st, t0)
 
 	_, body, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
-	for _, want := range []string{"KAM reads 0 · 1 failed", "Last error just now: dial tcp 127.0.0.1:8766: connection refused"} {
-		if !strings.Contains(body, want) {
-			t.Errorf("the admin's sidebar lacks %q", want)
-		}
+	if strings.Contains(body, "server-stats") {
+		t.Error("waiting for KAM must hide the server block, not show zeroes")
 	}
 }
