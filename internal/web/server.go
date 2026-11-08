@@ -121,11 +121,11 @@ func (s *Server) routes() []route {
 		{"GET /channels", viewer, s.channelsPage},
 		{"GET /ui/channel-messages", viewer, s.channelMessagesPartial},
 		{"GET /ui/channel-metrics", viewer, s.channelMetricsPartial},
-		{"GET /rooms", viewer, s.roomsPage},
+		{"GET /rooms", admin, s.roomsPage},
 		{"GET /ui/room-posts", admin, s.roomPostsPartial},
-		{"GET /ui/room-metrics", viewer, s.roomMetricsPartial},
-		{"GET /automations", viewer, s.automationsPage},
-		{"GET /ui/script-list", viewer, s.scriptListPartial},
+		{"GET /ui/room-metrics", admin, s.roomMetricsPartial},
+		{"GET /automations", admin, s.automationsPage},
+		{"GET /ui/script-list", admin, s.scriptListPartial},
 		{"POST /ui/script-validate", admin, s.scriptValidateSubmit},
 		{"POST /ui/script-dry-run", admin, s.scriptDryRunSubmit},
 		{"POST /ui/script-save", admin, s.scriptSaveSubmit},
@@ -160,7 +160,10 @@ func (s *Server) Handler() http.Handler {
 // four hours. Requests stay public GETs; the dynamic pages never carry this header.
 func cachedFS(h http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=14400")
+		// no-cache, not a long max-age: the versioned URL should make long caching safe, but a
+		// browser cache did keep serving retired bytes for an unchanged URL (Safari 27, caught by
+		// measuring inside the browser), and revalidating 21 kB on loopback costs nothing.
+		w.Header().Set("Cache-Control", "no-cache")
 		h.ServeHTTP(w, r)
 	}
 }

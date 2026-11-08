@@ -13,7 +13,9 @@ var t0 = time.Date(2026, 10, 11, 15, 0, 0, 0, time.UTC)
 
 func ptr[T any](v T) *T { return &v }
 
-func TestPagesHideAccountsFromViewers(t *testing.T) {
+func TestPagesHideAdminItemsFromViewers(t *testing.T) {
+	adminOnly := []string{"rooms", "accounts", "automations", "modem"}
+	forall := []string{"overview", "traffic", "channels"}
 	has := func(role config.Role, key string) bool {
 		for _, p := range Pages(role) {
 			if p.Key == key {
@@ -22,8 +24,18 @@ func TestPagesHideAccountsFromViewers(t *testing.T) {
 		}
 		return false
 	}
-	if has(config.RoleViewer, "accounts") || !has(config.RoleAdmin, "accounts") || !has(config.RoleViewer, "modem") {
-		t.Fatal("accounts is admin only; modem snapshot is for everyone")
+	for _, key := range adminOnly {
+		if has(config.RoleViewer, key) {
+			t.Errorf("%s must not be offered to a viewer (MON-AX-12)", key)
+		}
+		if !has(config.RoleAdmin, key) {
+			t.Errorf("the administrator still needs %s", key)
+		}
+	}
+	for _, key := range forall {
+		if !has(config.RoleViewer, key) {
+			t.Errorf("%s is for every role", key)
+		}
 	}
 }
 
