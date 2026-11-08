@@ -28,7 +28,7 @@ Plain words: **airtime** is how long a packet occupies the radio channel. LoRa i
 | Area | Content |
 |---|---|
 | **Metric strip** (4) | Observed packet airtime (%); Node TX duty cycle (%) against its limit; Packets observed (RX and TX, with how many were repeats); Room posts in the last hour. |
-| **Airtime chart** | Stacked bars, one per time slot, by packet class. Range switch 15m / 1h / 24h and a pause control. |
+| **Channel Utilization chart** | Stacked bars, one per time slot, by packet class. Range switch 15m / 1h / 24h and a pause control. Health-zone backgrounds, a percent axis and the 25 % hold-back line (§3.3). |
 | **Packet mix** | The same classes as a thin bar and a list with counts and percentages. |
 | **Recent packets** | The six newest: time, type, source or destination. A link to the Traffic page. |
 | **Rooms** | Each room: serving state, last activity, posts in the last hour, remembered clients. Admin: the two most recent clients with the activity indicator. |
@@ -52,6 +52,16 @@ Plain words: **airtime** is how long a packet occupies the radio channel. LoRa i
 - **Packets observed** = all `rx` and `tx` events in the range. The caption shows RX and TX counts and how many RX events were repeats.
 - **Chart slots**: at most 60 bars. 15m uses 15 one-minute bars; 1h uses 60 one-minute bars; 24h uses 60 bars of 24 minutes.
 
+### 3.3 The channel utilization chart's health zones
+
+The chart washes the background with the utilization bands the LoRa community reads a shared channel against:
+
+- **Healthy, under 10 %.** Collisions are rare; packets pass several hops cleanly and the network answers promptly.
+- **Busy, 10-20 %.** Regular traffic contention; occasional dropped packets or delayed acknowledgements, mostly on multi-hop routes.
+- **Congested, over 20 %.** LoRa has no slot scheduling, so as the channel fills, collisions rise steeply and firmware transmit backoffs delay or drop messages to keep the network from freezing.
+
+The chart's y axis carries a percent every 10 %, so the bands read as numbers. The dashed **hold-back line** sits at 25 %, where the backoffs begin to bite; bars reaching past it deserve attention. The axis never ends under 30 % of one slot and grows in whole 10 % bands, so the zones keep their shape and their meaning even on a quiet channel (D37). The key line under the chart names the zones in words — a green swatch for healthy, yellow for busy, red for congested, and a dashed one for the hold-back line; the percents stay on the axis, and the text alternative still spells the ranges out. This section carries the longer explanation. The bars keep their packet-class colours, keyed by the packet mix list under the chart.
+
 ## 4. Requirements
 
 | ID | Requirement | Level |
@@ -60,7 +70,7 @@ Plain words: **airtime** is how long a packet occupies the radio channel. LoRa i
 | MON-OV-2 | The four metrics and their captions follow §3.2. The airtime metric is labelled "Observed packet airtime", never "occupancy". | MUST |
 | MON-OV-3 | The chart is drawn on the server as SVG, stacked by the four classes in §3.1, with the class colours from the design. | MUST |
 | MON-OV-4 | Changing the range refreshes the chart, the packet mix and the metric strip together. | MUST |
-| MON-OV-5 | If the store holds less than the range, the chart caption says "History starts at HH:MM". KAM restarts and gaps appear as marks on the axis. | MUST |
+| MON-OV-5 | KAM restarts and gaps appear as marks on the axis, said in words below the chart. The "History starts at HH:MM" caption is withdrawn 2026-11-08; the Traffic list keeps its history note (MON-TR-12). | MUST |
 | MON-OV-6 | The chart has a text alternative with the range, the average and the peak. | MUST |
 | MON-OV-7 | Recent packets show at most six rows with the same name rules as the Traffic page. | MUST |
 | MON-OV-8 | Each room line shows "Last activity" from KAM's room list and posts in the last hour from `room` events. The wording says "remembered", not "online". | MUST |
@@ -88,9 +98,9 @@ Viewers and admins see the same numbers. The admin also sees client names in the
 
 - Bucket arithmetic: a known event list gives the expected percentage, mix and counts.
 - Class mapping for each payload type, including `room` set and unset.
-- A range switch with less history than the range shows the caption.
 - Rendering with the store empty, with KAM down, and with only some snapshots filled.
 - A snapshot test of the SVG for a fixed input.
+- The health zones: the band washes, the 25 % hold-back line and the 30 % axis floor (D37).
 
 ## 8. Open points
 

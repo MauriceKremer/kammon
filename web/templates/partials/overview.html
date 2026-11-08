@@ -17,14 +17,17 @@
     <div class="main">
       <section class="section" aria-labelledby="airtime-title">
         <div class="section-head">
-          <div><h2 id="airtime-title">Airtime</h2><p class="small muted">Observed packet airtime · {{.SlotText}}</p></div>
-          <span class="mono muted">axis 0–{{.AxisTop}}</span>
+          <div><h2 id="airtime-title">Channel Utilization</h2><p class="small muted">Observed packet airtime · {{.SlotText}}</p></div>
         </div>
-        <div role="img" aria-label="{{.ChartAlt}}">{{.Chart}}</div>
+        <div class="chart-wrap" role="img" aria-label="{{.ChartAlt}}">{{.Chart}}<span class="chart-ticks" aria-hidden="true">{{range .YTicks}}<span class="tick{{if .Base}} base{{end}}" style="top:{{.Top}}">{{.Label}}</span>{{end}}</span></div>
         <div class="chart-labels" aria-hidden="true">{{range .Labels}}<span>{{.}}</span>{{end}}</div>
-        {{if .HistoryNote}}<p class="small muted">{{.HistoryNote}}</p>{{end}}
         {{range .Marks}}<p class="small warn">{{.}}</p>{{end}}
-        <div class="legend">{{range .Classes}}<span><span class="swatch {{.Key}}"></span>{{.Name}}</span>{{end}}</div>
+        <div class="legend">
+          <span><span class="swatch air-calm"></span>Healthy</span>
+          <span><span class="swatch air-busy"></span>Busy</span>
+          <span><span class="swatch air-congested"></span>Congested</span>
+          <span><span class="swatch air-hold"></span>Hold-back line</span>
+        </div>
       </section>
 
       <section class="section" aria-labelledby="mix-title">
