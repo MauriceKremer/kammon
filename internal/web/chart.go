@@ -23,7 +23,7 @@ const axisFloorPercent = 30.0
 // text from KAM can reach it; this is the one place template.HTML is allowed (a test enforces that).
 // It returns the markup and the top of the axis as a percent of one slot.
 func chartSVG(w store.Window) (chartMarkup, float64) {
-	const width, height = 600.0, 160.0
+	const width, gutter, height = 600.0, 40.0, 160.0 // the gutter keeps the y-axis percents clear of the bars
 	n := len(w.Slots)
 	slotMS := float64(w.SlotWidth / time.Millisecond)
 	axisMS := slotMS * axisFloorPercent / 100
@@ -46,7 +46,7 @@ func chartSVG(w store.Window) (chartMarkup, float64) {
 	var toY = func(percent float64) float64 { return height - height*percent/axisTop }
 
 	var b strings.Builder
-	fmt.Fprintf(&b, `<svg class="chart" viewBox="0 0 %.0f %.0f" aria-hidden="true">`, width, height)
+	fmt.Fprintf(&b, `<svg class="chart" viewBox="0 0 %.0f %.0f" aria-hidden="true">`, width+gutter, height)
 	// The channel's health zones as backgrounds (D37): healthy to 10 %, busy to 20 %, congested
 	// above. The words live below the chart, like the gap and restart marks' words (MON-OV-5).
 	var band = func(fromPercent, toPercent float64, class string) {
@@ -55,20 +55,31 @@ func chartSVG(w store.Window) (chartMarkup, float64) {
 			return
 		}
 		y := toY(toPercent)
-		fmt.Fprintf(&b, `<rect class="%s" x="0" y="%.2f" width="%.0f" height="%.2f"/>`,
-			class, y, width, toY(fromPercent)-y)
+		fmt.Fprintf(&b, `<rect class="%s" x="%.0f" y="%.2f" width="%.0f" height="%.2f"/>`,
+			class, gutter, y, width, toY(fromPercent)-y)
 	}
 	band(0, 10, "air-calm")
 	band(10, 20, "air-busy")
 	band(20, axisTop, "air-congested")
-	for i := 1; i <= 4; i++ {
-		y := height - height*float64(i)/4
-		fmt.Fprintf(&b, `<line class="grid" x1="0" x2="%.0f" y1="%.1f" y2="%.1f"/>`, width, y, y)
+	// A 10 % ladder answers the zone words: a grid line and a percent on every step, so the bands
+	// read as numbers. The percents live in the gutter; the 25 % hold line falls between its steps.
+	for v := 10.0; v <= axisTop; v += 10 {
+		y := toY(v)
+		fmt.Fprintf(&b, `<line class="grid" x1="%.0f" x2="%.0f" y1="%.1f" y2="%.1f"/>`, gutter, width+gutter, y, y)
+	}
+	for v := 0.0; v <= axisTop; v += 10 {
+		yy := toY(v)
+		if v == 0 {
+			yy = height - 3
+		} else {
+			yy += 3.5
+		}
+		fmt.Fprintf(&b, `<text class="axis" x="%.0f" y="%.1f" text-anchor="end">%.0f%%</text>`, gutter-4, yy, v)
 	}
 	// The hold-back line at 25 % (D37): past it a LoRa channel's backoffs grow quickly, so the busy
 	// bars run into a warning border. Its words sit below the chart with the zones'.
 	y := toY(25)
-	fmt.Fprintf(&b, `<line class="air-hold" x1="0" x2="%.0f" y1="%.2f" y2="%.2f"/>`, width, y, y)
+	fmt.Fprintf(&b, `<line class="air-hold" x1="%.0f" x2="%.0f" y1="%.2f" y2="%.2f"/>`, gutter, width+gutter, y, y)
 	barWidth := width / float64(n)
 	for i, slot := range w.Slots {
 		y := height
@@ -79,7 +90,7 @@ func chartSVG(w store.Window) (chartMarkup, float64) {
 			}
 			y -= h
 			fmt.Fprintf(&b, `<rect class="c-%s" x="%.2f" y="%.2f" width="%.2f" height="%.2f"/>`,
-				class.Key(), float64(i)*barWidth+0.5, y, max(barWidth-1, 1), h)
+				class.Key(), gutter+float64(i)*barWidth+0.5, y, max(barWidth-1, 1), h)
 		}
 	}
 	// Gap and restart marks sit on the axis (MON-OV-5). A restart is a filled triangle, a gap an open
@@ -89,7 +100,7 @@ func chartSVG(w store.Window) (chartMarkup, float64) {
 		if m.Kind == "gap" {
 			class = "mark-gap"
 		}
-		x := (float64(m.Slot) + 0.5) * width / float64(n)
+		x := gutter + (float64(m.Slot)+0.5)*width/float64(n)
 		fmt.Fprintf(&b, `<path class="%s" d="M%.1f 3 L%.1f 13 L%.1f 13 Z"/>`, class, x, x-5, x+5)
 	}
 	b.WriteString(`</svg>`)

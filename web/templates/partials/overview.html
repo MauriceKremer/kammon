@@ -18,14 +18,17 @@
       <section class="section" aria-labelledby="airtime-title">
         <div class="section-head">
           <div><h2 id="airtime-title">Airtime</h2><p class="small muted">Observed packet airtime · {{.SlotText}}</p></div>
-          <span class="mono muted">axis 0–{{.AxisTop}}</span>
         </div>
         <div role="img" aria-label="{{.ChartAlt}}">{{.Chart}}</div>
         <div class="chart-labels" aria-hidden="true">{{range .Labels}}<span>{{.}}</span>{{end}}</div>
-        <p class="small muted">Healthy under 10% · busy 10–20% · congested over 20% · hold-back line at 25%.</p>
         {{if .HistoryNote}}<p class="small muted">{{.HistoryNote}}</p>{{end}}
         {{range .Marks}}<p class="small warn">{{.}}</p>{{end}}
-        <div class="legend">{{range .Classes}}<span><span class="swatch {{.Key}}"></span>{{.Name}}</span>{{end}}</div>
+        <div class="legend">
+          <span><span class="swatch air-calm"></span>Healthy under 10%</span>
+          <span><span class="swatch air-busy"></span>busy 10–20%</span>
+          <span><span class="swatch air-congested"></span>congested over 20%</span>
+          <span><span class="swatch air-hold"></span>hold-back line at 25%</span>
+        </div>
       </section>
 
       <section class="section" aria-labelledby="mix-title">

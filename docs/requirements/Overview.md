@@ -28,7 +28,7 @@ Plain words: **airtime** is how long a packet occupies the radio channel. LoRa i
 | Area | Content |
 |---|---|
 | **Metric strip** (4) | Observed packet airtime (%); Node TX duty cycle (%) against its limit; Packets observed (RX and TX, with how many were repeats); Room posts in the last hour. |
-| **Airtime chart** | Stacked bars, one per time slot, by packet class. Range switch 15m / 1h / 24h and a pause control. Health-zone backgrounds and the 25 % hold-back line (§3.3). |
+| **Airtime chart** | Stacked bars, one per time slot, by packet class. Range switch 15m / 1h / 24h and a pause control. Health-zone backgrounds, a percent axis and the 25 % hold-back line (§3.3). |
 | **Packet mix** | The same classes as a thin bar and a list with counts and percentages. |
 | **Recent packets** | The six newest: time, type, source or destination. A link to the Traffic page. |
 | **Rooms** | Each room: serving state, last activity, posts in the last hour, remembered clients. Admin: the two most recent clients with the activity indicator. |
@@ -60,7 +60,7 @@ The chart washes the background with the utilization bands the LoRa community re
 - **Busy, 10-20 %.** Regular traffic contention; occasional dropped packets or delayed acknowledgements, mostly on multi-hop routes.
 - **Congested, over 20 %.** LoRa has no slot scheduling, so as the channel fills, collisions rise steeply and firmware transmit backoffs delay or drop messages to keep the network from freezing.
 
-The dashed **hold-back line** sits at 25 %, where the backoffs begin to bite; bars reaching past it deserve attention. The axis never ends under 30 % of one slot and grows in whole 10 % bands, so the zones keep their shape and their meaning even on a quiet channel (D37). The page itself keeps only a short caption — "Healthy under 10% · busy 10–20% · congested over 20% · hold-back line at 25%." — and the text alternative names the bands too; this section carries the longer explanation.
+The chart's y axis carries a percent every 10 %, so the bands read as numbers. The dashed **hold-back line** sits at 25 %, where the backoffs begin to bite; bars reaching past it deserve attention. The axis never ends under 30 % of one slot and grows in whole 10 % bands, so the zones keep their shape and their meaning even on a quiet channel (D37). The key line under the chart says the meanings in words — a green swatch for healthy under 10 %, yellow for busy 10-20 %, red for congested over 20 %, and a dashed one for the hold-back line — and the text alternative repeats them; this section carries the longer explanation. The bars keep their packet-class colours, keyed by the packet mix list under the chart.
 
 ## 4. Requirements
 

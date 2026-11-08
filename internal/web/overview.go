@@ -61,7 +61,6 @@ type overviewData struct {
 	Metrics           []metric
 	Chart             chartMarkup
 	ChartAlt          string
-	AxisTop           string
 	SlotText          string
 	Labels            []string
 	HistoryNote       string
@@ -87,10 +86,9 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 
 	// The event stream answers separately from the status and room jobs (MON-DS-13): say its age
 	// instead of letting the metrics, chart and recent table look current while they are not.
-	chart, axisTop := chartSVG(w)
+	chart, _ := chartSVG(w)
 	data := overviewData{
 		Range: opt.Key, RangeLabel: opt.Label, Chart: chart,
-		AxisTop:  fmt.Sprintf("%.0f%%", axisTop),
 		SlotText: fmt.Sprintf("%d bars of %s", len(w.Slots), slotWidthText(w.SlotWidth)),
 		ChartAlt: fmt.Sprintf("Observed packet airtime over the last %s: average %.1f%%, busiest bar %.1f%%. Healthy under 10%%, busy 10 to 20%%, congested over 20%%, hold-back line at 25%%. %d marks.", opt.Label, w.AirtimePercent, w.PeakPercent, len(w.Marks)),
 	}

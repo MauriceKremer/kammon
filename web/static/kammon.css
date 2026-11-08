@@ -136,16 +136,22 @@ main { min-width: 0; padding: 0 32px 48px; }
 .chart { width: 100%; height: auto; display: block; }
 .chart .grid { stroke: var(--border-subtle); stroke-width: 1; }
 /* The channel's health zones (D37) and the hold-back line at 25 %, where backoffs grow.
-   The bands are washes of the status colours; the words live below the chart. */
+   The bands are washes of the status colours; the key line under the chart speaks them. */
 .chart .air-calm { fill: var(--success); fill-opacity: 0.09; }
 .chart .air-busy { fill: var(--warning); fill-opacity: 0.13; }
 .chart .air-congested { fill: var(--danger); fill-opacity: 0.10; }
 .chart .air-hold { stroke: var(--warning); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.chart .axis { font: 10px var(--font-code); fill: var(--text-muted); }
+/* The key line: a solid swatch per zone and a dash for the hold-back line. */
+.swatch.air-calm { background: var(--success); }
+.swatch.air-busy { background: var(--warning); }
+.swatch.air-congested { background: var(--danger); }
+.swatch.air-hold { width: 14px; height: 0; background: none; border-top: 2px dashed var(--warning); border-radius: 0; vertical-align: middle; }
 .c-group { fill: var(--signal); } .c-advert { fill: var(--warning); } .c-room { fill: var(--success); } .c-other { fill: var(--text-muted); }
 .c-posts, .c-msgs { fill: var(--signal); }
 .chart .mark-restart { fill: var(--warning); }
 .chart .mark-gap { fill: none; stroke: var(--warning); stroke-width: 1.5; }
-.chart-labels { display: flex; justify-content: space-between; margin-top: 8px; font: 11px var(--font-code); color: var(--text-muted); }
+.chart-labels { display: flex; justify-content: space-between; margin-top: 8px; padding-left: 6.25%; font: 11px var(--font-code); color: var(--text-muted); }
 .legend, .mix-list { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 16px; font-size: 12px; color: var(--text-muted); }
 .swatch { display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 2px; }
 .swatch.group { background: var(--signal); } .swatch.advert { background: var(--warning); } .swatch.room { background: var(--success); } .swatch.other { background: var(--text-muted); }
