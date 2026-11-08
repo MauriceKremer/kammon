@@ -70,7 +70,7 @@ The chart's y axis carries a percent every 10 %, so the bands read as numbers. T
 | MON-OV-2 | The four metrics and their captions follow §3.2. The airtime metric is labelled "Observed packet airtime", never "occupancy". | MUST |
 | MON-OV-3 | The chart is drawn on the server as SVG, stacked by the four classes in §3.1, with the class colours from the design. | MUST |
 | MON-OV-4 | Changing the range refreshes the chart, the packet mix and the metric strip together. | MUST |
-| MON-OV-5 | If the store holds less than the range, the chart caption says "History starts at HH:MM". KAM restarts and gaps appear as marks on the axis. | MUST |
+| MON-OV-5 | KAM restarts and gaps appear as marks on the axis, said in words below the chart. The "History starts at HH:MM" caption is withdrawn 2026-11-08; the Traffic list keeps its history note (MON-TR-12). | MUST |
 | MON-OV-6 | The chart has a text alternative with the range, the average and the peak. | MUST |
 | MON-OV-7 | Recent packets show at most six rows with the same name rules as the Traffic page. | MUST |
 | MON-OV-8 | Each room line shows "Last activity" from KAM's room list and posts in the last hour from `room` events. The wording says "remembered", not "online". | MUST |
@@ -98,7 +98,6 @@ Viewers and admins see the same numbers. The admin also sees client names in the
 
 - Bucket arithmetic: a known event list gives the expected percentage, mix and counts.
 - Class mapping for each payload type, including `room` set and unset.
-- A range switch with less history than the range shows the caption.
 - Rendering with the store empty, with KAM down, and with only some snapshots filled.
 - A snapshot test of the SVG for a fixed input.
 - The health zones: the band washes, the 25 % hold-back line and the 30 % axis floor (D37).

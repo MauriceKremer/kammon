@@ -72,7 +72,6 @@ type overviewData struct {
 	YTicks            []axisTick
 	SlotText          string
 	Labels            []string
-	HistoryNote       string
 	Marks             []string
 	Classes           []classRow
 	Recent            []packetRow
@@ -126,9 +125,6 @@ func (s *Server) overview(role config.Role, rangeKey string) overviewData {
 			layout = "02 15:04"
 		}
 		data.Labels = append(data.Labels, w.From.Add(time.Duration(i)*opt.Dur/4).Local().Format(layout))
-	}
-	if !w.HistoryStart.IsZero() {
-		data.HistoryNote = "History starts at " + w.HistoryStart.Local().Format("15:04") + "."
 	}
 	for _, m := range s.store.Marks() {
 		if m.At.Before(w.From) {

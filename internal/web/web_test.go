@@ -407,6 +407,15 @@ func TestOverviewNumbers(t *testing.T) {
 	}
 }
 
+// The "History starts at" caption left the chart; the marks keep warning in their own words.
+func TestOverviewDoesNotSayHistoryStarts(t *testing.T) {
+	h := newHarness(t)
+	_, body, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/")
+	if strings.Contains(body, "History starts at") {
+		t.Error("the overview still carries the history caption")
+	}
+}
+
 func TestSilentKamShowsTheStaleBar(t *testing.T) {
 	h := newHarness(t)
 	c := h.login(t, "viewer", "viewer")
