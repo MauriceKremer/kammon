@@ -28,7 +28,7 @@ const (
 // AssetVersion is the cache-buster of the shared static assets (kammon.css and
 // the static scripts). Bump it when one of those files changes, so browsers drop
 // their cached copy instead of running or styling the pages with the old rules.
-const AssetVersion = "kammon-11"
+const AssetVersion = "kammon-12"
 
 type Deps struct {
 	Config config.Config
@@ -325,12 +325,20 @@ type nodeBlock struct {
 	KamTime, ClockNote                                        string
 }
 
+// statRow is one labelled line of the server block: a short label, the value (text, or a numbers
+// only gauge from gaugeSVG), and the full detail the row shows on hover.
+type statRow struct {
+	Label  string
+	Value  any
+	Detail string
+}
+
 // statsBlock is the admin-only summary of the server's host, under the node block (MON-SV-1).
-// Lines are already formatted from the status snapshot's system section (MON-SV-2); a section
-// the OS cannot measure is left out, and Notice explains a KAM that offers no system snapshot.
+// Rows are already built from the status snapshot's system section (MON-SV-2); a section the OS
+// cannot measure is left out, and Notice explains a KAM that offers no system snapshot.
 type statsBlock struct {
 	Notice string
-	Lines  []string
+	Rows   []statRow
 }
 
 type placeholderData struct{ Text, Slice, Doc string }
@@ -463,9 +471,9 @@ func (s *Server) sideParts(r *http.Request) []partial {
 }
 
 // serverStats builds the admin-only block under the node block (MON-SV-1) from the status
-// snapshot the poller already fetched with ?system=true: memory, CPU load, the database's disk
-// and the database files (MON-SV-2). It reads the store only, asks KAM nothing, and shows
-// nothing at all while KAM has not answered (MON-SV-3).
+// snapshot the poller already fetched with ?system=true (MON-SV-2). The full numbers ride in
+// each row's hover detail; a section the OS cannot measure is left out entirely. It reads the
+// store only, asks KAM nothing, and shows nothing at all while KAM has not answered (MON-SV-3).
 func (s *Server) serverStats(role config.Role) *statsBlock {
 	if !view.CanSeeServerStats(role) {
 		return nil
@@ -479,29 +487,53 @@ func (s *Server) serverStats(role config.Role) *statsBlock {
 		return &statsBlock{Notice: "Needs a newer KAM."}
 	}
 	sb := &statsBlock{}
-	if sys.Memory != nil {
-		sb.Lines = append(sb.Lines, fmt.Sprintf("Memory %.1f%% · %s available",
-			sys.Memory.UsedPercent, sizeBytes(sys.Memory.AvailableBytes)))
-	}
 	if sys.CPU != nil {
-		cpu := fmt.Sprintf("CPU %d cores", sys.CPU.Cores)
+		row := statRow{Label: "CPU", Value: "—"}
+		row.Detail = detailOf(sys.CPU)
 		if sys.CPU.Load1m != nil && sys.CPU.Load5m != nil && sys.CPU.Load15m != nil {
-			cpu += fmt.Sprintf(" · load %.2f / %.2f / %.2f", *sys.CPU.Load1m, *sys.CPU.Load5m, *sys.CPU.Load15m)
+			row.Value = fmt.Sprintf("%.2f | %.2f | %.2f", *sys.CPU.Load1m, *sys.CPU.Load5m, *sys.CPU.Load15m)
 		}
-		sb.Lines = append(sb.Lines, cpu)
+		sb.Rows = append(sb.Rows, row)
+	}
+	if sys.Memory != nil {
+		sb.Rows = append(sb.Rows, statRow{
+			Label: "MEM",
+			Value: gaugeSVG(sys.Memory.UsedPercent),
+			Detail: fmt.Sprintf("%s of %s used (%.1f%%) · %s available",
+				sizeBytes(sys.Memory.UsedBytes), sizeBytes(sys.Memory.TotalBytes), sys.Memory.UsedPercent, sizeBytes(sys.Memory.AvailableBytes)),
+		})
 	}
 	if sys.Disk != nil {
-		sb.Lines = append(sb.Lines, fmt.Sprintf("Disk %.1f%% · %s available",
-			sys.Disk.UsedPercent, sizeBytes(sys.Disk.AvailableBytes)))
+		sb.Rows = append(sb.Rows, statRow{
+			Label: "DISC",
+			Value: gaugeSVG(sys.Disk.UsedPercent),
+			Detail: fmt.Sprintf("%s of %s used (%.1f%%) on %s · %s available",
+				sizeBytes(sys.Disk.UsedBytes), sizeBytes(sys.Disk.TotalBytes), sys.Disk.UsedPercent, sys.Disk.Path, sizeBytes(sys.Disk.AvailableBytes)),
+		})
 	}
 	if sys.Database != nil {
-		db := sizeBytes(sys.Database.SizeBytes)
-		if sys.Database.WalSizeBytes != nil {
-			db += " · WAL " + sizeBytes(*sys.Database.WalSizeBytes)
+		value, detail := sizeBytes(sys.Database.SizeBytes), fmt.Sprintf("%s · %s", sys.Database.Path, sizeBytes(sys.Database.SizeBytes))
+		if sys.Database.WalSizeBytes != nil && *sys.Database.WalSizeBytes > 0 {
+			value += " | " + sizeBytes(*sys.Database.WalSizeBytes) + " WAL"
+			detail += "; WAL " + sizeBytes(*sys.Database.WalSizeBytes)
 		}
-		sb.Lines = append(sb.Lines, "Database "+db)
+		sb.Rows = append(sb.Rows, statRow{Label: "DB", Value: value, Detail: detail})
 	}
 	return sb
+}
+
+// detailOf words the CPU row's hover detail: the model when the OS exposes it, the core count,
+// and the load averages or their absence (the contract leaves them null, never zero).
+func detailOf(cpu *kam.SystemCPU) string {
+	detail := ""
+	if cpu.Model != nil && *cpu.Model != "" {
+		detail = *cpu.Model + " · "
+	}
+	detail += fmt.Sprintf("%d cores", cpu.Cores)
+	if cpu.Load1m != nil && cpu.Load5m != nil && cpu.Load15m != nil {
+		return detail + fmt.Sprintf(" · 1/5/15-minute load: %.2f, %.2f, %.2f", *cpu.Load1m, *cpu.Load5m, *cpu.Load15m)
+	}
+	return detail + " · load averages unknown on this system"
 }
 func (s *Server) overviewPartial(w http.ResponseWriter, r *http.Request) {
 	data := s.overview(principalOf(r).Role, r.URL.Query().Get("range"))

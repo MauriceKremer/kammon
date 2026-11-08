@@ -1,4 +1,6 @@
 {{define "serverstats"}}<div class="stats" id="server-stats" hx-swap-oob="true">
   <strong>Server</strong>
-  {{if .Notice}}<span class="muted">{{.Notice}}</span>{{end}}{{range .Lines}}{{.}}<br>{{end}}
+  {{if .Notice}}<span class="muted">{{.Notice}}</span>{{else}}<dl class="stat-rows">
+  {{range .Rows}}<div class="stat-row" title="{{.Detail}}"><dt>{{.Label}}</dt><dd>{{.Value}}</dd></div>{{end}}
+  </dl>{{end}}
 </div>{{end}}

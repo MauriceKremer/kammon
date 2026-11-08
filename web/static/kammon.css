@@ -95,6 +95,13 @@ button.primary { background: var(--signal); color: var(--bg-0); border-color: va
 .node strong { display: block; margin-bottom: 6px; color: var(--text-secondary); }
 .stats { padding: 16px 8px 0; border-top: 1px solid var(--border-subtle); font-size: 13px; color: var(--text-muted); }
 .stats strong { display: block; margin-bottom: 6px; color: var(--text-secondary); }
+.stat-rows { margin: 0; display: grid; gap: 8px; }
+.stat-row { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 8px; align-items: center; }
+.stat-row dt { font: 600 11px var(--font-code); color: var(--text-secondary); }
+.stat-row dd { margin: 0; min-width: 0; font-size: 13px; }
+.chart-gauge { display: block; width: 100%; height: 8px; }
+.gauge-used { fill: var(--danger); }
+.gauge-free { fill: var(--signal); }
 .dot { display: inline-block; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: var(--success); }
 .dot.stale { background: var(--warning); } .dot.down { background: var(--danger); }
 .proto { display: block; margin-top: 16px; font: 11px var(--font-code); }

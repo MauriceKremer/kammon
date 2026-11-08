@@ -4,15 +4,14 @@ The machine that runs KAM, in the sidebar under the node block, for the administ
 
 ## 1. What the block shows
 
-| Line | Meaning |
+| Row | Visible (hover shows the full numbers) |
 |---|---|
-| **Server** | The heading, to tell it apart from the node (KAM) above it. |
-| Memory | `used_percent` and `available_bytes` — the RAM ready for new work, not a usage claim. |
-| CPU | The core count and the 1/5/15-minute load averages, rounded for display to what `top` shows. No usage percentage: load is portable and answers "is the box overloaded" without sampling. |
-| Disk | `used_percent` and `available_bytes` of the one filesystem the database lives on — the only disk KAM can actually exhaust. |
-| Database | The database file's size, plus the WAL file's, when there is one. |
+| **CPU** | The 1/5/15-minute load averages, "1.64 \| 2.10 \| 2.47"; a dash when the OS has none. Hover: the model, the core count, the loads. |
+| **MEM** | A horizontal bar: used in red, available in the signal blue. Hover: "7.6 GB of 24 GB used (31.4%) · 16.4 GB available". |
+| **DISC** | The same bar for the filesystem the database lives on. Hover adds the mount path. |
+| **DB** | "1.2 MB \| 8 KB WAL". Hover: the resolved path. |
 
-Honesty rules from the contract: sizes are bytes and are shown in the usual binary units; a section the OS cannot measure (memory, disk, CPU loads on some systems) is left out entirely, never shown as a zero. `collected_at` in the snapshot says how fresh a reading is; KAM refreshes it at most once per `monitor.system_interval_sec` (default 5 s) and collects nothing while nobody asks.
+Honesty rules from the contract: sizes are bytes and are shown in the usual binary units; a bar is drawn only when KAM reports a used percentage, so a section the OS cannot measure (memory, disk, CPU loads on some systems) is left out entirely, never shown as a zero. `collected_at` in the snapshot says how fresh a reading is; KAM refreshes it at most once per `monitor.system_interval_sec` (default 5 s) and collects nothing while nobody asks.
 
 ## 2. Requirements
 

@@ -1054,10 +1054,14 @@ func TestServerStatsAreAdminOnly(t *testing.T) {
 	_, body, _ = get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
 	for _, want := range []string{
 		"<strong>Server</strong>",
-		"Memory 31.4% · 16.4 GB available",
-		"CPU 14 cores · load 1.64 / 2.10 / 2.47",
-		"Disk 58.9% · 379.8 GB available",
-		"Database 1.2 MB · WAL 8 KB",
+		"<dt>CPU</dt><dd>1.64 | 2.10 | 2.47</dd>",
+		"Apple M4 Pro · 14 cores · 1/5/15-minute load: 1.64, 2.10, 2.47",
+		`<dt>MEM</dt><dd><svg `,
+		`aria-label="31.4% used"`,
+		"7.6 GB of 24 GB used (31.4%) · 16.4 GB available",
+		"546.6 GB of 926.4 GB used (58.9%) on /Users/maurice/git/kam · 379.8 GB available",
+		"<dt>DB</dt><dd>1.2 MB | 8 KB WAL</dd>",
+		"kam.db · 1.2 MB; WAL 8 KB",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the admin's sidebar lacks %q", want)
@@ -1083,11 +1087,14 @@ func TestServerStatsSkipUnknownSections(t *testing.T) {
 	h.st.SetStatus(st, at)
 
 	_, body, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
-	if strings.Contains(body, "Memory ") || strings.Contains(body, "Disk ") || strings.Contains(body, "load ") {
+	if strings.Contains(body, "gauge-used") || strings.Contains(body, "of 24 GB used") {
 		t.Error("a null section must be left out, never zero")
 	}
-	if !strings.Contains(body, "CPU 14 cores") || !strings.Contains(body, "Database 1.2 MB") || strings.Contains(body, "WAL ") {
-		t.Errorf("the known sections and a missing WAL are handled: %q", body)
+	if !strings.Contains(body, "<dt>CPU</dt><dd>—</dd>") || !strings.Contains(body, "load averages unknown on this system") {
+		t.Errorf("a CPU without loads shows a dash and explains itself on hover: %q", body)
+	}
+	if !strings.Contains(body, "<dt>DB</dt><dd>1.2 MB</dd>") || strings.Contains(body, "WAL ") {
+		t.Errorf("a database without a WAL shows its size only: %q", body)
 	}
 }
 
