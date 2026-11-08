@@ -1,7 +1,4 @@
 {{define "serverstats"}}<div class="stats" id="server-stats" hx-swap-oob="true">
   <strong>Server</strong>
-  {{.TX}}<br>
-  {{.Pipeline}}<br>
-  {{.Gate}}<br>
-  Event ring {{.Ring}}
+  {{if .Notice}}<span class="muted">{{.Notice}}</span>{{end}}{{range .Lines}}{{.}}<br>{{end}}
 </div>{{end}}

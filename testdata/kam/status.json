@@ -56,5 +56,33 @@
     "capacity": 8192,
     "first_seq": 1,
     "last_seq": 61
+  },
+  "system": {
+    "collected_at": "2026-10-12T06:54:45Z",
+    "memory": {
+      "total_bytes": 25769803776,
+      "available_bytes": 17609365903,
+      "used_bytes": 8160437873,
+      "used_percent": 31.4
+    },
+    "cpu": {
+      "model": "Apple M4 Pro",
+      "cores": 14,
+      "load_1m": 1.64,
+      "load_5m": 2.1,
+      "load_15m": 2.47
+    },
+    "disk": {
+      "path": "/Users/maurice/git/kam",
+      "total_bytes": 994662589440,
+      "available_bytes": 407786668032,
+      "used_bytes": 586875921408,
+      "used_percent": 58.9
+    },
+    "database": {
+      "path": "kam.db",
+      "size_bytes": 1245184,
+      "wal_size_bytes": 8192
+    }
   }
 }

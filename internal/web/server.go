@@ -325,11 +325,12 @@ type nodeBlock struct {
 	KamTime, ClockNote                                        string
 }
 
-// statsBlock is the admin-only summary of KAM's own operating counters, under the node block
-// (MON-SV-1). Every line is already formatted; nil means the role gets nothing at all. The
-// numbers come from the newest status snapshot in the store, never from a page-side request.
+// statsBlock is the admin-only summary of the server's host, under the node block (MON-SV-1).
+// Lines are already formatted from the status snapshot's system section (MON-SV-2); a section
+// the OS cannot measure is left out, and Notice explains a KAM that offers no system snapshot.
 type statsBlock struct {
-	TX, Pipeline, Gate, Ring string
+	Notice string
+	Lines  []string
 }
 
 type placeholderData struct{ Text, Slice, Doc string }
@@ -462,9 +463,9 @@ func (s *Server) sideParts(r *http.Request) []partial {
 }
 
 // serverStats builds the admin-only block under the node block (MON-SV-1) from the status
-// snapshot the poller already fetched: KAM's own counters for its TX pipeline, its persistence
-// rings and its event ring (MON-SV-2). The block reads the store only and is nil while KAM has
-// not answered (MON-SV-3).
+// snapshot the poller already fetched with ?system=true: memory, CPU load, the database's disk
+// and the database files (MON-SV-2). It reads the store only, asks KAM nothing, and shows
+// nothing at all while KAM has not answered (MON-SV-3).
 func (s *Server) serverStats(role config.Role) *statsBlock {
 	if !view.CanSeeServerStats(role) {
 		return nil
@@ -473,21 +474,34 @@ func (s *Server) serverStats(role config.Role) *statsBlock {
 	if st.Epoch == "" {
 		return nil
 	}
-	drops := uint64(0)
-	for _, ring := range st.Persistence {
-		drops += ring.Dropped
+	sys := st.System
+	if sys == nil {
+		return &statsBlock{Notice: "Needs a newer KAM."}
 	}
-	ringEvents := uint64(0)
-	if st.EventRing.LastSeq >= st.EventRing.FirstSeq {
-		ringEvents = st.EventRing.LastSeq - st.EventRing.FirstSeq + 1
+	sb := &statsBlock{}
+	if sys.Memory != nil {
+		sb.Lines = append(sb.Lines, fmt.Sprintf("Memory %.1f%% · %s available",
+			sys.Memory.UsedPercent, sizeBytes(sys.Memory.AvailableBytes)))
 	}
-	return &statsBlock{
-		TX: fmt.Sprintf("%s sent · %s queued", thousands(int(st.TX.Sent)), thousands(int(st.TX.Queued))),
-		Pipeline: fmt.Sprintf("%s rejected · %s evicted · %s deferred",
-			thousands(int(st.TX.Rejected)), thousands(int(st.TX.Evicted)), thousands(int(st.TX.Deferred))),
-		Gate: fmt.Sprintf("%s gate timeouts · %s ring drops", thousands(int(st.TX.GateTimeouts)), thousands(int(drops))),
-		Ring: fmt.Sprintf("%s / %s", thousands(int(ringEvents)), thousands(st.EventRing.Capacity)),
+	if sys.CPU != nil {
+		cpu := fmt.Sprintf("CPU %d cores", sys.CPU.Cores)
+		if sys.CPU.Load1m != nil && sys.CPU.Load5m != nil && sys.CPU.Load15m != nil {
+			cpu += fmt.Sprintf(" · load %.2f / %.2f / %.2f", *sys.CPU.Load1m, *sys.CPU.Load5m, *sys.CPU.Load15m)
+		}
+		sb.Lines = append(sb.Lines, cpu)
 	}
+	if sys.Disk != nil {
+		sb.Lines = append(sb.Lines, fmt.Sprintf("Disk %.1f%% · %s available",
+			sys.Disk.UsedPercent, sizeBytes(sys.Disk.AvailableBytes)))
+	}
+	if sys.Database != nil {
+		db := sizeBytes(sys.Database.SizeBytes)
+		if sys.Database.WalSizeBytes != nil {
+			db += " · WAL " + sizeBytes(*sys.Database.WalSizeBytes)
+		}
+		sb.Lines = append(sb.Lines, "Database "+db)
+	}
+	return sb
 }
 func (s *Server) overviewPartial(w http.ResponseWriter, r *http.Request) {
 	data := s.overview(principalOf(r).Role, r.URL.Query().Get("range"))

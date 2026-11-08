@@ -1028,21 +1028,21 @@ func TestManualsAreGoneFromTheInterface(t *testing.T) {
 
 // The server block sits under the node block in the sidebar and is for the administrator alone;
 // a viewer is sent neither the block nor its numbers, on the page or in a live refresh (MON-SV-1).
-// Its numbers are KAM's own counters from the status snapshot (MON-SV-2).
+// Its lines come from the status snapshot's opt-in system section (MON-SV-2).
 func TestServerStatsAreAdminOnly(t *testing.T) {
 	h := newHarness(t)
 	st, at := h.st.Status()
-	st.TX.Submitted, st.TX.Sent, st.TX.Completed, st.TX.Queued = 2126, 2123, 2123, 2
-	st.TX.Rejected, st.TX.Evicted, st.TX.Deferred, st.TX.GateTimeouts = 3, 1, 2, 5
-	st.Persistence = map[string]struct {
-		Depth   int    `json:"depth"`
-		Dropped uint64 `json:"dropped"`
-	}{"adverts": {Depth: 2, Dropped: 4}, "group_texts": {Depth: 312, Dropped: 6}}
-	st.EventRing.Capacity, st.EventRing.FirstSeq, st.EventRing.LastSeq = 8192, 5931, 8123
+	st.System = &kam.SystemStats{
+		CollectedAt: t0,
+		Memory:      &kam.SystemMemory{TotalBytes: 25769803776, AvailableBytes: 17609365903, UsedBytes: 8160437873, UsedPercent: 31.4},
+		CPU:         &kam.SystemCPU{Model: ptr("Apple M4 Pro"), Cores: 14, Load1m: ptr(1.64), Load5m: ptr(2.1), Load15m: ptr(2.47)},
+		Disk:        &kam.SystemDisk{Path: "/Users/maurice/git/kam", TotalBytes: 994662589440, AvailableBytes: 407786668032, UsedBytes: 586875921408, UsedPercent: 58.9},
+		Database:    &kam.SystemDatabase{Path: "kam.db", SizeBytes: 1245184, WalSizeBytes: ptr(uint64(8192))},
+	}
 	h.st.SetStatus(st, at)
 
 	_, body, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/")
-	if strings.Contains(body, "server-stats") || strings.Contains(body, "Event ring") {
+	if strings.Contains(body, "server-stats") || strings.Contains(body, "16.4 GB") {
 		t.Error("a viewer must not see server statistics")
 	}
 
@@ -1054,10 +1054,10 @@ func TestServerStatsAreAdminOnly(t *testing.T) {
 	_, body, _ = get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
 	for _, want := range []string{
 		"<strong>Server</strong>",
-		"2,123 sent · 2 queued",
-		"3 rejected · 1 evicted · 2 deferred",
-		"5 gate timeouts · 10 ring drops",
-		"Event ring 2,193 / 8,192",
+		"Memory 31.4% · 16.4 GB available",
+		"CPU 14 cores · load 1.64 / 2.10 / 2.47",
+		"Disk 58.9% · 379.8 GB available",
+		"Database 1.2 MB · WAL 8 KB",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the admin's sidebar lacks %q", want)
@@ -1070,7 +1070,29 @@ func TestServerStatsAreAdminOnly(t *testing.T) {
 	}
 }
 
-// Before KAM has answered, the block shows nothing rather than zeroes (MON-SV-3).
+// A section the OS cannot measure is left out rather than shown as a fake zero, and a KAM
+// without the opt-in system section says so (MON-SV-2, the contract's null rules).
+func TestServerStatsSkipUnknownSections(t *testing.T) {
+	h := newHarness(t)
+	st, at := h.st.Status()
+	st.System = &kam.SystemStats{
+		CollectedAt: t0,
+		CPU:         &kam.SystemCPU{Cores: 14},
+		Database:    &kam.SystemDatabase{Path: "kam.db", SizeBytes: 1245184},
+	}
+	h.st.SetStatus(st, at)
+
+	_, body, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
+	if strings.Contains(body, "Memory ") || strings.Contains(body, "Disk ") || strings.Contains(body, "load ") {
+		t.Error("a null section must be left out, never zero")
+	}
+	if !strings.Contains(body, "CPU 14 cores") || !strings.Contains(body, "Database 1.2 MB") || strings.Contains(body, "WAL ") {
+		t.Errorf("the known sections and a missing WAL are handled: %q", body)
+	}
+}
+
+// Before KAM has answered, the block shows nothing rather than zeroes; an older KAM without the
+// system section is told apart from a missing answer (MON-SV-3).
 func TestServerStatsWaitForKAM(t *testing.T) {
 	h := newHarness(t)
 	st, _ := h.st.Status()
@@ -1080,5 +1102,13 @@ func TestServerStatsWaitForKAM(t *testing.T) {
 	_, body, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
 	if strings.Contains(body, "server-stats") {
 		t.Error("waiting for KAM must hide the server block, not show zeroes")
+	}
+
+	st.Epoch = "e1"
+	st.System = nil
+	h.st.SetStatus(st, t0)
+	_, body, _ = get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
+	if !strings.Contains(body, "Needs a newer KAM.") {
+		t.Error("a KAM without the system section must say so")
 	}
 }
