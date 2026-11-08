@@ -1,6 +1,6 @@
 # KAMmon Requirements: Automations (Starlark Workspace)
 
-**Status:** Built (2026-10-23): the list, the editor, validate, save, enable, disable, recover and delete (MON-AU-1..14, 21..23). The dry run and the run object wait for KAM API phase 5; a KAM without the dry-run route leaves the button out and says "Needs a newer KAM." (MON-AU-20, D30). KAM ships periodic scripts, `rest_get` and `room_post` since 2026-11-06 (§10); KAMmon's reference panel describes them, the screens themselves are unchanged.
+**Status:** Built (2026-10-23): the list, the editor, validate, save, enable, disable, recover and delete (MON-AU-1..14, 21..23). The page is for administrators only since D34 (2026-11-08). The dry run and the run object wait for KAM API phase 5; a KAM without the dry-run route leaves the button out and says "Needs a newer KAM." (MON-AU-20, D30). KAM ships periodic scripts, `rest_get` and `room_post` since 2026-11-06 (§10); KAMmon's reference panel describes them, the screens themselves are unchanged.
 **Scope:** Creating, testing, saving and managing the Starlark scripts that KAM runs when it hears a channel message or on a timer. Design: [DESIGN.md](../DESIGN.md) §4.2 (master-detail). KAM side: [docs/kam-api/FeatureKamApi.md](../kam-api/FeatureKamApi.md) §7.6. Language and runtime: [docs/FeatureStarlark.md](../../../kam/docs/FeatureStarlark.md); periodic posts: [docs/FeatureStarlarkPeriodicPosts.md](../../../kam/docs/FeatureStarlarkPeriodicPosts.md).
 
 ## 1. Summary
@@ -83,10 +83,10 @@ def on_group_text(message):
 
 | ID | Requirement | Level |
 |---|---|---|
-| MON-AU-1 | The script list is read from `GET /scripts` (the KAM API listener, 8766) every 10 s and when the page opens. | MUST |
+| MON-AU-1 | The script list sits in the store, where the poller reads `GET /scripts` (the KAM API listener, 8766) every 10 s. The page opens on the store's copy and calls KAM only for its editor and its actions (MON-DS-1, D29). | MUST |
 | MON-AU-2 | The list shows `runtime_status` in words. A FROZEN script shows the last error and a Recover button; a BROKEN script shows the last error. | MUST |
 | MON-AU-3 | When `run` is present the page shows last run time, duration and reply count; otherwise it shows nothing in its place. | MUST |
-| MON-AU-4 | Viewers see names, state, revision and run information. They never see source, and no source is fetched for them. | MUST |
+| MON-AU-4 | The page and its routes are for administrators; any other role is answered `403` (D34). A viewer is never sent source, and no source is fetched for one. | MUST |
 | MON-AU-5 | When KAM's script API is down, the list shows the last known state with the stale-data bar. | MUST |
 
 ### 4.2 Editing (admin)
@@ -145,14 +145,14 @@ KAMmon uses one base URL, `kam_monitor_url` (8766); the script routes share it (
 
 | Element | Viewer | Admin |
 |---|---|---|
-| Script names, state, revision, run information | Yes | Yes |
+| Script names, state, revision, run information | No: the routes answer `403` (D34) | Yes |
 | Source, dry run, save, enable, delete, recover | No | Yes |
 
 ## 7. Tests
 
 - Fake KAM: validate ok and error, save ok and `409`, enable and disable with a stale revision, recover, delete, dry run ok and error and `404`.
 - A `409` keeps the user's text.
-- A viewer cannot fetch a script's source.
+- A viewer gets `403` from the page and every script route (D34), so no source is fetched for one.
 - The dry-run console always says nothing was sent.
 - Starter template and fixture defaults match `message` keys in §3.1.
 

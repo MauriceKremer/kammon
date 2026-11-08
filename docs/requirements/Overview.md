@@ -1,6 +1,6 @@
 # KAMmon Requirements: Overview Page
 
-**Status:** Requirements only. Nothing is built.
+**Status:** Built: the overview page with the channel utilization chart, the rooms and automation blocks (MON-OV-1..13). The last-run line waits for KAM phase 5; the chart's health zones are D37 (2026-11-08).
 **Scope:** The first page an operator sees: how busy the radio channel is, what kinds of packets are being heard, and whether rooms and scripts are healthy. Shown in the prototype as "Network overview". Design: [DESIGN.md](../DESIGN.md) §4.2. Data: [DataStore.md](DataStore.md).
 
 ## 1. Summary
@@ -30,9 +30,9 @@ Plain words: **airtime** is how long a packet occupies the radio channel. LoRa i
 | **Metric strip** (4) | Observed packet airtime (%); Node TX duty cycle (%) against its limit; Packets observed (RX and TX, with how many were repeats); Room posts in the last hour. |
 | **Channel Utilization chart** | Stacked bars, one per time slot, by packet class. Range switch 15m / 1h / 24h and a pause control. Health-zone backgrounds, a percent axis and the 25 % hold-back line (§3.3). |
 | **Packet mix** | The same classes as a thin bar and a list with counts and percentages. |
-| **Recent packets** | The six newest: time, type, source or destination. A link to the Traffic page. |
-| **Rooms** | Each room: serving state, last activity, posts in the last hour, remembered clients. Admin: the two most recent clients with the activity indicator. |
-| **Automation** | Scripts ready and disabled; time of the last run. |
+| **Recent packets** | The six newest: time, type, source or destination. |
+| **Rooms** | Each room: last activity, posts in the last hour, remembered clients. Admin: the two most recent clients with the activity indicator. |
+| **Automation** | Scripts ready, with the queue depth and dropped-event counts; run information waits for KAM phase 5. |
 | **Node block** (sidebar) | Node name, link state, radio summary, uptime. |
 | **Stale-data bar** | Shown above the page when KAM has not answered for over 10 s. |
 
@@ -75,7 +75,7 @@ The chart's y axis carries a percent every 10 %, so the bands read as numbers. T
 | MON-OV-7 | Recent packets show at most six rows with the same name rules as the Traffic page. | MUST |
 | MON-OV-8 | Each room line shows "Last activity" from KAM's room list and posts in the last hour from `room` events. The wording says "remembered", not "online". | MUST |
 | MON-OV-9 | Admin sees the two newest clients per room with the activity indicator ([Rooms.md](Rooms.md)). Viewers see no client names. | MUST |
-| MON-OV-10 | The automation block shows counts from `GET /scripts` and the newest `run.last_run_at`. When `run` is absent it shows only counts. | SHOULD |
+| MON-OV-10 | The automation block shows the counts of the status snapshot's `automation` section (scripts ready, queue depth, dropped events). The last-run time, from `GET /scripts`'s `run` object, waits for KAM phase 5; until then the block shows only the counts. | SHOULD |
 | MON-OV-11 | The metric strip and the recent-packets table refresh on their own every 2 seconds (htmx). The page's pause control stops them. | MUST |
 | MON-OV-12 | When the duty cycle is above 80 % of its limit the caption turns amber and says so in words. | SHOULD |
 | MON-OV-13 | When the link is `down`, the metric strip keeps the last values and the stale-data bar explains why. | MUST |
@@ -87,7 +87,7 @@ The chart's y axis carries a percent every 10 %, so the bands read as numbers. T
 | Every packet heard or sent, with airtime | `rx` and `tx` events | API-EV-3, API-EV-4, API-EV-8 |
 | Room posts and activity | `room` events and `GET /v1/rooms` | API-EV-5, API-RM-1 |
 | Duty cycle, queue, link, radio summary | `GET /v1/status` | API-ST-1 |
-| Script counts and last run | `GET /scripts` with `run` | API-AU-2 |
+| Script counts (and, from phase 5, the last run) | `GET /v1/status` (`automation`); `GET /scripts` with `run` | API-AU-5, API-AU-2 |
 | Script queue depth | `GET /v1/status` (`automation`) | API-AU-5 |
 
 ## 6. Visibility

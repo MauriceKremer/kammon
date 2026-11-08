@@ -1,6 +1,6 @@
 # KAMmon Requirements: In-Memory Data Store and Poller
 
-**Status:** Requirements only. Nothing is built.
+**Status:** Built: the store and the poller, with the limits and behaviours below; the `system` snapshot of the status poll (D33) rides along. The modem snapshot and the command log wait for the KISS modem page.
 **Scope:** How KAMmon keeps the data it shows, so that its pages never depend on KAM's API speed or on SQLite. Design context: [DESIGN.md](../DESIGN.md). KAM side: [docs/kam-api/FeatureKamApi.md](../kam-api/FeatureKamApi.md) (`API-EV-*`, `API-ST-1`).
 
 ## 1. Summary
@@ -34,13 +34,13 @@ Plain words: a **bucket** is the total of one minute of events, kept so charts d
 | **Recent events** | Ring of the newest events (rx, tx, room, script, modem) | 4096 events, about 1 MB | `GET /v1/events` |
 | **Minute buckets** | One entry per minute, last 24 hours (1440): per packet class, count and estimated airtime, plus counts for duplicates, room posts and script runs | 1440 buckets, under 200 KB | Built from events |
 | **Status snapshot** | Latest `/v1/status` | One | Poll every 2 s |
-| **Modem snapshot** | Latest `/v1/modem` | One | Poll every 10 s |
+| **Modem snapshot** | Latest `/v1/modem` | One | Poll every 10 s; not built yet (with the KISS modem page) |
 | **Channel list** | Latest `/v1/channels` | One | Poll every 30 s |
 | **Room list and clients** | Latest `/v1/rooms` and per-room `/clients` | Up to 10 rooms (KAM's limit, MON-DS-18), 100 clients each | Poll every 10 s |
 | **Script list** | Latest `GET /scripts` (the KAM API listener, 8766): names, states, revisions and run information. The script's source never rides along: the editor loads it straight from KAM when it opens, and a viewer is never sent source (Automations.md §6) | 64 scripts + a note saying the list was truncated | Poll every 10 s |
 | **Text cache** | Newest page of channel messages and room posts, for admin pages | 10 pages, 5 s lifetime | On demand |
-| **Command log** | Lines from modem commands | 200 lines | Admin actions |
-| **History marks** | "history starts at", "KAM restarted at", "gap from, to" | 50 marks | Poller |
+| **Command log** | Lines from modem commands | 200 lines | Admin actions; not built yet |
+| **History marks** | "KAM restarted at" and "gap" marks, and the history-start time beside them | 50 marks | Poller |
 
 Total expected size: under 5 MB.
 
@@ -75,7 +75,7 @@ Total expected size: under 5 MB.
 | MON-DS-13 | Each snapshot remembers when it was last refreshed. A page shows data as **fresh** (under 10 s old), **stale** (10 s to 2 min) or **down** (older, or never). The 10 s and 2 min thresholds are defaults, settable in kammon.yml (D24). | MUST |
 | MON-DS-14 | Stale and down data stay on screen with the stale-data bar: "KAM has not answered for 12 s. Showing data from 14:59:46." | MUST |
 | MON-DS-15 | KAMmon measures the difference between KAM's `now` (from `/v1/status`) and its own clock, and shows KAM time on every screen. | SHOULD |
-| MON-DS-16 | A chart caption says "History starts at HH:MM" when the store holds less than the selected range, and shows marks for gaps and KAM restarts. | MUST |
+| MON-DS-16 | Where the store holds less than the range asked for, the page says so: the Traffic list shows "History starts at HH:MM" (MON-TR-12), and the Channels and Rooms metric charts' text alternatives name a history shorter than their hour and day. Gaps and KAM restarts appear as marks said in words (MON-OV-5). | MUST |
 | MON-DS-17 | The status area of the sidebar shows the link as `up`, `stale` or `down` from the freshness rule. | MUST |
 
 ### 4.4 Memory and concurrency
@@ -83,7 +83,7 @@ Total expected size: under 5 MB.
 | ID | Requirement | Level |
 |---|---|---|
 | MON-DS-18 | All sizes in §3 are hard limits. The oldest entry is dropped when a limit is reached. | MUST |
-| MON-DS-19 | The poller is the only writer. Pages read an immutable snapshot (an atomic pointer swap), never a structure that is being changed. | MUST |
+| MON-DS-19 | The poller is the only writer. Pages read an immutable copy taken under the store's read lock, never a structure that is being changed. | MUST |
 | MON-DS-20 | The store has no lock that a page view can hold while it waits for KAM or for the network. | MUST |
 | MON-DS-21 | The text cache is only filled by admin pages and expires after 5 seconds. Viewers never trigger a text fetch. | MUST |
 | MON-DS-22 | A KAMmon restart loses the command log, sessions and marks. This is accepted. | MUST |
@@ -94,7 +94,7 @@ Total expected size: under 5 MB.
 |---|---|---|
 | New events and the cursor | `GET /v1/events?after=&epoch=&limit=` | 1-2 s |
 | Status, radio, duty cycle, counters | `GET /v1/status` | 2 s |
-| Modem snapshot | `GET /v1/modem` | 10 s |
+| Modem snapshot | `GET /v1/modem` | 10 s (with the KISS modem page) |
 | Channel list | `GET /v1/channels` | 30 s |
 | Rooms and their clients | `GET /v1/rooms`, `GET /v1/rooms/{id}/clients` | 10 s |
 | Scripts | `GET /scripts` | 10 s |
