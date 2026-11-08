@@ -7,3 +7,4 @@
 # Agent skills are installed per machine, like in the KAM repository
 /.agents/skills
 /skills-lock.json
+.worktrees/

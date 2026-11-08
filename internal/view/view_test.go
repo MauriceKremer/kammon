@@ -52,6 +52,16 @@ func TestCanReadChannelText(t *testing.T) {
 	}
 }
 
+// Server statistics are for the administrator (MON-SV-1).
+func TestCanSeeServerStats(t *testing.T) {
+	if CanSeeServerStats(config.RoleViewer) {
+		t.Error("a viewer may not see server statistics")
+	}
+	if !CanSeeServerStats(config.RoleAdmin) {
+		t.Error("an admin may see server statistics")
+	}
+}
+
 // Scripts are read for everyone but edited only by admins (MON-AU-4, §6).
 func TestCanEditScripts(t *testing.T) {
 	if CanEditScripts(config.RoleViewer) {

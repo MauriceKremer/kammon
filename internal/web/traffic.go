@@ -424,10 +424,8 @@ func (s *Server) trafficPartial(w http.ResponseWriter, r *http.Request) {
 	data := s.trafficView(principalOf(r).Role, r.URL.Query())
 	var buf bytes.Buffer
 	t := s.pages["traffic"]
-	for _, part := range []struct {
-		name string
-		data any
-	}{{"traffic-live", data}, {"stalebar", s.staleBar()}, {"nodeblock", s.nodeBlock()}} {
+	parts := append([]partial{{"traffic-live", data}, {"stalebar", s.staleBar()}}, s.sideParts(r)...)
+	for _, part := range parts {
 		if err := t.ExecuteTemplate(&buf, part.name, part.data); err != nil {
 			http.Error(w, "Template error.", http.StatusInternalServerError)
 			return

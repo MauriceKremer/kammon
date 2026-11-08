@@ -72,6 +72,39 @@ func TestPostsSparkSvgIsNumbersOnly(t *testing.T) {
 	}
 }
 
+// TestGaugeSvgIsNumbersOnly applies the rule-5 guard to the server block's used/free bar and
+// pins its shape: a red segment of the used percent, a free one for the rest, clamped to 100.
+func TestGaugeSvgIsNumbersOnly(t *testing.T) {
+	s := string(gaugeSVG(31.4))
+	if !strings.HasPrefix(s, `<svg class="chart-gauge"`) || !strings.HasSuffix(s, `</svg>`) {
+		t.Fatalf("svg has an unexpected shape: %s", s)
+	}
+	if !strings.Contains(s, `preserveAspectRatio="none"`) || !strings.Contains(s, `aria-label="31.4% used"`) {
+		t.Errorf("the bar stretches to its box and says its percent for readers: %s", s)
+	}
+	for _, want := range []string{
+		`<rect class="gauge-used" x="0" y="0" width="31.40" height="8"/>`,
+		`<rect class="gauge-free" x="31.40" y="0" width="68.60" height="8"/>`,
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("segment missing or misplaced: %s", s)
+		}
+	}
+	// A percent beyond either end is clamped, and the empty segment is not drawn at all.
+	if s := string(gaugeSVG(150)); !strings.Contains(s, `width="100.00"`) || strings.Contains(s, `gauge-free`) {
+		t.Errorf("over-full percent clamps to a full red bar: %s", s)
+	}
+	if s := string(gaugeSVG(-5)); strings.Contains(s, `gauge-used`) || !strings.Contains(s, `width="100.00"`) {
+		t.Errorf("a negative percent leaves only the free bar: %s", s)
+	}
+	// Numbers only: every text node between tags is empty; radio text can never show in the SVG.
+	for _, seg := range strings.Split(s, ">")[1:] {
+		if text, _, ok := strings.Cut(seg, "<"); ok && text != "" {
+			t.Errorf("svg contains text %q: %s", text, s)
+		}
+	}
+}
+
 // TestMessagesSparkSvgIsNumbersOnly applies the same rule-5 guard to the channel messages mini
 // chart and pins its shape: one square, height equal to width, per minute that decoded messages,
 // resting on the base of the box, however many messages the minute held.

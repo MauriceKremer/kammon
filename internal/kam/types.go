@@ -51,6 +51,50 @@ type Status struct {
 		FirstSeq uint64 `json:"first_seq"`
 		LastSeq  uint64 `json:"last_seq"`
 	} `json:"event_ring"`
+	// System is the opt-in host snapshot KAM serves when the status read asks with ?system=true;
+	// nil when the answer came from a KAM without the section (docs/requirements/ServerStats.md).
+	System *SystemStats `json:"system"`
+}
+
+// SystemStats is the "system" object of GET /v1/status?system=true: the one filesystem and the
+// machine KAM runs on. Nothing is collected while nobody asks, so CollectedAt may lag behind now.
+// Empty or unsupported readings are null, never 0, and stay that way per section (memory and disk
+// and the CPU loads are not known on every OS); Database is present on every OS.
+type SystemStats struct {
+	CollectedAt time.Time       `json:"collected_at"`
+	Memory      *SystemMemory   `json:"memory"`
+	CPU         *SystemCPU      `json:"cpu"`
+	Disk        *SystemDisk     `json:"disk"`
+	Database    *SystemDatabase `json:"database"`
+}
+
+type SystemMemory struct {
+	TotalBytes     uint64  `json:"total_bytes"`
+	AvailableBytes uint64  `json:"available_bytes"`
+	UsedBytes      uint64  `json:"used_bytes"`
+	UsedPercent    float64 `json:"used_percent"`
+}
+
+type SystemCPU struct {
+	Model   *string  `json:"model"`
+	Cores   int      `json:"cores"`
+	Load1m  *float64 `json:"load_1m"`
+	Load5m  *float64 `json:"load_5m"`
+	Load15m *float64 `json:"load_15m"`
+}
+
+type SystemDisk struct {
+	Path           string  `json:"path"`
+	TotalBytes     uint64  `json:"total_bytes"`
+	AvailableBytes uint64  `json:"available_bytes"`
+	UsedBytes      uint64  `json:"used_bytes"`
+	UsedPercent    float64 `json:"used_percent"`
+}
+
+type SystemDatabase struct {
+	Path         string  `json:"path"`
+	SizeBytes    uint64  `json:"size_bytes"`
+	WalSizeBytes *uint64 `json:"wal_size_bytes"`
 }
 
 // Radio is the radio line in the status. Source is always "modem_echo": a stored copy, not a chip reading.

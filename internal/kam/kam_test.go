@@ -33,6 +33,19 @@ func TestFixturesDecodeStrictly(t *testing.T) {
 	if status.Radio.Source != "modem_echo" || status.EventRing.Capacity != 8192 {
 		t.Fatalf("status = %+v", status)
 	}
+	// The opt-in system section: sections may be null per OS; the fixture carries them all but
+	// with a null-free WAL only when one exists (docs/requirements/ServerStats.md).
+	sys := status.System
+	if sys == nil || sys.Memory == nil || sys.CPU == nil || sys.Disk == nil || sys.Database == nil {
+		t.Fatalf("system sections missing: %+v", sys)
+	}
+	if sys.CPU.Cores != 14 || sys.CPU.Model == nil || *sys.CPU.Model != "Apple M4 Pro" ||
+		sys.CPU.Load1m == nil || *sys.CPU.Load1m != 1.64 || sys.CPU.Load15m == nil || *sys.CPU.Load15m != 2.47 {
+		t.Fatalf("system cpu = %+v", sys.CPU)
+	}
+	if sys.Database.SizeBytes != 1245184 || sys.Database.WalSizeBytes == nil || *sys.Database.WalSizeBytes != 8192 {
+		t.Fatalf("system database = %+v", sys.Database)
+	}
 
 	// events.json is recorded from the live node: four real RX events, all with SNR.
 	var events EventsResponse

@@ -173,7 +173,7 @@ func TestAdminOnlyNavItemsShowALock(t *testing.T) {
 	}
 }
 
-// Every sidebar entry leads with the icon of its page (D34); each appears exactly once.
+// Every sidebar entry leads with the icon of its page (D35); each appears exactly once.
 func TestNavItemsCarryTheirIcon(t *testing.T) {
 	h := newHarness(t)
 	_, admin, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
@@ -1064,5 +1064,99 @@ func TestManualsAreGoneFromTheInterface(t *testing.T) {
 	}
 	if status, _, _ := get(t, h.client(t), h.ts.URL+"/static/theme-init.js"); status != http.StatusNotFound {
 		t.Errorf("/static/theme-init.js: %d, want 404", status)
+	}
+}
+
+// The server block sits under the node block in the sidebar and is for the administrator alone;
+// a viewer is sent neither the block nor its numbers, on the page or in a live refresh (MON-SV-1).
+// Its lines come from the status snapshot's opt-in system section (MON-SV-2).
+func TestServerStatsAreAdminOnly(t *testing.T) {
+	h := newHarness(t)
+	st, at := h.st.Status()
+	st.System = &kam.SystemStats{
+		CollectedAt: t0,
+		Memory:      &kam.SystemMemory{TotalBytes: 25769803776, AvailableBytes: 17609365903, UsedBytes: 8160437873, UsedPercent: 31.4},
+		CPU:         &kam.SystemCPU{Model: ptr("Apple M4 Pro"), Cores: 14, Load1m: ptr(1.64), Load5m: ptr(2.1), Load15m: ptr(2.47)},
+		Disk:        &kam.SystemDisk{Path: "/Users/maurice/git/kam", TotalBytes: 994662589440, AvailableBytes: 407786668032, UsedBytes: 586875921408, UsedPercent: 58.9},
+		Database:    &kam.SystemDatabase{Path: "kam.db", SizeBytes: 1245184, WalSizeBytes: ptr(uint64(8192))},
+	}
+	h.st.SetStatus(st, at)
+
+	_, body, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/")
+	if strings.Contains(body, "server-stats") || strings.Contains(body, "16.4 GB") {
+		t.Error("a viewer must not see server statistics")
+	}
+
+	status, body, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/ui/traffic", "HX-Request", "true")
+	if status != http.StatusOK || strings.Contains(body, "server-stats") {
+		t.Errorf("a viewer's live refresh carries %q (status %d)", "server-stats", status)
+	}
+
+	_, body, _ = get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
+	for _, want := range []string{
+		"<strong>Server</strong>",
+		"<dt>CPU</dt><dd>1.64 | 2.10 | 2.47</dd>",
+		"Apple M4 Pro · 14 cores · 1/5/15-minute load: 1.64, 2.10, 2.47",
+		`<dt>MEM</dt><dd><svg `,
+		`aria-label="31.4% used"`,
+		"7.6 GB of 24 GB used (31.4%) · 16.4 GB available",
+		"546.6 GB of 926.4 GB used (58.9%) on /Users/maurice/git/kam · 379.8 GB available",
+		"<dt>DB</dt><dd>1.2 MB | 8 KB WAL</dd>",
+		"kam.db · 1.2 MB; WAL 8 KB",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the admin's sidebar lacks %q", want)
+		}
+	}
+
+	status, body, _ = get(t, h.login(t, "admin", "admin"), h.ts.URL+"/ui/overview", "HX-Request", "true")
+	if status != http.StatusOK || !strings.Contains(body, `id="server-stats"`) {
+		t.Errorf("the admin's overview refresh lacks the server block (status %d)", status)
+	}
+}
+
+// A section the OS cannot measure is left out rather than shown as a fake zero, and a KAM
+// without the opt-in system section says so (MON-SV-2, the contract's null rules).
+func TestServerStatsSkipUnknownSections(t *testing.T) {
+	h := newHarness(t)
+	st, at := h.st.Status()
+	st.System = &kam.SystemStats{
+		CollectedAt: t0,
+		CPU:         &kam.SystemCPU{Cores: 14},
+		Database:    &kam.SystemDatabase{Path: "kam.db", SizeBytes: 1245184},
+	}
+	h.st.SetStatus(st, at)
+
+	_, body, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
+	if strings.Contains(body, "gauge-used") || strings.Contains(body, "of 24 GB used") {
+		t.Error("a null section must be left out, never zero")
+	}
+	if !strings.Contains(body, "<dt>CPU</dt><dd>—</dd>") || !strings.Contains(body, "load averages unknown on this system") {
+		t.Errorf("a CPU without loads shows a dash and explains itself on hover: %q", body)
+	}
+	if !strings.Contains(body, "<dt>DB</dt><dd>1.2 MB</dd>") || strings.Contains(body, "WAL ") {
+		t.Errorf("a database without a WAL shows its size only: %q", body)
+	}
+}
+
+// Before KAM has answered, the block shows nothing rather than zeroes; an older KAM without the
+// system section is told apart from a missing answer (MON-SV-3).
+func TestServerStatsWaitForKAM(t *testing.T) {
+	h := newHarness(t)
+	st, _ := h.st.Status()
+	st.Epoch = ""
+	h.st.SetStatus(st, t0)
+
+	_, body, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
+	if strings.Contains(body, "server-stats") {
+		t.Error("waiting for KAM must hide the server block, not show zeroes")
+	}
+
+	st.Epoch = "e1"
+	st.System = nil
+	h.st.SetStatus(st, t0)
+	_, body, _ = get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
+	if !strings.Contains(body, "Needs a newer KAM.") {
+		t.Error("a KAM without the system section must say so")
 	}
 }

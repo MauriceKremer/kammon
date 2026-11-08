@@ -46,6 +46,22 @@ func uptime(d time.Duration) string {
 	}
 }
 
+// sizeBytes writes a byte count for people, trimming whole decimals: "8 KB", "1.2 MB", "24 GB".
+func sizeBytes(n uint64) string {
+	value, unit := float64(n), "B"
+	switch {
+	case n >= 1<<40:
+		value, unit = float64(n)/(1<<40), "TB"
+	case n >= 1<<30:
+		value, unit = float64(n)/(1<<30), "GB"
+	case n >= 1<<20:
+		value, unit = float64(n)/(1<<20), "MB"
+	case n >= 1<<10:
+		value, unit = float64(n)/(1<<10), "KB"
+	}
+	return strings.TrimSuffix(strconv.FormatFloat(value, 'f', 1, 64), ".0") + " " + unit
+}
+
 // thousands writes 1284 as "1,284".
 func thousands(n int) string {
 	s := strconv.Itoa(n)
