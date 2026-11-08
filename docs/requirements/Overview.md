@@ -28,7 +28,7 @@ Plain words: **airtime** is how long a packet occupies the radio channel. LoRa i
 | Area | Content |
 |---|---|
 | **Metric strip** (4) | Observed packet airtime (%); Node TX duty cycle (%) against its limit; Packets observed (RX and TX, with how many were repeats); Room posts in the last hour. |
-| **Airtime chart** | Stacked bars, one per time slot, by packet class. Range switch 15m / 1h / 24h and a pause control. |
+| **Airtime chart** | Stacked bars, one per time slot, by packet class. Range switch 15m / 1h / 24h and a pause control. Health-zone backgrounds and the 25 % hold-back line (§3.3). |
 | **Packet mix** | The same classes as a thin bar and a list with counts and percentages. |
 | **Recent packets** | The six newest: time, type, source or destination. A link to the Traffic page. |
 | **Rooms** | Each room: serving state, last activity, posts in the last hour, remembered clients. Admin: the two most recent clients with the activity indicator. |
@@ -51,6 +51,16 @@ Plain words: **airtime** is how long a packet occupies the radio channel. LoRa i
 - **Node TX duty cycle** = `used_ms` divided by the window, from `/v1/status`, shown beside the configured limit. It counts only what this node sent.
 - **Packets observed** = all `rx` and `tx` events in the range. The caption shows RX and TX counts and how many RX events were repeats.
 - **Chart slots**: at most 60 bars. 15m uses 15 one-minute bars; 1h uses 60 one-minute bars; 24h uses 60 bars of 24 minutes.
+
+### 3.3 The airtime chart's health zones
+
+The chart washes the background with the utilization bands the LoRa community reads a shared channel against:
+
+- **Healthy, under 10 %.** Collisions are rare; packets pass several hops cleanly and the network answers promptly.
+- **Busy, 10-20 %.** Regular traffic contention; occasional dropped packets or delayed acknowledgements, mostly on multi-hop routes.
+- **Congested, over 20 %.** LoRa has no slot scheduling, so as the channel fills, collisions rise steeply and firmware transmit backoffs delay or drop messages to keep the network from freezing.
+
+The dashed **hold-back line** sits at 25 %, where the backoffs begin to bite; bars reaching past it deserve attention. The axis never ends under 30 % of one slot and grows in whole 10 % bands, so the zones keep their shape and their meaning even on a quiet channel (D37). The page itself keeps only a short caption — "Healthy under 10% · busy 10–20% · congested over 20% · hold-back line at 25%." — and the text alternative names the bands too; this section carries the longer explanation.
 
 ## 4. Requirements
 
@@ -91,6 +101,7 @@ Viewers and admins see the same numbers. The admin also sees client names in the
 - A range switch with less history than the range shows the caption.
 - Rendering with the store empty, with KAM down, and with only some snapshots filled.
 - A snapshot test of the SVG for a fixed input.
+- The health zones: the band washes, the 25 % hold-back line and the 30 % axis floor (D37).
 
 ## 8. Open points
 

@@ -400,7 +400,7 @@ func TestOverviewNumbers(t *testing.T) {
 	h := newHarness(t)
 	_, body, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/")
 	// 880 ms of airtime in an hour is 0.02 percent (shown as 0.0); three packets heard and one sent; one room post.
-	for _, want := range []string{">0.0 ", ">4</p>", "3 RX / 1 TX · 0 repeats", "Within limit · 1.0% configured", "/ 1 rooms", "Last activity 12 seconds ago", "9 remembered", "Healthy under 10%", "busy 10", "congested over 20%", "the hold-back line sits at 25%"} {
+	for _, want := range []string{">0.0 ", ">4</p>", "3 RX / 1 TX · 0 repeats", "Within limit · 1.0% configured", "/ 1 rooms", "Last activity 12 seconds ago", "9 remembered", "Healthy under 10%", "busy 10", "congested over 20%", "hold-back line at 25%"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("overview is missing %q", want)
 		}
