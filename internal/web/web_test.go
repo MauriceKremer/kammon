@@ -135,14 +135,52 @@ func TestViewerSeesOverviewButNotAccounts(t *testing.T) {
 	if status != http.StatusOK || !strings.Contains(body, "Observed packet airtime") || !strings.Contains(body, "Sign out") {
 		t.Fatalf("overview: %d", status)
 	}
-	if strings.Contains(body, `href="/accounts"`) {
-		t.Fatal("the Accounts page must not be offered to a viewer (MON-AX-12)")
+	// Rooms, Accounts, Automations and the KISS modem are admin pages (MON-AX-12): the sidebar
+	// offers none of them, and every route answers 403 to a viewer that types its URL anyway.
+	for _, hidden := range []string{"/rooms", "/accounts", "/automations", "/modem"} {
+		if strings.Contains(body, `href="`+hidden+`"`) {
+			t.Errorf("the admin page %s must not be offered to a viewer", hidden)
+		}
+		if status, _, _ = get(t, c, h.ts.URL+hidden); status != http.StatusForbidden {
+			t.Errorf("%s for a viewer: %d, want 403", hidden, status)
+		}
 	}
-	if status, _, _ = get(t, c, h.ts.URL+"/accounts"); status != http.StatusForbidden {
-		t.Fatalf("accounts for a viewer: %d", status)
+	if status, _, _ = get(t, c, h.ts.URL+"/ui/script-list"); status != http.StatusForbidden {
+		t.Errorf("/ui/script-list for a viewer: %d, want 403", status)
 	}
-	if status, _, _ = get(t, c, h.ts.URL+"/modem"); status != http.StatusOK {
+	if status, _, _ = get(t, c, h.ts.URL+"/ui/room-metrics?room=lobby"); status != http.StatusForbidden {
+		t.Errorf("/ui/room-metrics for a viewer: %d, want 403", status)
+	}
+	if status, _, _ = get(t, c, h.ts.URL+"/modem"); status != http.StatusForbidden {
 		t.Fatalf("modem page: %d", status)
+	}
+}
+
+// The admin-only menu items (rooms, accounts, automations, KISS modem) each show a light grey lock
+// at the right of their label (MON-AX-12); a viewer is offered none of them, so sees no lock at all.
+func TestAdminOnlyNavItemsShowALock(t *testing.T) {
+	h := newHarness(t)
+	_, admin, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
+	if n := strings.Count(admin, "nav-lock"); n != 4 {
+		t.Errorf("the admin sees %d locked menu items, want 4 (rooms, accounts, automations, modem)", n)
+	}
+	if n := strings.Count(admin, `class="admin-only"`); n != 4 {
+		t.Errorf("%d menu items carry the admin-only class, want 4", n)
+	}
+	_, viewer, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/")
+	if strings.Contains(viewer, "nav-lock") || strings.Contains(viewer, `class="admin-only"`) {
+		t.Error("the viewer sees no admin-only menu item, thus no lock (MON-AX-12)")
+	}
+}
+
+// Every sidebar entry leads with the icon of its page (D34); each appears exactly once.
+func TestNavItemsCarryTheirIcon(t *testing.T) {
+	h := newHarness(t)
+	_, admin, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
+	for _, icon := range []string{"activity", "radio-tower", "hash", "messages-square", "users", "workflow", "cpu"} {
+		if n := strings.Count(admin, "icons.svg#"+icon+"\""); n != 1 {
+			t.Errorf("icon %s appears %d times in the admin sidebar, want 1", icon, n)
+		}
 	}
 }
 
@@ -236,9 +274,9 @@ func TestChannelAndRoomPagesRespectViewerVisibility(t *testing.T) {
 			t.Errorf("admin channel view omitted stored message: %s", target)
 		}
 	}
-	_, viewerRooms, _ := get(t, viewerClient, h.ts.URL+"/rooms?room=lobby")
-	if strings.Contains(viewerRooms, "RoomAdmin") || strings.Contains(viewerRooms, "secret room post") || !strings.Contains(viewerRooms, "Client activity and posts are visible to the administrator.") {
-		t.Fatal("viewer room page exposed client or post data")
+	// The rooms page is admin-only (MON-AX-12); a viewer gets 403 and its data never reaches them.
+	if status, body, _ := get(t, viewerClient, h.ts.URL+"/rooms?room=lobby"); status != http.StatusForbidden || strings.Contains(body, "RoomAdmin") || strings.Contains(body, "secret room post") {
+		t.Fatalf("rooms page for a viewer: status %d leaks %v", status, strings.Contains(body, "secret room post"))
 	}
 	_, adminRooms, _ := get(t, adminClient, h.ts.URL+"/rooms?room=lobby")
 	if !strings.Contains(adminRooms, "RoomAdmin") || !strings.Contains(adminRooms, "Stale Node") || !strings.Contains(adminRooms, "secret room post") {
@@ -246,11 +284,9 @@ func TestChannelAndRoomPagesRespectViewerVisibility(t *testing.T) {
 	}
 }
 
-// The Posts metric carries the small 24 hour posts chart (MON-RM-15); its caption made room for
-// it, and the chart belongs to the strip that a viewer also sees (MON-RM-12).
 func TestRoomMetricStripHasPostsTrend(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer", "viewer")
+	c := h.login(t, "admin", "admin")
 	_, body, _ := get(t, c, h.ts.URL+"/rooms?room=lobby")
 	if !strings.Contains(body, `class="posts-trend"`) || !strings.Contains(body, "Accepted posts per hour over the last 24 hours: 1 in total, busiest hour 1.") {
 		t.Fatalf("room strip lacks the posts trend: %s", body)
@@ -344,7 +380,7 @@ func TestChannelMetricsPartialUpdatesCountersAndList(t *testing.T) {
 // never client keys or post text (MON-RM-12).
 func TestRoomMetricsPartialUpdatesCountersAndList(t *testing.T) {
 	h := newHarness(t)
-	c := h.login(t, "viewer", "viewer")
+	c := h.login(t, "admin", "admin")
 	_, body, _ := get(t, c, h.ts.URL+"/rooms?room=lobby")
 	if !strings.Contains(body, `id="room-metrics" hx-get="/ui/room-metrics?room=lobby" hx-trigger="every 20s" hx-swap="outerHTML"`) {
 		t.Fatalf("the strip does not poll at half the rooms frequency: %s", body)
@@ -633,6 +669,11 @@ func TestAssetsAreVendoredAndServed(t *testing.T) {
 	}
 	if !strings.Contains(string(res), `<symbol id="sun"`) {
 		t.Error("the sprite misses its icons")
+	}
+	for _, icon := range []string{"activity", "hash", "radio-tower", "messages-square", "users", "workflow", "cpu", "lock-keyhole"} {
+		if !strings.Contains(string(res), `<symbol id="`+icon+`"`) {
+			t.Errorf("the sprite misses %q, needed by the sidebar", icon)
+		}
 	}
 	for _, woff2 := range []string{"hanken-grotesk-5.3.0-latin-wght-normal.woff2", "syncopate-5.3.0-latin-700-normal.woff2"} {
 		buf, err := webassets.FS.ReadFile("static/fonts/" + woff2)

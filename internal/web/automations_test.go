@@ -98,20 +98,21 @@ func (h *scriptHarness) formPost(t *testing.T, method, target string, form url.V
 	return resp.StatusCode, string(body), resp.Header
 }
 
-func TestAutomationsViewerSeesListButNoEditor(t *testing.T) {
+func TestAutomationsListNeedsAdmin(t *testing.T) {
 	h := newScriptHarness(t)
 	h.login(t, "viewer", "viewer")
-	status, body := h.get(t, "/automations")
-	if status != http.StatusOK {
-		t.Fatalf("automations page: %d", status)
+	if status, _ := h.get(t, "/automations"); status != http.StatusForbidden {
+		t.Fatalf("automations page for a viewer: %d, want 403 (MON-AX-12)", status)
 	}
+	if status, _ := h.get(t, "/ui/script-list"); status != http.StatusForbidden {
+		t.Fatalf("script list for a viewer: %d, want 403 (MON-AX-12)", status)
+	}
+	h.login(t, "admin", "admin")
+	_, body := h.get(t, "/automations")
 	for _, want := range []string{"echo.star", "welcome.star", "Frozen", "rev 4", "12 runs"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("the list misses %q: %s", want, body)
 		}
-	}
-	if strings.Contains(body, "def on_group_text") || strings.Contains(body, "textarea") {
-		t.Error("a viewer never sees script source (MON-AU-4)")
 	}
 	// MON-AU-3: the run line names time, duration and replies (the hour is KAM's clock, in words).
 	if !strings.Contains(body, "last run ") || !strings.Contains(body, "· 2 ms · 1 reply") {
@@ -404,7 +405,7 @@ func TestAutomationsRecoverAndDelete(t *testing.T) {
 
 func TestAutomationsListPollAndBars(t *testing.T) {
 	h := newScriptHarness(t)
-	h.login(t, "viewer", "viewer")
+	h.login(t, "admin", "admin")
 	status, body := h.get(t, "/ui/script-list")
 	if status != http.StatusOK {
 		t.Fatalf("list partial: %d", status)
@@ -431,7 +432,7 @@ func TestAutomationsListPollAndBars(t *testing.T) {
 	}
 	// A KAM with automation off says so, and that cause wins over the bar's other words.
 	h2 := newScriptHarness(t)
-	h2.login(t, "viewer", "viewer")
+	h2.login(t, "admin", "admin")
 	st := kam.Status{Epoch: "e1", Now: t0, StartedAt: t0.Add(-time.Hour), NodeName: "kam"}
 	st.Automation.Enabled = false
 	h2.st.SetStatus(st, t0)

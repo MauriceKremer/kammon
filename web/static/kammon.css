@@ -87,9 +87,18 @@ button.primary { background: var(--signal); color: var(--bg-0); border-color: va
 .brand .mon { color: var(--signal); font-size: 16px; }
 .brand small { display: block; margin-top: 8px; font: 500 13px var(--font-body); color: var(--text-muted); }
 .nav { display: grid; gap: 4px; min-width: 0; max-width: 100%; }
-.nav a { padding: 10px 12px; border-radius: 0 6px 6px 0; color: var(--text-muted); text-decoration: none; font-size: 14px; }
+.nav a { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-radius: 0 6px 6px 0; color: var(--text-muted); text-decoration: none; font-size: 14px; }
 .nav a:hover { background: var(--highlight); color: var(--text-primary); }
 .nav a[aria-current="page"] { background: var(--highlight); color: var(--text-primary); font-weight: 600; box-shadow: inset 2px 0 var(--text-secondary); }
+/* An admin-only page shows a light grey lock flush to the right edge of the sidebar (MON-AX-12);
+   space-between pins it right in every engine, where margin-left auto breaks next to a flex gap
+   (measured in Chromium, WebKit and Firefox); the grey stays on hover and on the active page. */
+.nav a.admin-only { padding-right: 0; }
+.nav .nav-lock { width: 14px; height: 14px; color: var(--text-muted); }
+/* Every entry leads with its page icon; the icon follows the link colour (muted, primary when
+   hovered or active) and keeps its square at the label's 14 px size. */
+.nav .nav-item { display: inline-flex; align-items: center; gap: 8px; }
+.nav .nav-icon { width: 14px; height: 14px; }
 .sidebar > div, .sidebar > nav { min-width: 0; }
 .node { margin-top: auto; padding: 20px 8px 0; border-top: 1px solid var(--border-default); font-size: 13px; color: var(--text-muted); }
 .node strong { display: block; margin-bottom: 6px; color: var(--text-secondary); }

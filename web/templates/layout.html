@@ -16,7 +16,7 @@
 <a class="skip-link" href="#content">Skip to content</a>
 <aside class="sidebar" aria-label="Main navigation">
   <div class="brand">KAM<span class="mon">mon</span><small>MeshCore observatory</small></div>
-  <nav class="nav">{{range .Nav}}<a href="{{.Path}}"{{if eq .Key $.Active}} aria-current="page"{{end}}>{{.Title}}</a>{{end}}</nav>
+  <nav class="nav">{{range .Nav}}<a href="{{.Path}}"{{if .Admin}} class="admin-only"{{end}}{{if eq .Key $.Active}} aria-current="page"{{end}}><span class="nav-item"><svg class="icon nav-icon" aria-hidden="true"><use href="/static/icons.svg#{{.Icon}}"></use></svg>{{.Title}}</span>{{if .Admin}}<svg class="icon nav-lock" aria-hidden="true"><use href="/static/icons.svg#lock-keyhole"></use></svg>{{end}}</a>{{end}}</nav>
   {{template "nodeblock" .Node}}
 </aside>
 <main id="content">
