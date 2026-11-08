@@ -74,17 +74,18 @@ func RecentClients(role config.Role, clients []kam.RoomClient, nowKAM time.Time)
 // Page is one entry of the sidebar.
 type Page struct {
 	Key, Title, Path string
+	Icon             string
 	Admin            bool
 }
 
 var pages = []Page{
-	{Key: "overview", Title: "Overview", Path: "/"},
-	{Key: "traffic", Title: "Traffic", Path: "/traffic"},
-	{Key: "channels", Title: "Channels", Path: "/channels"},
-	{Key: "rooms", Title: "Rooms", Path: "/rooms"},
-	{Key: "accounts", Title: "Accounts", Path: "/accounts", Admin: true},
-	{Key: "automations", Title: "Automations", Path: "/automations"},
-	{Key: "modem", Title: "KISS modem", Path: "/modem"},
+	{Key: "overview", Title: "Overview", Path: "/", Icon: "activity"},
+	{Key: "traffic", Title: "Traffic", Path: "/traffic", Icon: "radio-tower"},
+	{Key: "channels", Title: "Channels", Path: "/channels", Icon: "hash"},
+	{Key: "rooms", Title: "Rooms", Path: "/rooms", Icon: "messages-square", Admin: true},
+	{Key: "accounts", Title: "Accounts", Path: "/accounts", Icon: "users", Admin: true},
+	{Key: "automations", Title: "Automations", Path: "/automations", Icon: "workflow", Admin: true},
+	{Key: "modem", Title: "KISS modem", Path: "/modem", Icon: "cpu", Admin: true},
 }
 
 // Pages lists the sidebar entries a role may use (MON-AX-12).
