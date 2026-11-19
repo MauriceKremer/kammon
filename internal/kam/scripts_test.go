@@ -24,9 +24,13 @@ func TestScriptFixturesDecodeStrictly(t *testing.T) {
 		if script.Run != nil {
 			t.Fatalf("today's list carries no run object: %+v", script)
 		}
-		if script.TimerInterval != 15 {
-			t.Fatalf("timer interval = %d, want the fixture's 15", script.TimerInterval)
-		}
+	}
+	// Two timer forms, exactly one per timer script: interval or cron text.
+	if scripts[0].TimerInterval != 15 || scripts[0].TimerSchedule != "" {
+		t.Fatalf("echo timer fields = %+v", scripts[0])
+	}
+	if scripts[1].TimerInterval != 0 || scripts[1].TimerSchedule != "0 7 * * *" {
+		t.Fatalf("status timer fields = %+v", scripts[1])
 	}
 
 	var withRun []Script

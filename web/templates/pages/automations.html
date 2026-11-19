@@ -124,7 +124,16 @@
     <tr><td><code>time_drift_seconds</code></td><td>Difference between sender and KAM clocks</td></tr>
   </tbody></table></div>
   <p><code>reply(channel, text)</code> queues a reply on a channel. <code>room_post(room_id, text)</code> posts into one of KAM's own rooms, as the room itself. <code>rest_get(url)</code> fetches a page over HTTP, for a script that keeps an eye on a web feed; it returns the body and the HTTP status, and KAM caps the body.</p>
-  <p>A script may also run on a timer: the line <code>timer_interval_minutes = 15</code> at the top of the source makes KAM call <code>on_timer(message)</code> about every 15 minutes with a one-field message, <code>{"timestamp_unix": ...}</code>. A timer script can send and fetch like any other.</p>
+  <p>A script may also run on a timer. The line <code>timer_interval_minutes = 15</code> at the top of the source makes KAM call <code>on_timer(now)</code> about every 15 minutes, with <code>now</code> a <code>time</code> value: read <code>now.unix</code> for a Unix timestamp or call <code>now.format("15:04")</code> for a clock time. A timer fire is not a message dict — it has no <code>body</code>, <code>sender</code> or <code>channel</code>. Or the line <code>timer_schedule = "0 7 * * *"</code> fires it on cron slots — here daily at 07:00; the standard five fields are allowed, plus an optional seconds field and a wall-clock alignment. Exactly one of the two timer lines may be set. A timer script can send and fetch like any other.</p>
+  <div class="table-scroll"><table><thead><tr><th>You want</th><th>Expression</th></tr></thead><tbody>
+    <tr><td>Daily at 21:50</td><td><code>50 21 * * *</code></td></tr>
+    <tr><td>Every hour on the hour</td><td><code>0 * * * *</code></td></tr>
+    <tr><td>Every 15 minutes</td><td><code>*/15 * * * *</code></td></tr>
+    <tr><td>21:50 on weekdays</td><td><code>50 21 * * 1-5</code></td></tr>
+    <tr><td>07:50 and 21:50 each day</td><td><code>50 7,21 * * *</code></td></tr>
+    <tr><td>Every 10 seconds (testing)</td><td><code>*/10 * * * * *</code></td></tr>
+  </tbody></table></div>
+  <p class="small muted">Fields are minute, hour, day of month, month, weekday, with an optional seconds field in front. A single expression cannot use a different minute in each hour: <code>50 21,7 * * *</code> means 21:50 and 07:50, not 21:50 and 07:00.</p>
   <p>That is what a script can reach: replies, room posts and HTTP reads. It cannot touch the radio settings, the files or KAM's configuration.</p>
   <p class="small muted">The dry run uses KAM's own engine and the same timeout rules, but it cannot reproduce load. A test captures at most 16 replies or 4096 bytes.</p>
 </details>
