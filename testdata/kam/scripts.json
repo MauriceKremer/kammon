@@ -21,7 +21,8 @@
     "revision": 1,
     "created_at": 1760700000,
     "updated_at": 1760700000,
-    "timer_interval_minutes": 15
+    "timer_interval_minutes": 0,
+    "timer_schedule": "0 7 * * *"
   },
   {
     "id": "broken",

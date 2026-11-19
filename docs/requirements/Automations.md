@@ -55,7 +55,7 @@ A script can only do what KAM's `reply(channel, text)` allows. It cannot reach t
 | `has_rx_meta`, `snr_quarter_db`, `rssi_dbm` | Signal data; SNR is in quarter dB (divide by 4) |
 | `time_drift_seconds` | Difference between sender and KAM clocks |
 
-A timer script's `on_timer(message)` gets one field, `timestamp_unix` — the KAM time of the fire.
+A timer script's `on_timer(now)` gets one `time` value — the KAM time of the fire — read as `now.unix` or formatted with `now.format(...)`. It is not a message dict.
 
 ## 3.2 What a script can do (KAM, 2026-11-06)
 
@@ -65,7 +65,7 @@ Besides `reply(channel, text)`, a script can:
 |---|---|---|
 | A web page | `rest_get(url)` | Returns the body and the HTTP status. Shares the script's timeout, caps the body at 1 MiB, allows only `http`/`https`. |
 | A KAM room | `room_post(room_id, text)` | Posts as the room's own identity into one of KAM's hosted rooms; clients get it through the normal backlog and push. |
-| A timer | `timer_interval_minutes = N` plus `def on_timer(message)` | `N` a whole number of minutes ≥ 1, a plain assignment at the top of the source. The script object's `timer_interval_minutes` (read-only, from the source) shows it; a timer fire reuses the script's timeout and can freeze on timeout. |
+| A timer | `timer_interval_minutes = N` plus `def on_timer(now)`, or `timer_schedule = "<cron>"` plus `def on_timer(now)` (exactly one of the two) | The interval: a whole number of minutes ≥ 1, a plain assignment at the top of the source. The cron form: a plain string literal with five standard cron fields plus an optional seconds field (once a second is the floor), slot-aligned to the clock. The script object's `timer_interval_minutes` and `timer_schedule` (read-only, from the source) show which; a timer fire reuses the script's timeout and can freeze on timeout. |
 
 The standard Starlark `json` and `time` modules are predeclared in every script.
 
@@ -133,11 +133,11 @@ def on_group_text(message):
 | Dry run | `POST /scripts/dry-run` | API-AU-3, API-AU-4 |
 | Queue depth and dropped events | `GET /v1/status` (`automation`) | API-AU-5 |
 | Script run events | `script` events | API-EV-6 |
-| Periodic scripts | `timer_interval_minutes` field, read-only, from the script's source | KAM's FeatureStarlarkPeriodicPosts (no new endpoint) |
+| Periodic scripts | `timer_interval_minutes` field, read-only, from the script's source; `timer_schedule` when the script uses a cron timer | KAM's FeatureStarlarkPeriodicPosts and FeatureStarlarkTimerSchedules (no new endpoint) |
 
 KAM's periodic posts (2026-11-06) need no new route: the script list already carries the read-only `timer_interval_minutes` field, so the screens stay current with the list alone. What a page tells a user about them is §3.2 and the reference panel. If a later screen surfaces per-script timer intervals (for example in the list) it reads the same field.
 
-KAM grew a second way to run a script. A line `timer_interval_minutes = N` in the source (a plain integer ≥ 1, top-level) makes KAM call `on_timer(message)` about every N minutes; `message` carries only `timestamp_unix`. A script may handle messages, timers or both, and timer scripts can send and fetch like any other. Timer fires are best-effort: one is dropped when the queue is full, and there is no catch-up on KAM restart.
+KAM grew a second way to run a script. A line `timer_interval_minutes = N` in the source (a plain integer ≥ 1, top-level) makes KAM call `on_timer(now)` about every N minutes, with `now` a `time` value holding the fire moment. The line `timer_schedule = "0 7 * * *"` is the alternative: standard cron slots, wall-clock aligned (KAM skips a slot missed while it was down), with an optional leading seconds field and once a second as the shortest period; a script sets exactly one of the two timer lines. A script may handle messages, timers or both, and timer scripts can send and fetch like any other. Timer fires are best-effort: one is dropped when the queue is full, and there is no catch-up on KAM restart.
 
 KAMmon uses one base URL, `kam_monitor_url` (8766); the script routes share it (D28).
 
