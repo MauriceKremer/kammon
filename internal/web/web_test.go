@@ -107,9 +107,12 @@ func TestUnauthenticatedRequestsAreSentToLogin(t *testing.T) {
 	if status, _, _ = get(t, c, h.ts.URL+"/static/kammon.css"); status != http.StatusOK {
 		t.Fatalf("static files are public, got %d", status)
 	}
-	status, body, _ := get(t, c, h.ts.URL+"/login")
+	status, body, header := get(t, c, h.ts.URL+"/login")
 	if status != http.StatusOK || strings.Contains(body, "Emmen") || strings.Contains(body, "Observed") {
 		t.Fatalf("the login page must reveal nothing about the node: %d", status)
+	}
+	if csp := header.Get("Content-Security-Policy"); !strings.Contains(csp, "style-src 'self' 'unsafe-inline'") {
+		t.Errorf("CSP must allow inline styles for chart ticks and dynamic UI elements, got %q", csp)
 	}
 }
 
