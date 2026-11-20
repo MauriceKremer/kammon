@@ -138,9 +138,9 @@ func TestViewerSeesOverviewButNotAccounts(t *testing.T) {
 	if status != http.StatusOK || !strings.Contains(body, "Observed packet airtime") || !strings.Contains(body, "Sign out") {
 		t.Fatalf("overview: %d", status)
 	}
-	// Rooms, Accounts, Automations and the KISS modem are admin pages (MON-AX-12): the sidebar
+	// Rooms, Accounts, Web users, Automations and the KISS modem are admin pages (MON-AX-12): the sidebar
 	// offers none of them, and every route answers 403 to a viewer that types its URL anyway.
-	for _, hidden := range []string{"/rooms", "/accounts", "/automations", "/modem"} {
+	for _, hidden := range []string{"/rooms", "/accounts", "/web-users", "/automations", "/modem"} {
 		if strings.Contains(body, `href="`+hidden+`"`) {
 			t.Errorf("the admin page %s must not be offered to a viewer", hidden)
 		}
@@ -159,16 +159,16 @@ func TestViewerSeesOverviewButNotAccounts(t *testing.T) {
 	}
 }
 
-// The admin-only menu items (rooms, accounts, automations, KISS modem) each show a light grey lock
+// The admin-only menu items (rooms, accounts, web users, automations, KISS modem) each show a light grey lock
 // at the right of their label (MON-AX-12); a viewer is offered none of them, so sees no lock at all.
 func TestAdminOnlyNavItemsShowALock(t *testing.T) {
 	h := newHarness(t)
 	_, admin, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
-	if n := strings.Count(admin, "nav-lock"); n != 4 {
-		t.Errorf("the admin sees %d locked menu items, want 4 (rooms, accounts, automations, modem)", n)
+	if n := strings.Count(admin, "nav-lock"); n != 5 {
+		t.Errorf("the admin sees %d locked menu items, want 5 (rooms, accounts, web-users, automations, modem)", n)
 	}
-	if n := strings.Count(admin, `class="admin-only"`); n != 4 {
-		t.Errorf("%d menu items carry the admin-only class, want 4", n)
+	if n := strings.Count(admin, `class="admin-only"`); n != 5 {
+		t.Errorf("%d menu items carry the admin-only class, want 5", n)
 	}
 	_, viewer, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/")
 	if strings.Contains(viewer, "nav-lock") || strings.Contains(viewer, `class="admin-only"`) {
@@ -180,7 +180,7 @@ func TestAdminOnlyNavItemsShowALock(t *testing.T) {
 func TestNavItemsCarryTheirIcon(t *testing.T) {
 	h := newHarness(t)
 	_, admin, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
-	for _, icon := range []string{"activity", "radio-tower", "hash", "messages-square", "users", "workflow", "cpu"} {
+	for _, icon := range []string{"activity", "radio-tower", "hash", "messages-square", "users", "shield-check", "workflow", "cpu"} {
 		if n := strings.Count(admin, "icons.svg#"+icon+"\""); n != 1 {
 			t.Errorf("icon %s appears %d times in the admin sidebar, want 1", icon, n)
 		}

@@ -1,0 +1,92 @@
+{{define "content"}}
+<div class="web-users-layout">
+  <div class="section-head">
+    <div>
+      <h2>Web users</h2>
+      <p class="small muted">KAMmon web logins stored in <code>kammon.yml</code>. Passwords are saved as PBKDF2 hashes.</p>
+    </div>
+  </div>
+
+  {{if .Content.Demo}}
+    <p class="notice">Demo mode: user changes apply in memory and are discarded on restart.</p>
+  {{end}}
+
+  <div id="users-table-container">
+    {{template "users-table" .Content}}
+  </div>
+
+  <section class="web-users-form-card" aria-label="Add or edit user">
+    <div class="section-head">
+      <h3 id="form-title">{{if .Content.Editing}}Edit user: {{.Content.Form.Name}}{{else}}Add user{{end}}</h3>
+      {{if .Content.Editing}}<a class="text-button" href="/web-users">Cancel</a>{{end}}
+    </div>
+
+    <form class="script-editor" id="user-form" hx-post="/ui/web-users/save" hx-target="main">
+      {{if .Content.Editing}}
+        <input type="hidden" name="orig_name" value="{{.Content.Form.Name}}">
+      {{end}}
+      
+      <div class="script-settings">
+        <label for="user-name">Username
+          <input type="text" id="user-name" name="name" value="{{.Content.Form.Name}}" spellcheck="false" autocomplete="off" required>
+        </label>
+
+        <label for="user-role">Role
+          <select id="user-role" name="role">
+            <option value="admin"{{if eq .Content.Form.Role "admin"}} selected{{end}}>admin</option>
+            <option value="viewer"{{if eq .Content.Form.Role "viewer"}} selected{{end}}>viewer</option>
+          </select>
+        </label>
+
+        <label for="user-password">Password
+          <input type="password" id="user-password" name="password" autocomplete="new-password" {{if not .Content.Editing}}required{{end}}>
+        </label>
+      </div>
+
+      {{if .Content.Editing}}
+        <p class="small muted">Leave password blank to keep the current password.</p>
+      {{end}}
+
+      <div class="script-actions">
+        <button type="submit">{{if .Content.Editing}}Save changes{{else}}Add user{{end}}</button>
+      </div>
+
+      {{if .Content.Error}}
+        <p class="small warn" role="alert">{{.Content.Error}}</p>
+      {{end}}
+      {{if .Content.Notice}}
+        <p class="small success" role="status">{{.Content.Notice}}</p>
+      {{end}}
+    </form>
+  </section>
+</div>
+{{end}}
+
+{{define "users-table"}}
+<div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Username</th>
+        <th>Role</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Users}}
+        <tr>
+          <td><strong>{{.Name}}</strong></td>
+          <td><span class="badge">{{.Role}}</span></td>
+          <td>
+            <a class="text-button" href="/web-users?edit={{urlquery .Name}}">Edit</a>
+            <button type="button" class="text-button danger-text"
+              hx-delete="/ui/web-users?name={{urlquery .Name}}"
+              hx-confirm="Delete user {{.Name}}? Any active sessions will be signed out."
+              hx-target="#users-table-container">Delete</button>
+          </td>
+        </tr>
+      {{end}}
+    </tbody>
+  </table>
+</div>
+{{end}}

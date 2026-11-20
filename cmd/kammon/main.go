@@ -65,7 +65,7 @@ func run(configPath string, demo bool) error {
 	}
 	go poller.Run(ctx)
 
-	srv, err := web.New(web.Deps{Config: cfg, Store: st, Demo: demo, KAM: kamClient})
+	srv, err := web.New(web.Deps{Config: cfg, ConfigPath: configPath, Store: st, Demo: demo, KAM: kamClient})
 	if err != nil {
 		return err
 	}
