@@ -18,6 +18,13 @@ Open <http://127.0.0.1:8080>. Sign in as `admin` / `admin` (administrator) or `v
 
 Stop the demo with `Ctrl-C`. If you lose track of a server you started in the background, `scripts/kill-kammon.sh` stops it.
 
+## Install on a Raspberry Pi
+
+For a service-managed install beside KAM, use [kamstack](https://github.com/MauriceKremer/kamstack):
+it installs KAM and KAMmon together, writes the systemd units and configs,
+generates the web logins, and updates the matched pair. The manual steps below
+stay the way to run KAMmon on its own.
+
 ## Run against a real KAM
 
 1. Copy [kammon.yml](kammon.yml) to `kammon.local.yml` and change the passwords.
