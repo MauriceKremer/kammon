@@ -1,1 +1,6 @@
-{{define "content"}}{{template "overview-live" .Content}}{{end}}
+{{define "content"}}{{template "overview-heading" .Content}}
+{{template "overview-metrics-live" .Content}}
+  <div class="dashboard">
+    <div class="main">{{template "overview-charts-live" .Content}}</div>
+    <div class="side">{{template "overview-recent-live" .Content}}{{template "overview-rooms-live" .Content}}{{template "overview-automation-live" .Content}}</div>
+  </div>{{end}}

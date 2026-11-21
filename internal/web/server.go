@@ -28,7 +28,7 @@ const (
 // AssetVersion is the cache-buster of the shared static assets (kammon.css and
 // the static scripts). Bump it when one of those files changes, so browsers drop
 // their cached copy instead of running or styling the pages with the old rules.
-const AssetVersion = "kammon-18"
+const AssetVersion = "kammon-19"
 
 type Deps struct {
 	Config     config.Config
@@ -118,6 +118,12 @@ func (s *Server) routes() []route {
 		{"POST /logout", viewer, s.logout},
 		{"GET /{$}", viewer, s.overviewPage},
 		{"GET /ui/overview", viewer, s.overviewPartial},
+		// Each overview region answers on its own URL (MON-OV-11); the factory names the template.
+		{"GET /ui/overview/metrics", viewer, s.overviewPart("metrics")},
+		{"GET /ui/overview/charts", viewer, s.overviewPart("charts")},
+		{"GET /ui/overview/recent", viewer, s.overviewPart("recent")},
+		{"GET /ui/overview/rooms", viewer, s.overviewPart("rooms")},
+		{"GET /ui/overview/automation", viewer, s.overviewPart("automation")},
 		{"GET /traffic", viewer, s.trafficPage},
 		{"GET /ui/traffic", viewer, s.trafficPartial},
 		{"GET /traffic.csv", viewer, s.csvPage},
@@ -544,11 +550,44 @@ func detailOf(cpu *kam.SystemCPU) string {
 	}
 	return detail + " · load averages unknown on this system"
 }
+
+// overviewPartial is the whole overview page in one answer: the metric strip as the main swap,
+// the other four regions and the sidebar rides out of band. The range tabs ask for it, so all
+// regions change range together (MON-OV-4) and the browser URL follows.
 func (s *Server) overviewPartial(w http.ResponseWriter, r *http.Request) {
 	data := s.overview(principalOf(r).Role, r.URL.Query().Get("range"))
+	parts := append([]partial{
+		{"overview-metrics-live", data},
+		{"overview-charts-live-oob", data},
+		{"overview-recent-live-oob", data},
+		{"overview-rooms-live-oob", data},
+		{"overview-automation-live-oob", data},
+		{"stalebar", s.staleBar()},
+	}, s.sideParts(r)...)
+	s.writeParts(w, parts)
+}
+
+// overviewPart answers exactly one polled region of the overview page (MON-OV-11, DESIGN.md
+// §7.1): a two-second round then never redraws the heading, the tabs or the other regions, and
+// text selected in one region survives the rest. The metric strip carries the stale bar and the
+// sidebar rides, so a KAM outage or stale snapshot stays visible while everything else polls.
+func (s *Server) overviewPart(part string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		data := s.overview(principalOf(r).Role, r.URL.Query().Get("range"))
+		parts := []partial{{"overview-" + part + "-live", data}}
+		if part == "metrics" {
+			parts = append(parts, partial{"stalebar", s.staleBar()})
+			parts = append(parts, s.sideParts(r)...)
+		}
+		s.writeParts(w, parts)
+	}
+}
+
+// writeParts renders the named templates of an htmx answer into a buffer first, so a template
+// error never sends half an answer.
+func (s *Server) writeParts(w http.ResponseWriter, parts []partial) {
 	var buf bytes.Buffer
 	t := s.pages["overview"]
-	parts := append([]partial{{"overview-live", data}, {"stalebar", s.staleBar()}}, s.sideParts(r)...)
 	for _, part := range parts {
 		if err := t.ExecuteTemplate(&buf, part.name, part.data); err != nil {
 			http.Error(w, "Template error.", http.StatusInternalServerError)
@@ -563,7 +602,6 @@ func (s *Server) overviewPartial(w http.ResponseWriter, r *http.Request) {
 var placeholders = map[string]placeholderData{
 	"channels": {Text: "Channel activity and decoded messages.", Slice: "slice 3", Doc: "docs/requirements/Channels.md"},
 	"rooms":    {Text: "Room activity, remembered clients and posts.", Slice: "slice 3", Doc: "docs/requirements/Rooms.md"},
-	"accounts": {Text: "Room roles for the administrator.", Slice: "slice 6", Doc: "docs/requirements/RoomAccounts.md"},
 	"modem":    {Text: "KISS modem snapshot, queries and radio settings.", Slice: "slice 5", Doc: "docs/requirements/KissModem.md"},
 }
 

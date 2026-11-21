@@ -7,8 +7,8 @@ session_idle_hours: 8
 poll:
   events:     1s    # new events and the cursor, /v1/events
   status:     10s    # status, radio, duty cycle, counters, /v1/status
-  rooms:      5s   # rooms and their clients, /v1/rooms
-  channels:   5s   # channel list, /v1/channels
+  rooms:      1s   # rooms and their clients, /v1/rooms
+  channels:   1s   # channel list, /v1/channels
   scripts:    1s   # script list and run information, /scripts
   timeout:    1s    # the timeout of every read
   not_served: 10m   # after a 404 the poller stops asking that read for this long
@@ -28,5 +28,5 @@ viewer_text_channels: ["#public"]
 # sign in from. Serving the site beyond your LAN is the operator's choice; put the
 # proper services (TLS through a reverse proxy, for example) in place first.
 users:
-  - { name: maurice, password: "change-me", role: admin }
-  - { name: observer, password: "change-me-too", role: viewer }
+  - { name: admin, password: "change-me", role: admin }
+  - { name: viewer, password: "change-me", role: viewer }
