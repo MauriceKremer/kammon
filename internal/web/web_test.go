@@ -366,11 +366,23 @@ func TestChannelMetricsPartialUpdatesCountersAndList(t *testing.T) {
 	h := newHarness(t)
 	c := h.login(t, "viewer", "viewer")
 	_, body, _ := get(t, c, h.ts.URL+"/channels?channel=%23public")
-	if !strings.Contains(body, `id="channel-metrics" hx-get="/ui/channel-metrics?channel=%23public" hx-trigger="every 2s" hx-swap="outerHTML"`) {
+	if !strings.Contains(body, `id="channel-metrics" data-live hx-get="/ui/channel-metrics?channel=%23public" hx-trigger="every 2s" hx-swap="outerHTML"`) {
 		t.Fatalf("the strip does not poll for its own updates: %s", body)
 	}
-	if !strings.Contains(body, `id="channel-messages" hx-get="/ui/channel-messages?channel=%23public&amp;q=" hx-trigger="every 10s"`) {
-		t.Fatalf("the message list does not poll at half the text cache: %s", body)
+	if !strings.Contains(body, `id="channel-messages" data-live hx-get="/ui/channel-messages?channel=%23public&amp;q=" hx-trigger="load delay:1s, every 10s"`) {
+		t.Fatalf("the message list does not fetch once and then poll at half the text cache: %s", body)
+	}
+	for _, want := range []string{`id="pause"`, "data-apply-on-blur"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the channel page is missing %q (MON-CH-14)", want)
+		}
+	}
+	_, messagePartial, _ := get(t, c, h.ts.URL+"/ui/channel-messages?channel=%23public")
+	if !strings.Contains(messagePartial, `id="channel-messages" data-live hx-get="/ui/channel-messages?channel=%23public&amp;q=" hx-trigger="every 10s"`) {
+		t.Fatalf("the swapped-in message list must only poll, never reload itself (MON-CH-13): %s", messagePartial)
+	}
+	if strings.Contains(messagePartial, "load delay") {
+		t.Fatalf("the swapped-in message list carries a load trigger (MON-CH-13): %s", messagePartial)
 	}
 	h.st.ApplyEvents(kam.EventsResponse{Epoch: "e1", FirstSeq: 6, LastSeq: 6, Events: []kam.Event{
 		{Seq: 6, At: t0.Add(-5 * time.Second), Kind: kam.KindRX, PayloadType: "GRP_TXT", Channel: "#public"},
@@ -380,7 +392,8 @@ func TestChannelMetricsPartialUpdatesCountersAndList(t *testing.T) {
 		t.Fatalf("metrics partial: %d", status)
 	}
 	for _, want := range []string{
-		`<strong>2</strong>`, // the count moved with the new message
+		`id="channel-metrics" data-live`, // the pause control keeps working after the swap
+		`<strong>2</strong>`,             // the count moved with the new message
 		"Decoded messages over the last 60 minutes: 2 in total, in 1 of the 60 minutes. Every square is a minute with at least one message.",
 		`<rect class="c-msgs" x="590.50" y="15.00" width="9.00" height="9.00"/>`, // both in the last minute, one square
 		`<nav class="resource-list" aria-label="Channels" id="channel-list" hx-swap-oob="true">`,
@@ -861,6 +874,7 @@ func TestTrafficPageBasics(t *testing.T) {
 	_, body, _ := get(t, viewer, h.ts.URL+"/traffic")
 	for _, want := range []string{
 		`id="traffic-live"`, `hx-trigger="every 2s"`, `hx-get="/ui/traffic?"`,
+		`data-apply-on-blur`, // a filter applies when its field loses focus
 		"OpenSender", "Sender hidden → #emmen", "KAM → Emmen local",
 		"Export CSV", `href="/traffic.csv?"`,
 		"History starts at " + t0.Add(-50*time.Second).Local().Format("15:04") + ".",

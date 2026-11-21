@@ -2,7 +2,7 @@
 
 {{define "traffic-page"}}
 <div class="filters">
-  <form id="traffic-filter" hx-get="/ui/traffic" hx-push-url="true" hx-target="#traffic-live" hx-swap="outerHTML" role="search" aria-label="Traffic filters">
+  <form id="traffic-filter" hx-get="/ui/traffic" hx-push-url="true" hx-target="#traffic-live" hx-swap="outerHTML" role="search" aria-label="Traffic filters" data-apply-on-blur>
     <input type="search" name="text" value="{{.Text}}" placeholder="Filter source or destination" aria-label="Filter by source or destination">
     <select name="type" aria-label="Packet type">
       <option value="">All types</option>
