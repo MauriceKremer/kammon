@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starlark Automation Manual</title>
+    <link href="manuals.css" rel="stylesheet">
+    <script>try{var t=localStorage.getItem("kam-theme");document.documentElement.dataset.theme=t||(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")}catch(e){document.documentElement.dataset.theme="dark"}</script>
+    <script src="manuals.js" defer></script>
+</head>
+<body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <!-- Sidebar -->
+    <aside>
+        <div class="manual-brand"><span class="brand-mark" aria-hidden="true">K</span><span class="brand-text"><strong>KAM<span class="mon">mon</span></strong><span>Documentation</span></span><button class="theme-toggle" type="button" aria-label="Switch to dark mode"><svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button>
+</div>
+        <details class="manual-navigation" open>
+        <summary>Contents</summary>
+        <details class="navigation-section" open>
+        <summary>On this page</summary>
+        <nav aria-label="On this page">
+            <a href="#overview">Overview</a>
+            <a href="#quickstart">Quick Start</a>
+            <a href="#lifecycle">Lifecycle</a>
+            <a href="#environment">Writing a Script</a>
+            <a href="#capabilities">Capabilities</a>
+            <a href="#periodic">Timers &amp; Periodic Posts</a>
+            <a href="#samples">Sample Scripts</a>
+            <a href="#management">Management API</a>
+            <a href="#security">Security</a>
+            <a href="#troubleshooting">Troubleshooting</a>
+            <a href="#technical">Technical Deep Dive</a>
+        </nav>
+        </details>
+        <details class="navigation-section" open>
+        <summary>Manuals</summary>
+        <nav aria-label="Manuals">
+            <a href="KAM.html">KAM Guide</a>
+                    <a href="KAMmon.html">KAMmon</a>
+            <a href="Architecture.html">Architecture</a>
+            <a href="FeatureStarlark.html" aria-current="page">Starlark Automations</a>
+            <a href="FeatureKissModem.html">KISS Modem</a>
+            <a href="FeatureRoomServer.html">Room Server</a>
+            <a href="FeatureMonitorApi.html">Backend API</a>
+        </nav>
+        <details class="navigation-section" open>
+            <summary>Online</summary>
+            <nav aria-label="Online">
+                <a href="https://mauricekremer.github.io/kammon/" target="_blank" rel="noopener">Read online <span aria-hidden="true">&#8599;</span></a>
+            </nav>
+        </details>
+        </details>
+        </details>
+    </aside>
+
+    <!-- Main Content -->
+    <main id="main-content" tabindex="-1">
+        <header>
+            <span>Feature Manual</span>
+            <h1>Starlark Automations</h1>
+            <p>Extending KAM functionality with custom, safe, sandboxed scripts.</p>
+            <p class="mt-4"><span class="badge badge-green">Implemented (v1)</span> <span class="text-sm text-slate-500 ml-2">Includes the periodic-posts extension: timers, <code>rest_get</code>, <code>room_post</code>, and the cron <code>timer_schedule</code>. Design: <code>docs/FeatureStarlark.md</code>, <code>docs/FeatureStarlarkPeriodicPosts.md</code>, <code>docs/FeatureStarlarkTimerSchedules.md</code></span></p>
+        </header>
+
+        <article class="prose prose-slate max-w-none">
+
+            <!-- Overview -->
+            <section id="overview">
+                <h2>Overview</h2>
+                <p>Starlark Automation lets an operator write small scripts that react to events on the radio. A script can run in two ways: it is called with each <strong class="text-blue-600">decoded group text</strong> (a message on a channel KAM can decrypt), and it can declare a <strong class="text-blue-600">timer</strong> so KAM calls it on a schedule — an interval such as every 15 minutes, or a cron expression such as daily at 07:00. Instead of compiling new Go code each time a behaviour changes, you install or edit a <strong class="text-blue-600">Starlark</strong> script through the Local Management API, and the change takes effect without restarting KAM.</p>
+
+                <div class="info-box info-box-blue">
+                    <strong class="text-blue-700">What is Starlark?</strong> Starlark is a small dialect of Python designed for configuration and automation. It is deterministic and has no built-in access to files, the network or the operating system, which is why it is safe to run operator-supplied code in-process.
+                </div>
+
+                <p>Scripts are stored in the SQLite database (table <code>automation_scripts</code>), not in <code>kam.yml</code>. The former built-in ECHO responder is now just an example script (<code>docs/examples/echo.star</code>); a fresh install has no ECHO until you install it.</p>
+
+                                <div class="mermaid arch-diagram">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 360" role="img" aria-labelledby="overview-title overview-desc">
+                        <title id="overview-title">How scripts receive events and send</title>
+                        <desc id="overview-desc">Group texts decoded by KAM and timer fires join one 128-slot event queue. One automation worker runs your installed scripts one at a time; it loads them from the SQLite scripts table, which the operator manages through the local management API. A script's reply goes to a group channel, its room_post goes to a room server, and rest_get fetches an HTTPS URL.</desc>
+                        <defs>
+                            <marker id="arch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker>
+                        </defs>
+
+<!-- Actors and frame -->
+                        <text class="caption" x="166" y="54">Inside KAM: one Go program</text>
+                        <rect class="frame" x="166" y="60" width="700" height="184" rx="12"/>
+                        <g><rect class="box box-outside" x="6" y="76" width="132" height="56" rx="8"/><text class="name mid" x="72" y="96">MeshCore radio</text><text class="note mid" x="72" y="114">over the air</text></g>
+                        <g><rect class="box" x="166" y="76" width="170" height="56" rx="8"/><text class="name mid" x="251" y="96">Packet router</text><text class="note mid" x="251" y="114">taps decoded group texts</text></g>
+                        <g><rect class="box" x="426" y="76" width="160" height="56" rx="8"/><text class="name mid" x="506" y="96">Event queue (128)</text><text class="note mid" x="506" y="112">group texts and</text><text class="note mid" x="506" y="126">timer fires share it</text></g>
+                        <g><rect class="box" x="646" y="76" width="180" height="56" rx="8"/><text class="name mid" x="736" y="96">Timer loop</text><text class="note mid" x="736" y="112">one loop for all</text><text class="note mid" x="736" y="126">scripts, steady pace</text></g>
+                        <g><rect class="box" x="426" y="170" width="160" height="56" rx="8"/><text class="name mid" x="506" y="190">Automation worker</text><text class="note mid" x="506" y="206">runs scripts one</text><text class="note mid" x="506" y="220">at a time, in id order</text></g>
+                        <g><rect class="box box-optional" x="636" y="170" width="190" height="56" rx="8"/><text class="name mid" x="731" y="190">Your scripts</text><text class="note mid" x="731" y="206">each run starts</text><text class="note mid" x="731" y="220">with fresh state</text></g>
+
+<!-- Outside, below -->
+                        <g><rect class="box box-outside" x="6" y="270" width="120" height="56" rx="8"/><text class="name mid" x="66" y="290">Operator</text><text class="note mid" x="66" y="308">curl, kam CLI</text></g>
+                        <g><rect class="box box-outside" x="166" y="270" width="150" height="56" rx="8"/><text class="name mid" x="241" y="290">SQLite scripts</text><text class="note mid" x="241" y="306">source, status,</text><text class="note mid" x="241" y="320">revisions</text></g>
+                        <g><rect class="box box-outside" x="366" y="270" width="170" height="56" rx="8"/><text class="name mid" x="451" y="290">Group channels</text><text class="note mid" x="451" y="308">reply() floods out</text></g>
+                        <g><rect class="box box-outside" x="566" y="270" width="150" height="56" rx="8"/><text class="name mid" x="641" y="290">Room servers</text><text class="note mid" x="641" y="308">room_post() posts</text></g>
+                        <g><rect class="box box-outside" x="746" y="270" width="200" height="56" rx="8"/><text class="name mid" x="846" y="290">HTTP(S) APIs</text><text class="note mid" x="846" y="308">rest_get(), one GET</text></g>
+
+<!-- Arrows -->
+                        <path class="link" d="M138 104H166"/>
+                        <path class="link" d="M336 104H426"/>
+                        <text class="caption mid" x="381" y="96">group text</text>
+                        <path class="link" d="M646 104H586"/>
+                        <text class="caption mid" x="616" y="96">timer fire</text>
+                        <path class="link" d="M456 132V170"/>
+                        <path class="link" d="M586 198H636"/>
+                        <path class="link" d="M241 270V198H426"/>
+                        <text class="caption" x="249" y="216">compiled scripts</text>
+                        <path class="link" d="M126 298H166"/>
+                        <text class="caption mid" x="146" y="344">Local Management API</text>
+                        <path class="link" d="M646 226V248H451V270"/>
+                        <path class="link" d="M686 226V258H641V270"/>
+                        <path class="link" d="M726 226V238H846V270"/>
+                    </svg>
+                </div>
+                <p class="text-sm">Figure 1. The path from radio and timers to your scripts. Grey boxes are outside KAM, and the dashed box holds scripts you install through the API. Group texts and timer fires share one bounded queue, and a single worker runs scripts one at a time.</p>
+            </section>
+
+            <!-- Quick start -->
+            <section id="quickstart">
+                <h2>Quick Start</h2>
+                <p>KAM must be running (the API starts with it). The example installs a script that answers <code>ping</code> on <code>#public</code>:</p>
+                <pre><code class="language-bash">curl -s -X POST localhost:8766/scripts \
+  -H 'Content-Type: application/json' \
+  -d '{"script":{"id":"ping","name":"ping","enabled":true,
+       "source":"def on_group_text(message):\n    if message[\"channel\"] == \"#public\" and \"ping\" in message[\"body\"] and message[\"sender\"] != \"kam\":\n        reply(message[\"channel\"], \"pong, %d hops\" % message[\"hop_count\"])\n"}}'</code></pre>
+                <p>To install the bundled ECHO example, edit its three settings (<code>CHANNELS</code>, <code>MENTION</code>, <code>NODE_NAME</code>) and post it:</p>
+                <pre><code class="language-bash">jq -n --rawfile source docs/examples/echo.star \
+  '{script: {id: "echo", name: "echo", enabled: true, source: $source}}' \
+  | curl -s -X POST localhost:8766/scripts -H 'Content-Type: application/json' -d @-</code></pre>
+                <p>For a timer-based script, install the bundled weather poster the same way. Edit its settings at the top of <code>docs/examples/periodic.star</code> (<code>ROOM</code> and <code>API_URL</code> with your own weather API key) and give it a longer timeout, because one HTTPS round trip can exceed the 500 ms default:</p>
+                <pre><code class="language-bash">jq -n --rawfile source docs/examples/periodic.star \
+  '{script: {id: "periodic", name: "periodic", enabled: true, timeout_ms: 30000, source: $source}}' \
+  | curl -s -X POST localhost:8766/scripts -H 'Content-Type: application/json' -d @-</code></pre>
+                <p>From then on KAM calls its <code>on_timer</code> every 15 minutes and posts one line like <code>Emmen 4.9°C, feels 1.8°C, Clear, wind 14 km/h, humidity 80% (19:52)</code> into the room. The <a href="#periodic">Timers &amp; Periodic Posts</a> section explains the pieces. More ready-to-adapt samples are collected in the <a href="#samples">Sample Scripts</a> section.</p>
+
+                <div class="info-box info-box-amber">
+                    <strong>Do not forget <code>"enabled": true</code>.</strong> A script created without it is stored but never runs. The same applies to updates: <code>PUT</code> replaces the whole script, so leave out <code>enabled</code> and you disable it.
+                </div>
+            </section>
+
+            <!-- Lifecycle -->
+            <section id="lifecycle">
+                <h2>The Automation Lifecycle</h2>
+                <p>Two independent settings decide whether a script runs: <code>enabled</code> (what the operator wants) and <code>runtime_status</code> (what KAM has detected). A script runs only when it is <strong>enabled and <code>READY</code></strong>.</p>
+                <ul class="space-y-2">
+                    <li><strong class="text-green-600">READY:</strong> The script compiled and has not misbehaved. It runs for each event and timer fire if it is also enabled.</li>
+                    <li><strong class="text-red-600">BROKEN:</strong> A stored script failed to compile or validate when KAM loaded it at startup (for example because the host function set changed). It is inactive and <code>last_error</code> holds the reason.</li>
+                    <li><strong class="text-amber-600">FROZEN:</strong> A run exceeded the script's <code>timeout_ms</code> (default 500). KAM stopped dispatching to it, saved the error and waits for an operator to recover it.</li>
+                </ul>
+
+                <div class="mermaid arch-diagram">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" role="img" aria-labelledby="lifecycle-title lifecycle-desc">
+                        <title id="lifecycle-title">A script's status lifecycle</title>
+                        <desc id="lifecycle-desc">A script saved through the API is compiled with its entry points checked; success makes it READY, failure rejects the request with 422 and changes nothing. A stored script recompiled at startup follows the same check; success makes it READY, failure marks it BROKEN. A READY script runs for each event and timer fire; a run exceeding timeout_ms freezes it, and runs within the limit simply return. FROZEN and BROKEN scripts return to READY only through recover or a new save.</desc>
+                        <defs>
+                            <marker id="arch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker>
+                        </defs>
+
+<!-- Entries -->
+                        <g><rect class="box" x="196" y="8" width="200" height="56" rx="8"/><text class="name mid" x="296" y="28">Save via API</text><text class="note mid" x="296" y="46">local management API</text></g>
+                        <g><rect class="box" x="564" y="8" width="200" height="56" rx="8"/><text class="name mid" x="664" y="28">KAM startup</text><text class="note mid" x="664" y="46">loads stored scripts</text></g>
+
+<!-- Compile checks -->
+                        <g><rect class="box" x="196" y="120" width="200" height="64" rx="8"/><text class="name mid" x="296" y="142">Valid script?</text><text class="note mid" x="296" y="162">compiles + entry points</text></g>
+                        <g><rect class="box" x="564" y="120" width="200" height="64" rx="8"/><text class="name mid" x="664" y="142">Valid script?</text><text class="note mid" x="664" y="162">recompiled from storage</text></g>
+
+<!-- Outcomes -->
+                        <g><rect class="box" x="36" y="240" width="200" height="64" rx="8"/><text class="name mid" x="136" y="264">Rejected (422)</text><text class="note mid" x="136" y="284">nothing changes</text></g>
+                        <g><rect class="box" x="386" y="240" width="188" height="80" rx="8"/><text class="name mid" x="480" y="264">READY</text><text class="note mid" x="480" y="286">enabled, and runs for</text><text class="note mid" x="480" y="302">each event or timer fire</text></g>
+                        <g><rect class="box" x="724" y="240" width="200" height="64" rx="8"/><text class="name mid" x="824" y="264">BROKEN</text><text class="note mid" x="824" y="284">did not compile at startup</text></g>
+
+<!-- Runtime -->
+                        <g><rect class="box" x="386" y="380" width="188" height="64" rx="8"/><text class="name mid" x="480" y="404">Event or timer fire</text><text class="note mid" x="480" y="424">from the event queue</text></g>
+                        <g><rect class="box" x="624" y="380" width="200" height="64" rx="8"/><text class="name mid" x="724" y="404">Over timeout_ms?</text><text class="note mid" x="724" y="424">one run's wall clock</text></g>
+                        <g><rect class="box" x="624" y="500" width="200" height="64" rx="8"/><text class="name mid" x="724" y="524">FROZEN</text><text class="note mid" x="724" y="544">stopped until you recover</text></g>
+
+<!-- Arrows: entries to checks -->
+                        <path class="link" d="M296 64V120"/>
+                        <path class="link" d="M664 64V120"/>
+
+<!-- Arrows: check outcomes -->
+                        <path class="link" d="M236 184V212H136V240"/>
+                        <text class="caption" x="186" y="206">no</text>
+                        <path class="link" d="M296 184V212H420V240"/>
+                        <text class="caption" x="358" y="206">yes</text>
+                        <path class="link" d="M724 184V212H824V240"/>
+                        <text class="caption" x="774" y="206">no</text>
+                        <path class="link" d="M664 184V212H540V240"/>
+                        <text class="caption" x="602" y="206">yes</text>
+
+<!-- Arrows: runtime loop -->
+                        <path class="link" d="M480 320V380"/>
+                        <path class="link" d="M574 412H624"/>
+                        <path class="link" d="M824 412H930V332H480V320"/>
+                        <text class="caption" x="700" y="344">runs finish within the limit</text>
+                        <path class="link" d="M724 444V500"/>
+                        <text class="caption" x="732" y="478">over the limit</text>
+
+<!-- Arrows: recover paths -->
+                        <path class="link link-soft" d="M624 532H592V352H420V320"/>
+                        <text class="caption" x="500" y="368">recover</text>
+                        <path class="link link-soft" d="M724 272H574"/>
+                        <text class="caption" x="649" y="264">recover</text>
+                    </svg>
+                </div>
+                <p class="text-sm">Figure 2. What happens to a script's status. Solid arrows are normal paths; dashed arrows are the operator's recover paths. A save that does not compile is rejected with <code>422</code> and changes nothing; a stored script that fails at startup is <code>BROKEN</code>. <code>FROZEN</code> and <code>BROKEN</code> return to <code>READY</code> only through <code>recover</code> or a new save.</p>
+
+                <h3>What changes the status</h3>
+                <table>
+                    <thead><tr><th>Event</th><th>Result</th></tr></thead>
+                    <tbody>
+                        <tr><td>Source fails to compile through the API</td><td>Request rejected with <code>422</code>. The previous version, if any, keeps running. The script never becomes <code>BROKEN</code> this way.</td></tr>
+                        <tr><td>Stored script fails to compile at startup</td><td><code>BROKEN</code>, saved with <code>last_error</code>. KAM still starts and keeps receiving.</td></tr>
+                        <tr><td>Run exceeds <code>timeout_ms</code></td><td><code>FROZEN</code> immediately in memory, then saved. If saving fails, it is logged and the script stays frozen until restart.</td></tr>
+                        <tr><td>Run raises another error (bad call, <code>reply</code> failure)</td><td>Logged only. Status stays <code>READY</code>; the next event or timer fire runs normally and later scripts still run.</td></tr>
+                        <tr><td><code>enable</code> / <code>disable</code></td><td>Changes <code>enabled</code> only. A <code>FROZEN</code> or <code>BROKEN</code> script stays inactive.</td></tr>
+                        <tr><td><code>recover</code></td><td>Recompiles the stored source; on success status becomes <code>READY</code> and <code>last_error</code> is cleared. May also set a new <code>timeout_ms</code>.</td></tr>
+                        <tr><td>Saving new source</td><td>Compiles first, then stores it as <code>READY</code> with <code>last_error</code> cleared, and swaps it in.</td></tr>
+                    </tbody>
+                </table>
+                <p><code>BROKEN</code> and <code>FROZEN</code> survive a restart; a successful compile alone never re-activates them.</p>
+            </section>
+
+            <!-- Environment -->
+            <section id="environment">
+                <h2>Writing a Script</h2>
+                <p>A script defines one or both of these entry points, and declares a timer by setting an interval or a cron schedule at the top of the file:</p>
+                <pre><code class="language-python">def on_group_text(message):   # called for each decoded group text
+    ...
+
+def on_timer(now):        # called on the timer the source declares
+    ...
+
+timer_interval_minutes = 15   # interval in minutes, at least 1  
+# or, instead:  timer_schedule = "0 7 * * *"   # cron slots, e.g. daily at 07:00</code></pre>
+                <p>KAM rejects a script with neither entry point, and also rejects an incomplete timer: a timer line without a callable <code>on_timer(now)</code> is an error, and so is <code>on_timer</code> without any timer line. Two timer forms exist, and a script may set exactly one of them: <code>timer_interval_minutes</code>, a plain integer literal written directly in the source (not a calculation and not a variable) with a value of at least 1, or <code>timer_schedule</code>, a plain string literal holding a standard cron expression</p>
+            <p>A cron expression has five fields (minute, hour, day of month, month, weekday) and allows an optional sixth seconds field in front, so <code>"*/1 * * * * *"</code> means once a second — the fastest a script may run. Slots align with the clock: <code>"0 7 * * *"</code> runs at 07:00 local time, and the first run comes at the first slot after the script is saved or KAM restarts. Both forms are rejected at save time when they cannot be read. The API reports them as the read-only <code>timer_interval_minutes</code> and <code>timer_schedule</code> fields, and a request's values for them are ignored.</p>
+                <h4>Cron in practice</h4>
+                <p>Read a cron expression left to right as <em>minute, hour, day of month, month, weekday</em>, with an optional seconds field in front. A <code>*</code> means "every". Each row is the value to put after <code>timer_schedule =</code>, with the first runs it produces when saved on a Thursday evening:</p>
+                <table><thead><tr><th>You want</th><th>Expression</th><th>First runs from Thursday 21:52</th></tr></thead><tbody>
+                    <tr><td>Daily at 21:50</td><td><code>50 21 * * *</code></td><td>Fri 21:50, Sat 21:50</td></tr>
+                    <tr><td>Every hour on the hour</td><td><code>0 * * * *</code></td><td>22:00, 23:00, 00:00</td></tr>
+                    <tr><td>Every 15 minutes</td><td><code>*/15 * * * *</code></td><td>22:00, 22:15, 22:30</td></tr>
+                    <tr><td>21:50 on weekdays only</td><td><code>50 21 * * 1-5</code></td><td>Fri 21:50, Mon 21:50</td></tr>
+                    <tr><td>Twice a day, 07:50 and 21:50</td><td><code>50 7,21 * * *</code></td><td>Fri 07:50, Fri 21:50</td></tr>
+                    <tr><td>First of the month, 08:00</td><td><code>0 8 1 * *</code></td><td>1 Dec 08:00, 1 Jan 08:00</td></tr>
+                    <tr><td>Every 10 seconds (testing)</td><td><code>*/10 * * * * *</code></td><td>21:52:10, 21:52:20</td></tr>
+                </tbody></table>
+                <p>Weekday numbers run <code>0</code> to <code>6</code> from Sunday, and <code>1-5</code> is Monday to Friday. A comma lists alternatives (<code>7,21</code> means those two hours) and a slash means "every N" (<code>*/15</code> means every 15 minutes).</p>
+                <p>One thing cron cannot say: a different minute in each hour. <code>50 21,7 * * *</code> is <strong>not</strong> 21:50 plus 07:00 — it is minute 50 in both hours, so 21:50 and 07:50. For two different minutes, use two timer scripts, each with its own expression.</p>
+                <p>Each event or timer fire gets a <strong>fresh</strong> interpreter state: the top level of the file runs again every time, and nothing you assign survives to the next event. Treat every call as a brand-new interaction; there is no persistent storage for scripts.</p>
+
+                <h3>The <code>message</code> dictionary</h3>
+                <p>Both entry points take the argument <code>message</code>, a read-only (frozen) dictionary. For a group text it holds the fields below:</p>
+                <table>
+                    <thead>
+                        <tr><th>Field</th><th>Type</th><th>Meaning</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td><code>channel</code></td><td>string</td><td>Normalised channel name: lowercase with a leading <code>#</code>, e.g. <code>"#public"</code>.</td></tr>
+                        <tr><td><code>sender</code></td><td>string</td><td>Sender name parsed from the message; may be empty.</td></tr>
+                        <tr><td><code>body</code></td><td>string</td><td>The text after the <code>sender: </code> prefix.</td></tr>
+                        <tr><td><code>timestamp_unix</code></td><td>int</td><td>The sender's own timestamp, Unix seconds.</td></tr>
+                        <tr><td><code>hop_count</code></td><td>int</td><td>Number of relays the packet passed through.</td></tr>
+                        <tr><td><code>hop_stations</code></td><td>list of strings</td><td>Hex-encoded identity hashes of the relays, in path order.</td></tr>
+                        <tr><td><code>has_rx_meta</code></td><td>bool</td><td>True when the modem reported signal quality for this packet.</td></tr>
+                        <tr><td><code>snr_quarter_db</code></td><td>int</td><td>Signal-to-noise ratio in quarter-dB units (divide by 4 for dB). Meaningful only when <code>has_rx_meta</code> is true.</td></tr>
+                        <tr><td><code>rssi_dbm</code></td><td>int</td><td>Signal strength in dBm. Meaningful only when <code>has_rx_meta</code> is true.</td></tr>
+                        <tr><td><code>time_drift_seconds</code></td><td>int</td><td>Absolute difference between the sender's timestamp and KAM's clock, in seconds. Never negative.</td></tr>
+                    </tbody>
+                </table>
+                <p>KAM waits up to 200 ms for the modem's signal report; if it does not arrive, the event is delivered with <code>has_rx_meta</code> false (and <code>snr_quarter_db</code> and <code>rssi_dbm</code> at 0).</p>
+                <p>Scripts only see messages from channels KAM can decrypt, i.e. channels that are enabled in <code>kam.yml</code>.</p>
+                <p>A timer fire does not get a message dictionary at all. Its one argument is a <code>time</code> value — the moment the fire was due — so the handler reads <code>now.unix</code> for Unix seconds or calls <code>now.format("15:04")</code> for a clock time, as the weather example does. Nothing else of a group text exists there: no <code>body</code>, <code>sender</code> or <code>channel</code>.</p>
+
+                <h3>Language limits worth knowing</h3>
+                <ul>
+                    <li>No <code>while</code> loops; use <code>for</code> over a range or collection.</li>
+                    <li><code>if</code>/<code>for</code> statements are only allowed inside functions, not at the top level of the file.</li>
+                    <li>Global variables cannot be reassigned once defined, so each <code>timer_interval_minutes =</code> may appear once.</li>
+                    <li><code>load()</code> is not available: a script is a single file.</li>
+                    <li>Percent formatting has no precision flags (<code>"%.1f"</code> is an error) and there is no <code>round()</code>; <code>%s</code> on a float prints its shortest form (<code>4.9</code>) and <code>%d</code> truncates a float (<code>14.0</code> becomes <code>14</code>).</li>
+                    <li>Calling a name that is neither defined nor a host function is a compile error, so typos are caught when you save.</li>
+                </ul>
+
+                <h3>Example: reply to a mention</h3>
+                <pre><code class="language-python">NODE_NAME = "kam"          # must match node_name in kam.yml
+
+def on_group_text(message):
+    if message["channel"] != "#test" or message["sender"] == NODE_NAME:
+        return
+    if "@kam" in message["body"]:
+        reply(message["channel"], "hello %s" % (message["sender"] or "someone"))</code></pre>
+                <div class="info-box info-box-red">
+                    <strong>Avoid reply loops.</strong> A repeater may relay KAM's own reply back to KAM. A script that answers every message on a channel, without ignoring its own <code>node_name</code> as sender, will then answer itself indefinitely and flood the channel. Always filter on the sender and require a trigger such as a mention. The bundled <code>echo.star</code> does both.
+                </div>
+            </section>
+
+            <!-- Capabilities -->
+            <section id="capabilities">
+                <h2>Capabilities (Host Functions)</h2>
+                <p>Scripts cannot touch the filesystem or the radio directly, and they get no general internet access. They can only call the functions and modules KAM predeclares. Anything else is an "undefined" compile error.</p>
+
+                <table>
+                    <thead><tr><th>Capability</th><th>Kind</th><th>What it does</th></tr></thead>
+                    <tbody>
+                        <tr>
+                            <td><code>reply(channel, text)</code></td>
+                            <td><span class="badge badge-green">Function</span></td>
+                            <td>Sends a group text to a channel (flood route).</td>
+                        </tr>
+                        <tr>
+                            <td><code>room_post(room_id, text)</code></td>
+                            <td><span class="badge badge-green">Function</span></td>
+                            <td>Writes one post into one of KAM's own rooms, as the room identity. Clients receive it like any other post.</td>
+                        </tr>
+                        <tr>
+                            <td><code>rest_get(url, headers=...)</code></td>
+                            <td><span class="badge badge-green">Function</span></td>
+                            <td>Fetches an HTTP(S) URL and returns <code>(body, status)</code>. The script picks the URL and its key.</td>
+                        </tr>
+                        <tr>
+                            <td><code>json</code>, <code>time</code></td>
+                            <td><span class="badge badge-green">Modules</span></td>
+                            <td><code>json.decode</code>/<code>json.encode</code> for API payloads; <code>time.from_timestamp</code> and <code>.format</code> for clock times.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>How <code>reply</code> behaves</h3>
+                <ul>
+                    <li><strong>Channel:</strong> must be a channel configured and enabled in <code>kam.yml</code>. Names are normalised, so <code>"Public"</code> and <code>"#public"</code> are the same. An unknown channel raises an error that is logged.</li>
+                    <li><strong>Format:</strong> the message is sent as <code>&lt;node_name&gt;: &lt;text&gt;</code>. Text is trimmed, and the whole message is truncated to fit one radio packet (about 170 characters including the name prefix).</li>
+                    <li><strong>Queued, not delivered:</strong> <code>reply</code> returns once the packet is queued for transmission, within a best-effort 500 ms send budget that is also bounded by the script's own deadline. It does not wait for the radio, and there is no delivery confirmation.</li>
+                    <li><strong>Rapid replies:</strong> the modem holds one transmission at a time and KAM does not yet pace transmissions on the modem's <code>TxDone</code> event, so several replies in quick succession can lose the later ones. See the <a class="text-blue-600" href="FeatureKissModem.html">KISS Modem manual</a>.</li>
+                    <li><strong>Scope:</strong> scripts cannot send raw frames or change radio settings. The ways out are the capabilities listed above.</li>
+                </ul>
+
+                <h3>How <code>rest_get</code> behaves</h3>
+                <ul>
+                    <li><strong>Return value:</strong> a tuple <code>(body, status)</code>. A server error such as <code>404</code> or <code>503</code> is <em>not</em> a script error: you get the body and the status code and decide what to do. The weather example stays quiet when the status is not <code>200</code>.</li>
+                    <li><strong>Deadlines:</strong> the request uses the script's remaining time budget as its deadline. A slow API therefore freezes a fast-failing script no longer than <code>timeout_ms</code>; give timer scripts that call APIs a generous <code>timeout_ms</code> (the example uses 30000).</li>
+                    <li><strong>Size cap:</strong> a response body larger than 1 MiB (1,048,576 bytes) is an error, not a silent cut — a truncated JSON document would still decode and produce wrong data.</li>
+                    <li><strong>Accepted URLs:</strong> <code>http</code> and <code>https</code> only. A URL with a username and password (<code>https://user:pass@…</code>) is rejected; put credentials in the URL's query string or headers, as your API expects. Redirects are followed.</li>
+                    <li><strong>Headers:</strong> pass the optional second argument as a dictionary of strings, e.g. <code>rest_get(url, {"Authorization": "Bearer " + key})</code>.</li>
+                </ul>
+
+                <h3>How <code>room_post</code> behaves</h3>
+                <ul>
+                    <li><strong>Room id:</strong> the <code>id</code> from the <code>rooms:</code> list in <code>kam.yml</code> (the example posts to <code>"lobby"</code>). An unknown room raises an error that is logged; it does not freeze the script.</li>
+                    <li><strong>Author:</strong> the post is stored as the room's own identity, so clients see it without a sender name — like a pinned note on the board. Text is truncated to 150 characters, the same as a client post.</li>
+                    <li><strong>Delivery:</strong> the post enters the room's normal backlog, so clients that log in later receive it too, and online clients get it pushed within seconds. If rooms are not running (<code>kam.yml</code> has no <code>rooms:</code> list), the call errors instead of posting.</li>
+                </ul>
+
+                <div class="info-box info-box-amber">
+                    <strong>Deadlines:</strong> every host function receives the script's remaining time budget. A function that overruns it freezes the script, so slow work can never stall the single worker for long.
+                </div>
+            </section>
+
+<!-- Periodic posts -->
+            <section id="periodic">
+                <h2>Timers &amp; Periodic Posts</h2>
+                <p>The second entry point lets a script act on its own schedule instead of waiting for radio traffic. KAM runs one timer loop for all scripts: it checks which timer scripts are due and calls their <code>on_timer(now)</code>, one script at a time through the same worker as group texts. The timer line is either <code>timer_interval_minutes</code>, as below, or the cron <code>timer_schedule</code> shown in <a href="#environment">Writing a Script</a>.</p>
+                <pre><code class="language-python">timer_interval_minutes = 15
+
+def on_timer(now):
+    room_post("lobby", "checkpoint at %s" % now.format("15:04"))</code></pre>
+                <p>A scheduled post replaces only the timer line — everything about the run stays the same:</p>
+                <pre><code class="language-python">timer_schedule = "0 7 * * *"   # clock slots; see the cron table in Writing a Script</code></pre>
+                <p>What to expect:</p>
+                <ul>
+                    <li><strong>First fire:</strong> about one interval after the script becomes enabled and <code>READY</code> — a 15-minute timer does not fire immediately after saving. A cron script instead waits for its first clock slot after the save or restart, so a daily 07:00 script saved on any evening fires the next morning.</li>
+                    <li><strong>Changing the timer:</strong> a save that changes the interval or the schedule replaces the script's pending fire, so the new period takes effect at once. Disabling, freezing or deleting the script removes it from the schedule; a <code>recover</code> or new save joins it again.</li>
+                    <li><strong>No catch-up:</strong> if one run is delayed (the worker is busy, KAM is restarting), the next fire is measured from when the previous one was due — you get steady pacing, never a burst of missed runs. Cron slots skip the same way: a slot missed while KAM was down is not made up.</li>
+                    <li><strong>Counted with group texts:</strong> timer fires wait in the same 128-event queue; a full queue drops and logs a fire (<code>timer fire dropped: queue full</code>) rather than blocking anything.</li>
+                </ul>
+                <p>The bundled <code>docs/examples/periodic.star</code> puts the pieces together — fetch, decode, format, post:</p>
+                <pre><code class="language-python">timer_interval_minutes = 15
+
+ROOM = "lobby"
+API_URL = "https://api.weatherapi.com/v1/current.json?key=YOUR_KEY&q=Emmen"
+
+def on_timer(now):
+    body, status = rest_get(API_URL)
+    if status != 200:
+        return  # stay quiet and try again next interval; a bad key is not room news
+    weather = json.decode(body)
+    current = weather["current"]
+    text = "Emmen %s°C, feels %s°C, %s, wind %d km/h, humidity %d%% (%s)" % (
+        current["temp_c"],
+        current["feelslike_c"],
+        current["condition"]["text"],
+        current["wind_kph"],
+        current["humidity"],
+        now.format("15:04"),
+    )
+    room_post(ROOM, text)</code></pre>
+                <p>On the real WeatherAPI endpoint this posts one line such as <code>Emmen 4.9°C, feels 1.8°C, Clear, wind 14 km/h, humidity 80% (19:52)</code>. Edit <code>ROOM</code> and <code>API_URL</code> (with your own API key) before installing; the <a href="#quickstart">Quick Start</a> shows the command. The API key sits in the script source like a channel key in <code>kam.yml</code> — readable by anyone with database or API access, which on a single-operator node means you.</p>
+            </section>
+
+            <!-- Sample scripts -->
+            <section id="samples">
+                <h2>Sample Scripts</h2>
+                <p>Four ready-to-adapt samples, each small enough to read in one pass. <code>echo.star</code> and <code>periodic.star</code> are the two pinned bundled examples; these samples are for you to change. To install one, save the source as a file and post it as in the <a href="#quickstart">Quick Start</a>; to check a source without saving it, POST the same JSON body to <code>POST /scripts/validate</code> instead:</p>
+                <pre><code class="language-bash">jq -n --rawfile source my-script.star \
+  '{script: {id: "my-script", name: "my-script", enabled: true, timeout_ms: 10000, source: $source}}' \
+  | curl -sS -X POST localhost:8766/scripts -H 'Content-Type: application/json' -d @-</code></pre>
+
+                <h3>1. Answer a <code>!weather</code> command with a live lookup</h3>
+                <p>One <code>rest_get</code> per mention: the trigger word with a city, a fetch, a one-line reply. The 10-second timeout exists because one HTTPS round trip can exceed the 500 ms default budget.</p>
+                <pre><code class="language-python">API_KEY = "your-key"          # a weatherapi.com key; it sits in plain text like any script source
+NODE_NAME = "kam"             # must match node_name in kam.yml
+
+def on_group_text(message):
+    if message["sender"] == NODE_NAME:
+        return
+    words = message["body"].lower().split()
+    if len(words) &lt; 2 or words[0] != "!weather":
+        return
+    city = " ".join(words[1:])
+    url = "https://api.weatherapi.com/v1/current.json?key=" + API_KEY + "&amp;q=" + "%20".join(words[1:])
+    body, status = rest_get(url)
+    if status != 200:
+        reply(message["channel"], "lookup failed (%d)" % status)
+        return
+    w = json.decode(body)["current"]
+    reply(message["channel"], "%s: %s°C, %s, wind %d km/h" % (city, w["temp_c"], w["condition"]["text"], w["wind_kph"]))</code></pre>
+                <div class="info-box info-box-amber"><p><strong>Every fetch spends airtime twice.</strong> Only the trigger word fetches, but a live channel answering every command still queues packets one after another, and later replies can be lost (the modem holds one transmission at a time). Narrow triggers and short replies are the cheapest protection.</p></div>
+
+                <h3>2. A daily room bulletin on a cron schedule</h3>
+                <p>The cron form from <a href="#environment">Writing a Script</a>: one wall-clock slot a day, no timer drift across restarts. The body below is a placeholder line — put whatever your group agreed on:</p>
+                <pre><code class="language-python">timer_schedule = "0 7 * * *"   # once a day at 07:00 local time
+ROOM = "noticeboard"           # a room id from the rooms: list in kam.yml
+
+def on_timer(now):
+    room_post(ROOM, "Good morning. Board checked %s; old posts stay until an admin deletes them." % now.format("Mon 02 Jan"))</code></pre>
+                <p>The first fire is the first 07:00 after the save; a save that changes the expression reschedules at once, and a slot missed while KAM was down is skipped.</p>
+
+                <h3>3. An hourly self-report from KAM's own status</h3>
+                <p>A timer script may fetch over <code>http</code> too, and KAM's local API is one such URL. This post into a room reports the modem link, the duty-cycle window and the transmit counters:</p>
+                <pre><code class="language-python">timer_interval_minutes = 120
+STATUS_URL = "http://127.0.0.1:8766/v1/status"   # the KAM API; change the port if you moved monitor.listen
+ROOM = "ops"
+
+def on_timer(now):
+    body, status = rest_get(STATUS_URL)
+    if status != 200:
+        return   # stay quiet this round if the listener does not answer
+    s = json.decode(body)
+    pct = s["duty_cycle"]["used_ms"] // (s["duty_cycle"]["window_s"] * 10)
+    room_post(ROOM, "%s: modem %s, duty %d%% last window, TX %d sent, %d rejected" % (
+        now.format("Mon 02 Jan 15:04"),
+        s["modem"]["link"], pct, s["tx"]["sent"], s["tx"]["rejected"]))</code></pre>
+                <p><code>//</code> is floored division, so <code>pct</code> stays a whole number. The post costs nothing on the radio: it lands in the room only.</p>
+
+                <h3>4. A relay from a channel into a room</h3>
+                <p>Messages that carry a marker are cross-posted into one of KAM's rooms, so app clients that do not follow the channel still read them:</p>
+                <pre><code class="language-python">WATCH_CHANNEL = "#public"   # must be enabled in kam.yml
+ROOM = "relay"              # a room id from the rooms: list in kam.yml
+NODE_NAME = "kam"
+
+def on_group_text(message):
+    if message["channel"] != WATCH_CHANNEL or message["sender"] == NODE_NAME:
+        return
+    if "#bbs" not in message["body"]:
+        return
+    room_post(ROOM, "%s: %s" % (message["sender"] or "someone", message["body"]))</code></pre>
+                <div class="info-box info-box-amber"><p><strong>No memory between runs.</strong> A fresh interpreter state means this sample cannot rate-limit itself: messages keep arriving, one post follows per matching message, and nobody has seen the previous one. On a chatty channel the room fills with posts — narrow the marker, or run the sample on a quiet channel.</p></div>
+
+                <p>None of the samples can do more than the capability list allows: one reply, one room post or one fetch per run, no files, no saved state, no raw radio access. Everything a script can reach is in <a href="#capabilities">Capabilities</a>.</p>
+            </section>
+
+            <!-- Management -->
+            <section id="management">
+                <h2>Management via the Local Management API</h2>
+                <p>Scripts are managed over HTTP at <code class="text-blue-600">127.0.0.1:8766</code> (the same loopback listener as the monitoring API; the default is configurable with <code>monitor.listen</code> in <code>kam.yml</code>). The API is reachable only from the KAM machine and has <strong>no authentication</strong>: anyone who can log in to that machine can change scripts.</p>
+
+                <h3>Rules for every request</h3>
+                <ul>
+                    <li>The <code>Host</code> header must be a loopback name (<code>localhost</code>, <code>127.0.0.1</code>, <code>[::1]</code>), otherwise <code>403</code>.</li>
+                    <li><code>POST</code> and <code>PUT</code> need <code>Content-Type: application/json</code>, otherwise <code>415</code>.</li>
+                    <li>Unknown JSON fields are rejected with <code>400</code>, so a misspelt field name is an error rather than silently ignored.</li>
+                    <li><strong>Revisions:</strong> each script has a <code>revision</code> that increases on every save. Updates, enable, disable, recover and delete must send the revision you last read; a stale value returns <code>409</code>. Create uses <code>0</code> (or omits it). A freeze or <code>BROKEN</code> status change does not bump the revision.</li>
+                </ul>
+
+                <h3>Endpoints</h3>
+                <table>
+                    <thead><tr><th>Request</th><th>Purpose</th><th>Success</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>GET /scripts</code></td><td>List all scripts with status, <code>last_error</code> and the read-only <code>timer_interval_minutes</code> and <code>timer_schedule</code>.</td><td><code>200</code></td></tr>
+                        <tr><td><code>GET /scripts/{id}</code></td><td>Read one script.</td><td><code>200</code> (<code>404</code> if unknown)</td></tr>
+                        <tr><td><code>POST /scripts/validate</code></td><td>Compile source without saving. Body: <code>{"id", "source", "timeout_ms"}</code>.</td><td><code>200 {"valid":true}</code> (<code>422</code> with the compile error)</td></tr>
+                        <tr><td><code>POST /scripts</code></td><td>Create. Body: <code>{"script": {...}}</code>. <code>id</code>, <code>name</code> and <code>source</code> are required; <code>timeout_ms</code> defaults to 500; <code>enabled</code> defaults to false.</td><td><code>201</code> (<code>409</code> if the id or name exists)</td></tr>
+                        <tr><td><code>PUT /scripts/{id}</code></td><td>Replace the whole script. Body: <code>{"script": {...}, "expected_revision": N}</code>. Send <code>enabled</code> and a positive <code>timeout_ms</code> every time.</td><td><code>200</code> (<code>409</code> stale or name taken)</td></tr>
+                        <tr><td><code>POST /scripts/{id}/enable</code><br><code>POST /scripts/{id}/disable</code></td><td>Change the desired state only. Body: <code>{"expected_revision": N}</code>.</td><td><code>200</code></td></tr>
+                        <tr><td><code>POST /scripts/{id}/recover</code></td><td>Recompile and return to <code>READY</code>. Body: <code>{"expected_revision": N, "timeout_ms": M}</code>; <code>timeout_ms</code> is optional.</td><td><code>200</code> (<code>422</code> if the source still fails)</td></tr>
+                        <tr><td><code>DELETE /scripts/{id}?revision=N</code></td><td>Delete the script. The ECHO script is not protected and is never recreated.</td><td><code>204</code></td></tr>
+                    </tbody>
+                </table>
+
+                <h3>Typical session</h3>
+                <pre><code class="language-bash"># 1. See what exists and read the current revision
+curl -s localhost:8766/scripts
+
+# 2. Check a change before saving it
+curl -s -X POST localhost:8766/scripts/validate -H 'Content-Type: application/json' \
+  -d '{"source":"def on_group_text(message):\n    pass\n"}'
+
+# 3. Disable without deleting (revision 1)
+curl -s -X POST localhost:8766/scripts/ping/disable -H 'Content-Type: application/json' \
+  -d '{"expected_revision":1}'
+
+# 4. A frozen script: recover it with a longer timeout
+curl -s -X POST localhost:8766/scripts/ping/recover -H 'Content-Type: application/json' \
+  -d '{"expected_revision":2,"timeout_ms":1000}'</code></pre>
+                <p>Recovery fixes the status, not the cause. A script that froze because it is slow will freeze again unless you fix the source or raise <code>timeout_ms</code>.</p>
+            </section>
+
+            <!-- Security -->
+            <section id="security">
+                <h2 class="text-red-600">Security &amp; Sandboxing</h2>
+                <p>Automation is powerful, so it is strictly isolated:</p>
+                <ul class="space-y-1">
+                    <li><strong>No filesystem, sockets or process control:</strong> scripts cannot open sockets, read or write files, run shell commands or start threads. The only network access is <code>rest_get</code>: plain HTTP(S) get requests the script's own source defines — there is no arbitrary port, protocol or file access.</li>
+                    <li><strong>No hardware access:</strong> scripts cannot reach the KISS modem commands. Outbound actions are limited to <code>reply</code>, <code>room_post</code> and <code>rest_get</code>.</li>
+                    <li><strong>Immutable input:</strong> the <code>message</code> is a frozen copy; scripts cannot alter KAM's internal data.</li>
+                    <li><strong>Loopback only:</strong> the API binds to 127.0.0.1 and refuses to start on any other address. The Host and Content-Type checks stop web pages in a browser on the same machine from driving it (DNS rebinding and cross-site forms).</li>
+                    <li><strong>Trust model:</strong> one system administrator. There are no users, ownership or per-script permissions, and no limits on script count, source size or reply rate. The operator is responsible for the <code>timeout_ms</code> they choose; it has no maximum.</li>
+                    <li><strong>Treat incoming text as untrusted:</strong> <code>body</code> and <code>sender</code> come from the radio. Do not assume they are well-formed.</li>
+                    <li><strong>Treat HTTP bodies as untrusted too:</strong> a <code>rest_get</code> body comes from the network you asked. <code>json.decode</code> throws on malformed input, so wrap the parse in your own expectations; never format a fetched string straight into a room post without looking at it.</li>
+                </ul>
+                <div class="info-box info-box-amber">
+                    <strong>Backups:</strong> the database now holds your script source. Include it in backups: <code>sqlite3 kam.db ".backup kam-backup.db"</code> while running, or copy <code>kam.db</code> with its <code>-wal</code> and <code>-shm</code> files while KAM is stopped.
+                </div>
+            </section>
+
+            <!-- Troubleshooting -->
+            <section id="troubleshooting">
+                <h2>Troubleshooting</h2>
+                <table>
+                    <thead><tr><th>Symptom</th><th>Likely cause</th></tr></thead>
+                    <tbody>
+                        <tr><td>Script never runs</td><td>Not <code>enabled</code>; status is <code>FROZEN</code> or <code>BROKEN</code> (check <code>GET /scripts</code>); the channel is not enabled in <code>kam.yml</code>, so KAM cannot decrypt it; or the channel name in your script is not lowercase with a leading <code>#</code>.</td></tr>
+                        <tr><td>Script stopped after working</td><td><code>FROZEN</code> after a timeout. Read <code>last_error</code>, fix the script or raise <code>timeout_ms</code>, then <code>recover</code>.</td></tr>
+                        <tr><td>Timer script never fires</td><td>Not <code>enabled</code> and <code>READY</code> (the schedule only includes enabled, ready scripts); no timer line compiled (check <code>timer_interval_minutes</code> or <code>timer_schedule</code> on <code>GET /scripts/{id}</code>); or its first fire has not come yet — a new 15-minute script fires about 15 minutes after saving, a cron script at its first slot.</td></tr>
+                        <tr><td>Log: <code>timer fire dropped: queue full</code></td><td>The worker was busy with other scripts for longer than the whole queue; the timer cadence absorbs this (no catch-up burst), but check for a script that repeatedly freezes or runs near <code>timeout_ms</code>.</td></tr>
+                        <tr><td>Script error mentions <code>rest_get</code></td><td>The URL scheme was not http/https, the URL carried credentials, a header value was not a string, or the body exceeded 1 MiB. Check what your API returns and how you pass headers.</td></tr>
+                        <tr><td>Script error mentions <code>room_post</code></td><td>The room id is not in <code>kam.yml</code>'s <code>rooms:</code> list, the text was empty, or rooms are not running (a script can be saved either way; the call fails at runtime).</td></tr>
+                        <tr><td>Log: <code>script invocation failed</code></td><td>The script raised an error, for example an unknown channel in <code>reply</code>. The status is unchanged.</td></tr>
+                        <tr><td>Log: <code>group-text event dropped: queue full</code></td><td>More than 128 events (group texts and timer fires share the queue) were waiting; scripts are slower than the incoming traffic.</td></tr>
+                        <tr><td>Replies appear to be missing</td><td><code>reply</code> only queues the packet. Quick successive replies can be lost by the modem; see the note under Capabilities.</td></tr>
+                        <tr><td><code>400</code></td><td>Invalid JSON, an unknown field, a missing or non-positive <code>expected_revision</code> (enable, disable, recover), or a missing <code>revision</code> query parameter (delete).</td></tr>
+                        <tr><td><code>403</code> / <code>415</code></td><td>Non-loopback <code>Host</code> header / missing <code>Content-Type: application/json</code>.</td></tr>
+                        <tr><td><code>409</code></td><td>Stale revision, id already exists, or name already used by another script. Re-read the script and retry.</td></tr>
+                        <tr><td><code>422</code></td><td>The source did not compile, has no usable entry point (<code>on_group_text</code>/<code>on_timer</code>), sets <code>timer_interval_minutes</code> without a callable <code>on_timer</code> (or the reverse, or a value below 1), calls an undefined name, or <code>timeout_ms</code> is missing or not positive.</td></tr>
+                        <tr><td>Cannot connect to the API</td><td>The listener is off (<code>monitor.enabled: false</code> takes it down together with the monitoring API), the port is taken by another program (the log says <code>local API listener unavailable</code>), or automation was disabled because its database setup failed — monitoring still works then, and the script routes answer "automation is disabled".</td></tr>
+                    </tbody>
+                </table>
+            </section>
+
+            <!-- Technical Deep Dive -->
+            <section id="technical">
+                <h2 class="text-red-600">Technical Deep Dive</h2>
+                <p><em>Intended for developers.</em></p>
+
+                <details>
+                    <summary>The Execution Worker</summary>
+                    <div class="prose">
+                        <p>KAM subscribes one handler to decoded group texts. The handler copies the message and does a non-blocking put on a 128-event queue, so a slow script can never block packet routing. If the queue is full the event is dropped and logged. A separate timer loop goroutine feeds the same queue: per script it keeps one pending fire plus the declaration it came from, replaced when a save changes the interval or schedule; a change (save, enable, recover, delete) nudges it through a one-slot channel. Both event kinds are structs on the same channel, so the queue, drops and shutdown handling stay one mechanism.</p>
+                        <p>A single worker takes events in order. For each event or timer fire it snapshots the enabled <code>READY</code> scripts and runs them one after another, sorted by script id. A timer fire re-checks eligibility and calls <code>on_timer(now)</code> with a <code>time</code> value holding the fire moment. Execution is therefore sequential and deterministic; scripts need no locking and cannot run in parallel.</p>
+                        <p>Each run uses the already-compiled program held in memory with a new interpreter thread and the script's deadline. The timer itself is fixed at compile time — either an integer literal of at least 1 minutes, or a <code>timer_schedule</code> string parsed into a cron schedule — so the loop needs no reparsing between saves. SQLite is not read per event; it is touched only at startup, on API changes and when a status becomes <code>FROZEN</code> or <code>BROKEN</code>.</p>
+                        <p>On shutdown KAM stops the API and event intake, cancels the running script, stops the timer loop first so no new fire can be queued, drops any queued events (and logs how many), and only then stops the radio manager and rooms.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Storage Schema</summary>
+                    <div class="prose">
+                        <p>Scripts live in the SQLite table <code class="text-blue-600">automation_scripts</code>:</p>
+                        <pre><code class="language-text">script_id      TEXT PRIMARY KEY      -- stable identity, e.g. "echo"
+name           TEXT NOT NULL UNIQUE  -- human-facing name
+source         TEXT NOT NULL         -- Starlark source (not bytecode)
+enabled        INTEGER 0/1           -- operator's desired state (default 0)
+timeout_ms     INTEGER &gt; 0           -- per-run budget (default 500)
+runtime_status TEXT                  -- READY | BROKEN | FROZEN (default READY)
+last_error     TEXT                  -- latest BROKEN/FROZEN reason; cleared on READY
+revision       INTEGER               -- optimistic-concurrency counter
+created_at     INTEGER               -- Unix seconds
+updated_at     INTEGER               -- Unix seconds</code></pre>
+                        <p>Only the latest error is kept; there is no error history. Databases that ran the retired one-time ECHO migration still contain a <code>builtin.echo</code> row. It is an ordinary script that can be edited or deleted.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Adding a host function</summary>
+                    <div class="prose">
+                        <p>All capabilities are registered in one table, <code>hostFunctions</code> in <code>internal/automation/runtime.go</code>; <code>json</code> and <code>time</code> are the pinned <code>go.starlark.net</code> library modules, predeclared beside them. Compilation accepts only those names as predeclared, and every call receives the invocation context so it shares the script deadline. A new function that does I/O must honour that context, because Starlark's own step limits do not bound time spent inside Go code — <code>rest_get</code> and <code>room_post</code> were added as entries there.</p>
+                    </div>
+                </details>
+
+<details>
+                    <summary>Timer scheduling invariants</summary>
+                    <div class="prose">
+                        <p><code>timerLoop</code> (in <code>internal/automation/runtime.go</code>) owns <code>next[id]</code> and holds no lock over it: the map is loop-local, recomputed from the scripts' snapshot on every pass. Newly seen ids are seeded with the period's next fire after now — an interval adds its step, a cron schedule takes the first clock slot after now; ids gone from the schedule are dropped. On wake it enqueues each due fire as a non-blocking send and re-arms <code>next[id]</code> with the period's next fire after the due time (not the completion time) — that re-arm is what prevents catch-up bursts after a stall. Every pending fire carries the declaration it came from, so a save that changes <code>timer_interval_minutes</code> or <code>timer_schedule</code> replaces the pending fire on the next pass and the new period acts at once.</p>
+                        <p>Eligibility is decided twice, on purpose: the loop reads the shared scripts map under its read lock and dispatch re-checks before invoking, because a save may have replaced the resident program between snapshot and run. The API's <code>TimerIntervals()</code> and <code>TimerSchedules()</code> report every declared period regardless of status, so a frozen script still shows its interval or schedule; only the schedule drops it.</p>
+                    </div>
+                </details>
+
+                <details>
+                    <summary>Example Script (ECHO)</summary>
+                    <div class="prose">
+                        <p>The full responder is <code>docs/examples/echo.star</code>. It matches only configured channels, ignores the node's own messages, requires <code>@kam</code> not to be followed by a word character, and replies with the hop count, SNR/RSSI (when present) and clock drift:</p>
+                        <pre><code class="language-text">heard alice in 2 hops, SNR 7.25 dB, RSSI -64 dBm, drift 3s</code></pre>
+                        <p>Its replies are pinned by the test <code>TestEchoExampleScript</code>. Downgrade note: an older KAM binary still reads an <code>echo:</code> block in <code>kam.yml</code>; disable the <code>echo</code> script first or both would answer.</p>
+                        <p>The timer example is <code>docs/examples/periodic.star</code>, pinned by <code>TestPeriodicExamplePostsTheWeatherLine</code> against a replayed real WeatherAPI payload (it asserts the exact posted line above) and by <code>TestPeriodicExampleStaysQuietOnAFailedRequest</code> (a 401 produces no post and no freeze). Its header comment tells the operator to save it with <code>timeout_ms = 30000</code>.</p>
+                    </div>
+                </details>
+
+            </section>
+
+        </article>
+
+        <footer class="mt-24 pt-8 border-t border-slate-200 text-center text-slate-500 text-sm">
+            &copy; 2026 KAM Project Manuals. Written for beginner to intermediate readers. Checked against the source on 2026-11-21.
+        </footer>
+    </main>
+</body>
+</html>

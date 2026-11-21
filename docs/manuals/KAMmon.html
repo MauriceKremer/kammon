@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A guide to KAMmon, the web monitor for a KAM node: what it shows, how it signs people in, how to run it in demo mode and against a real KAM.">
+    <title>KAMmon Manual</title>
+    <link href="manuals.css" rel="stylesheet">
+    <script>try{var t=localStorage.getItem("kam-theme");document.documentElement.dataset.theme=t||(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark")}catch(e){document.documentElement.dataset.theme="dark"}</script>
+    <script src="manuals.js" defer></script>
+</head>
+<body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <aside>
+        <div class="manual-brand"><span class="brand-mark" aria-hidden="true">K</span><span class="brand-text"><strong>KAM<span class="mon">mon</span></strong><span>Documentation</span></span><button class="theme-toggle" type="button" aria-label="Switch to dark mode"><svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg><svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg></button>
+</div>
+        <details class="manual-navigation" open>
+            <summary>Contents</summary>
+            <details class="navigation-section" open>
+                <summary>On this page</summary>
+                <nav aria-label="On this page">
+                    <a href="#overview">What KAMmon Is</a>
+                    <a href="#principles">How It Behaves</a>
+                    <a href="#pages">What the Pages Show</a>
+                    <a href="#demo">Try It in Demo Mode</a>
+                    <a href="#roles">Viewers and Administrators</a>
+                    <a href="#installation">Run Against a Real KAM</a>
+                    <a href="#memory">What KAMmon Remembers</a>
+                    <a href="#independence">KAMmon Is a Client</a>
+                    <a href="#limits">Privacy and Limits</a>
+                    <a href="#troubleshooting">Troubleshooting</a>
+                    <a href="#reference">Glossary and Sources</a>
+                </nav>
+            </details>
+            <details class="navigation-section" open>
+                <summary>Manuals</summary>
+                <nav aria-label="Manuals">
+                    <a href="KAM.html">KAM Guide</a>
+                    <a href="KAMmon.html" aria-current="page">KAMmon</a>
+                    <a href="Architecture.html">Architecture</a>
+                    <a href="FeatureStarlark.html">Starlark Automations</a>
+                    <a href="FeatureKissModem.html">KISS Modem</a>
+                    <a href="FeatureRoomServer.html">Room Server</a>
+                    <a href="FeatureMonitorApi.html">Backend API</a>
+                </nav>
+            <details class="navigation-section" open>
+                <summary>Online</summary>
+                <nav aria-label="Online">
+                    <a href="https://mauricekremer.github.io/kammon/" target="_blank" rel="noopener">Read online <span aria-hidden="true">&#8599;</span></a>
+                </nav>
+            </details>
+            </details>
+        </details>
+    </aside>
+    <main id="main-content" tabindex="-1">
+        <header>
+            <span>The Web Monitor</span>
+            <h1>KAMmon</h1>
+            <p>A calm console for one KAM node: what the radio hears, how the channel is used, and what the channels, rooms and scripts are doing.</p>
+            <p><span class="badge badge-green">Working monitor</span><span>For operators and beginners. Demo mode, login, and the Overview, Traffic, Channels, Rooms and Automations pages are built; the KISS modem and Accounts pages are placeholders for their slices.</span></p>
+        </header>
+        <article class="prose">
+            <section id="overview">
+                <h2>What KAMmon Is</h2>
+                <p>KAMmon is a website that shows one KAM node at work. It runs on the same computer as KAM and talks to it over KAM's local REST API: it asks KAM what the radio heard, how busy the channel is, who the rooms' clients are, and which scripts are installed. You look at the screens and, when you are an administrator, you change things from them.</p>
+                <p><strong>KAM does the radio work. KAMmon provides the web interface.</strong> KAM starts, receives, stores messages and runs scripts without KAMmon. It does not register KAMmon as a client, check whether KAMmon is alive, or wait for it to read anything. A stopped or slow KAMmon changes nothing for KAM.</p>
+                <p>The screens are written for hobbyists. They explain themselves in plain words and repeat what the numbers actually mean: "Remembered clients" is not "online", and "Echo matches" is not "verified". When KAM has not answered for a while, the pages say so instead of pretending the numbers are current.</p>
+                <table>
+                    <thead><tr><th>Capability</th><th>Current status</th></tr></thead>
+                    <tbody>
+                        <tr><td>Demo mode with a fake KAM, so no radio is needed</td><td>Implemented; start with <code>go run ./cmd/kammon -demo</code></td></tr>
+                        <tr><td>Web login with two roles, sessions, and a slow-down for repeated failed logins</td><td>Implemented; passwords live in <code>kammon.yml</code></td></tr>
+                        <tr><td>Overview, Traffic and Channels pages</td><td>Implemented; every signed-in role can read them</td></tr>
+                        <tr><td>Rooms and Automations pages, with tools that change things</td><td>Implemented for administrators; other roles are refused</td></tr>
+                        <tr><td>KISS modem and Accounts pages</td><td>Placeholders for their planned slices; the KISS modem page waits on its tooling, Accounts on the web-user account feature</td></tr>
+                    </tbody>
+                </table>
+                <p>KAMmon is not a message archive, a chat application, or a second copy of KAM. It holds no database: its history lives in memory and starts again after a restart. Writing to <code>kam.yml</code>, the radio, the channels and the database stay KAM's job.</p>
+            </section>
+
+            <section id="principles">
+                <h2>How It Behaves</h2>
+                <h3>Calm and dense</h3>
+                <p>The interface is a quiet charcoal console. Small text, no cards and no decoration: one-pixel rules separate regions, and hierarchy comes from type size and spacing. The headings use a wide face and stay short. Dark is the default; a button switches to light, and the first visit follows the computer's own preference.</p>
+                <h3>Honest labels</h3>
+                <p>Every screen says what a number means. <strong>Remembered clients</strong> counts room clients KAM still knows about, including ones that have gone quiet — it is not "online". <strong>Last heard</strong> is the last request this node received from a client, not proof it is listening now. <strong>Estimated airtime</strong> comes from a formula, not from the radio. <strong>Echo matches</strong> means the modem returned the value it was sent; the radio chip may still have rejected it. A dot legend explains the activity states wherever they appear.</p>
+                <h3>Read first, change second</h3>
+                <p>Every page works as a read-only view for a signed-in viewer. Controls that change something appear only for administrators, and the server refuses those routes to other roles instead of merely hiding the buttons. Anything that touches the radio goes through a preview dialog that shows the exact commands before they are sent, with Cancel and Apply; the preview text comes from KAM, because KAM owns the protocol.</p>
+                <h3>Simple on purpose</h3>
+                <p>KAMmon is one Go program, one settings file and one stylesheet. Pages are rendered on the server; a small vendored script refreshes parts of a page every two seconds. Charts are drawn on the server as SVG. There is no database, no front-end build step and nothing loaded from a CDN.</p>
+            </section>
+
+            <section id="pages">
+                <h2>What the Pages Show</h2>
+                <table>
+                    <thead><tr><th>Page</th><th>Who may read it</th><th>What it shows</th></tr></thead>
+                    <tbody>
+                        <tr><td>Overview</td><td>Every signed-in role</td><td>A metric strip (packets, airtime, rooms, automation health), a channel-utilization chart with health zones and a hold-back line, the packet mix, and recent packets, rooms and scripts in a side column.</td></tr>
+                        <tr><td>Traffic</td><td>Every signed-in role</td><td>A filterable table from the event ring: packet type, time, channel and route, with a detail line per row. Text appears only if your role may read that channel. The table can export CSV.</td></tr>
+                        <tr><td>Channels</td><td>Every signed-in role</td><td>The configured channels with keys' names, whether KAM can decrypt them, message counts and airtime estimates.</td></tr>
+                        <tr><td>Rooms</td><td>Administrators</td><td>Each room server with remembered clients, protocol roles, activity states and last-heard times; read-only roles, and the remove-client control.</td></tr>
+                        <tr><td>Automations</td><td>Administrators</td><td>Installed Starlark scripts with their status, an editor with unsaved-text protection, validate, enable, recover and delete, and a dry-run test.</td></tr>
+                        <tr><td>Accounts</td><td>Administrators</td><td>A placeholder until the web-user account feature arrives; web users are today listed in <code>kammon.yml</code>.</td></tr>
+                        <tr><td>KISS modem</td><td>Administrators</td><td>A placeholder for the modem slice: planned readings, radio-settings form, command preview and command log.</td></tr>
+                    </tbody>
+                </table>
+                <div class="info-box info-box-blue"><p><strong>Sign-in is separate from the radio.</strong> A web login is a KAMmon account. A room client login, a channel key and a script are all KAM things. A web role never changes a radio role.</p></div>
+                <p>The sidebar keeps a small node block: the node name, link state, radio summary and uptime. Administrators also see server statistics — the memory and runtime of the computer KAMmon itself runs on, not of KAM.</p>
+            </section>
+
+            <section id="demo">
+                <h2>Try It in Demo Mode</h2>
+                <p>Demo mode starts a fake KAM with generated traffic, so no radio is needed. You need Go 1.25 or newer:</p>
+                <pre><code class="language-bash">go run ./cmd/kammon -demo</code></pre>
+                <p>Open <code>http://127.0.0.1:8080</code> in a browser. Two accounts exist for the demo: <code>admin</code> / <code>admin</code> is an administrator, and <code>viewer</code> / <code>viewer</code> can look only. Starting a server on a port your computer already uses fails with an address-in-use error; stop the other process first, or pass a different address. Demo mode answers every page from generated data, so no message you see came from a radio.</p>
+                <p>Stop the demo with <code>Ctrl-C</code>. If you lose track of a demo you started in the background, the repository's <code>scripts/kill-kammon.sh</code> stops it.</p>
+            </section>
+
+            <section id="roles">
+                <h2>Viewers and Administrators</h2>
+                <p>Users are written in the settings file, each with a role. <strong>Viewer</strong> means the pages answer as read-only views: counts, airtime, packet types, activity times, keys and radio state. <strong>Admin</strong> means every page plus everything a viewer sees — channel message text, room posts, client labels and every control.</p>
+                <ul>
+                    <li>A role belongs to the user, and admin power needs nothing more. KAMmon adds no transport rules of its own: an administrator signs in from any address and keeps that power.</li>
+                    <li>Channel <strong>text</strong> reaches a viewer only for channels named in <code>viewer_text_channels</code>, an allow list in the settings file. Everyone else sees metadata — that a message happened — without its content.</li>
+                    <li>The server decides. Every route knows its required role, and a viewer request to an administrator page is refused with an "administrator only" answer, not a hidden control.</li>
+                    <li>Room protocol roles are read-only. Removing a room client deletes its session; that client is gone only after KAM confirms. A removed client can log in again under the room's own rules, because its credentials were never deleted.</li>
+                    <li>Repeated failed logins from one address are slowed down; sessions expire after an idle time and live only in memory, so a restart signs everyone out.</li>
+                </ul>
+            </section>
+
+            <section id="installation">
+                <h2>Run Against a Real KAM</h2>
+                <p>The commands below assume macOS or Linux and that the terminal is in the KAMmon project folder.</p>
+                <h3>1. Make your own settings file</h3>
+                <p>Copy the supplied configuration once, before editing it. If <code>kammon.local.yml</code> already exists, keep that file instead of overwriting your settings.</p>
+                <pre><code class="language-bash">cp kammon.yml kammon.local.yml</code></pre>
+                <p>Open <code>kammon.local.yml</code> in a text editor and review these values rather than accepting the example unchanged:</p>
+                <table>
+                    <thead><tr><th>Setting</th><th>Meaning and action</th></tr></thead>
+                    <tbody>
+                        <tr><td><code>users</code></td><td>The web accounts. Choose real passwords; the example's <code>change-me</code> is not a password anyone should keep. Passwords are plain text in the file, like KAM's channel keys in <code>kam.yml</code>.</td></tr>
+                        <tr><td><code>listen</code></td><td>The address KAMmon serves, <code>:8080</code> by default. A leading colon means every network interface — tighten it to <code>127.0.0.1:8080</code> if only this computer should reach the site.</td></tr>
+                        <tr><td><code>kam_monitor_url</code></td><td>Where KAM's API listens, <code>http://127.0.0.1:8766</code> by default. KAM and KAMmon usually share one machine, so the loopback address is right.</td></tr>
+                        <tr><td><code>viewer_text_channels</code></td><td>The channels whose message text a web viewer may read; the default is <code>#public</code>.</td></tr>
+                        <tr><td><code>poll</code></td><td>How often KAMmon asks KAM for each kind of data, each read's timeout, and how long to wait after a 404 answer before asking again. Leave a line out to keep its default.</td></tr>
+                        <tr><td><code>freshness</code></td><td>When a reading stops counting as fresh: <code>stale_after</code> adds a "slow to answer" note, <code>down_after</code> marks KAM as down.</td></tr>
+                        <tr><td><code>session_idle_hours</code></td><td>How long a signed-in browser stays signed in without activity.</td></tr>
+                    </tbody>
+                </table>
+                <h3>2. Start KAM first</h3>
+                <p>KAMmon reads from KAM; it cannot receive alone. Start KAM as usual (its API listener is on by default on port 8766), and leave it running. KAMmon starting first only shows a down message until KAM answers.</p>
+                <h3>3. Start KAMmon</h3>
+                <pre><code class="language-bash">go run ./cmd/kammon -config kammon.local.yml</code></pre>
+                <p>Sign in with one of the users you wrote into the settings file. The site is a working monitor: nothing it shows comes from the demo generator, and a control appears only after the matching KAM feature has answered once. A page the running KAM does not serve shows a muted line, "Needs a newer KAM", instead of empty numbers.</p>
+                <div class="info-box info-box-amber"><p><strong>Serving beyond your LAN is your choice to make safely.</strong> The site has login and session checks, but the operator owns the transport: put HTTPS in place first (KAMmon can serve <code>tls_cert</code>/<code>tls_key</code> itself, or run behind a reverse proxy) before exposing anything to the internet.</p></div>
+            </section>
+
+            <section id="memory">
+                <h2>What KAMmon Remembers</h2>
+                <p>KAMmon keeps no database. Charts, history and room tables are built in memory with hard limits: a bounded event ring and room-per-minute buckets, roughly a day at best. The history is labelled where it is shorter ("History starts at 14:03"), because a chart that begins mid-hour must not pretend otherwise.</p>
+                <p>A restart, or a period when KAM was down, leaves gaps. KAMmon backfills what it can from KAM's own event ring and draws marks where its history starts or where data is missing. The numbers on screen are a read of what this node observed: KAM hears only what reaches its antenna.</p>
+                <div class="info-box info-box-amber"><p><strong>A snapshot can be slow or down.</strong> When KAM stops answering within the freshness limits, every page shows a ruled bar — "slow to answer", then "down" — and keeps the last numbers visible while marking the time they were taken.</p></div>
+            </section>
+
+            <section id="independence">
+                <h2>KAMmon Is a Client</h2>
+                <p>KAM serves one local REST API and does not know KAMmon exists. Nothing in KAM stores state for KAMmon, subscribes to it, or waits for it: the API keeps its event ring full whether or not anyone reads it, and the oldest events are replaced first. KAMmon is a reader with permission to send some changes, and KAMmon keeps every conclusion it draws in its own memory.</p>
+                <p>This separation goes both ways. You can stop KAMmon for hours and KAM keeps receiving, storing and running scripts. You can run a different client against the same API — the <a href="FeatureMonitorApi.html">backend API manual</a> describes what a client may ask for. And KAMmon holds none of KAM's data on disk: a restart costs the session logins and the in-memory history, then it rebuilds from KAM.</p>
+            </section>
+
+            <section id="limits">
+                <h2>Privacy and Limits</h2>
+                <ul>
+                    <li><strong>Passwords are plain text.</strong> Web users, like channel keys and room passwords, live in readable settings files. Protect the machine and the files; the format does not hide anything.</li>
+                    <li><strong>An admin is an admin from anywhere.</strong> The web role travels with the user and adds no network conditions. Only sign in as an administrator from a computer and network you trust.</li>
+                    <li><strong>KAM's own API has no authentication.</strong> It listens on loopback, and any local program can read or change what it serves. KAMmon's login protects its own screens, not KAM.</li>
+                    <li><strong>Viewers are filtered at render, not at KAM.</strong> KAM returns full data to KAMmon; the allow list decides what each browser sees. The filtering is server-side, so a viewer cannot read restricted text by editing the page.</li>
+                    <li><strong>Radio text is unverified input.</strong> Message bodies and senders come from the air; the site escapes them when rendering and never trusts them as structure.</li>
+                    <li><strong>The console shows one hop.</strong> Signal strength is not displayed on traffic lists: it describes the hop the measurement was taken at, usually a nearby repeater, not the original sender's link.</li>
+                    <li><strong>History is short by design.</strong> In-memory history ends with the process. For a lasting record, use KAM's SQLite database; for a shareable board, <a href="FeatureRoomServer.html">KAM's room servers</a> are the tool.</li>
+                </ul>
+            </section>
+
+            <section id="troubleshooting">
+                <h2>Troubleshooting</h2>
+                <h3>The pages say KAM is down or slow to answer</h3>
+                <p>Check that the KAM process is running and that <code>kam_monitor_url</code> points at it. A fresh KAMmon may out-ask an older KAM: the address it polls then answers 404, the poller pauses that read for <code>not_served</code>, and the pages say "Needs a newer KAM". Update KAM to gain the missing surface.</p>
+                <h3>Sign-in fails</h3>
+                <p>Confirm the user and password against the settings file KAMmon was started with, and that the role line is intact. Repeated failures from one address are deliberately slowed; wait a moment and try again. A restart of KAMmon signs everyone out, because sessions live only in memory.</p>
+                <h3>Channel text is missing on the Traffic page</h3>
+                <p>Text is shown to viewers only for channels in <code>viewer_text_channels</code>, and to administrators everywhere. If the channel is absent from the list, check that the running KAM actually decrypts it — KAMmon cannot show text KAM could not decode.</p>
+                <h3>A control does nothing</h3>
+                <p>Controls that change something answer in place, and a failure keeps your input visible. A "Changed elsewhere" answer means another save happened first: reload the page to see the current version, then apply your change again. A control about modem radio first shows the exact commands in a preview; check that dialog before applying.</p>
+                <h3>The demo will not start</h3>
+                <p>An address-in-use error means the port is taken; stop the other process or choose another address. Demo mode needs no radio and no KAM, but it does need a Go toolchain to build. Stopping with <code>Ctrl-C</code> is enough; <code>scripts/kill-kammon.sh</code> stops a lost background process.</p>
+            </section>
+
+            <section id="reference">
+                <h2>Glossary and Sources</h2>
+                <table>
+                    <thead><tr><th>Term</th><th>Plain-language meaning</th></tr></thead>
+                    <tbody>
+                        <tr><td>KAM API</td><td>The local REST interface KAM serves on port 8766; the one address KAMmon reads.</td></tr>
+                        <tr><td>Poller</td><td>The single part of KAMmon that asks KAM for data, on intervals set in <code>kammon.yml</code>.</td></tr>
+                        <tr><td>Store</td><td>KAMmon's memory: the event ring, minute buckets and latest snapshots. Nothing here is on disk.</td></tr>
+                        <tr><td>Fresh / stale / down</td><td>The three ages of a snapshot: answered recently; answered slowly, so pages say "slow to answer"; not answering, so pages say KAM appears down.</td></tr>
+                        <tr><td>Viewer / Admin</td><td>The two web roles. A viewer reads metadata and allow-listed channel text; an admin sees everything and may change things.</td></tr>
+                        <tr><td>Allow list</td><td><code>viewer_text_channels</code> in the settings file: the channels whose text a web viewer may read.</td></tr>
+                        <tr><td>Command preview</td><td>The dialog that lists the exact modem commands before they are sent, with Cancel and Apply.</td></tr>
+                        <tr><td>Demo mode</td><td>The <code>-demo</code> start that fakes a KAM with generated traffic for trying the screens.</td></tr>
+                        <tr><td>Remembered client</td><td>A room client KAM still keeps a session for, whether or not it was heard recently.</td></tr>
+                        <tr><td>Hold-back line</td><td>The 25 % mark on the airtime chart where sending slows down.</td></tr>
+                    </tbody>
+                </table>
+                <h3>Where to go next</h3>
+                <ul>
+                    <li><a href="KAM.html">KAM Guide</a>: the node KAMmon watches, from first radio contact to everyday operation.</li>
+                    <li><a href="FeatureMonitorApi.html">Backend API</a>: what a KAMmon (or any local client) may ask KAM for, and how.</li>
+                    <li><a href="FeatureStarlark.html">Starlark Automations</a>: the scripts the Automations page edits and tests.</li>
+                </ul>
+                <h3>Technical sources</h3>
+                <p>This guide follows the running KAMmon software. The project repository carries the detailed documents behind it:</p>
+                <ul>
+                    <li><a href="https://github.com/MauriceKremer/kammon">KAMmon repository</a>: "Try it" and "Run against a real KAM" live in the README.</li>
+                    <li><a href="https://github.com/MauriceKremer/kammon/blob/main/docs/DESIGN.md">KAMmon design</a>: principles, visual system, behaviour, and the plain-word label list.</li>
+                    <li><a href="https://github.com/MauriceKremer/kammon/blob/main/docs/kam-api/FeatureKamApi.md">KAM API contract</a>: the endpoints this version of KAMmon is built against.</li>
+                    <li><a href="https://github.com/MauriceKremer/kammon/blob/main/docs/PLAN.md">Build plan</a>: what is built and which slices remain open.</li>
+                </ul>
+            </section>
+        </article>
+        <footer>KAMmon manual &middot; Web monitor guide &middot; Updated 21 November 2026</footer>
+    </main>
+</body>
+</html>
