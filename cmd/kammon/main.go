@@ -22,7 +22,16 @@ import (
 func main() {
 	configPath := flag.String("config", "kammon.yml", "path to kammon.yml")
 	demo := flag.Bool("demo", false, "run against a fake KAM with generated data")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		if err := runVersion(os.Stdout); err != nil {
+			slog.Error("kammon stopped", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	if err := run(*configPath, *demo); err != nil {
 		slog.Error("kammon stopped", "error", err)
