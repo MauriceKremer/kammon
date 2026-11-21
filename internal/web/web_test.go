@@ -131,16 +131,16 @@ func TestWrongPasswordGivesOneGenericMessage(t *testing.T) {
 	}
 }
 
-func TestViewerSeesOverviewButNotAccounts(t *testing.T) {
+func TestViewerSeesOverviewButNotAdminPages(t *testing.T) {
 	h := newHarness(t)
 	c := h.login(t, "viewer", "viewer")
 	status, body, _ := get(t, c, h.ts.URL+"/")
 	if status != http.StatusOK || !strings.Contains(body, "Observed packet airtime") || !strings.Contains(body, "Sign out") {
 		t.Fatalf("overview: %d", status)
 	}
-	// Rooms, Accounts, Web users, Automations and the KISS modem are admin pages (MON-AX-12): the sidebar
+	// Rooms, Web users, Automations and the KISS modem are admin pages (MON-AX-12): the sidebar
 	// offers none of them, and every route answers 403 to a viewer that types its URL anyway.
-	for _, hidden := range []string{"/rooms", "/accounts", "/web-users", "/automations", "/modem"} {
+	for _, hidden := range []string{"/rooms", "/web-users", "/automations", "/modem"} {
 		if strings.Contains(body, `href="`+hidden+`"`) {
 			t.Errorf("the admin page %s must not be offered to a viewer", hidden)
 		}
@@ -159,16 +159,16 @@ func TestViewerSeesOverviewButNotAccounts(t *testing.T) {
 	}
 }
 
-// The admin-only menu items (rooms, accounts, web users, automations, KISS modem) each show a light grey lock
+// The admin-only menu items (rooms, web users, automations, KISS modem) each show a light grey open lock
 // at the right of their label (MON-AX-12); a viewer is offered none of them, so sees no lock at all.
 func TestAdminOnlyNavItemsShowALock(t *testing.T) {
 	h := newHarness(t)
 	_, admin, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
-	if n := strings.Count(admin, "nav-lock"); n != 5 {
-		t.Errorf("the admin sees %d locked menu items, want 5 (rooms, accounts, web-users, automations, modem)", n)
+	if n := strings.Count(admin, "nav-lock"); n != 4 {
+		t.Errorf("the admin sees %d locked menu items, want 4 (rooms, web-users, automations, modem)", n)
 	}
-	if n := strings.Count(admin, `class="admin-only"`); n != 5 {
-		t.Errorf("%d menu items carry the admin-only class, want 5", n)
+	if n := strings.Count(admin, `class="admin-only"`); n != 4 {
+		t.Errorf("%d menu items carry the admin-only class, want 4", n)
 	}
 	_, viewer, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/")
 	if strings.Contains(viewer, "nav-lock") || strings.Contains(viewer, `class="admin-only"`) {
@@ -180,7 +180,7 @@ func TestAdminOnlyNavItemsShowALock(t *testing.T) {
 func TestNavItemsCarryTheirIcon(t *testing.T) {
 	h := newHarness(t)
 	_, admin, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
-	for _, icon := range []string{"activity", "radio-tower", "hash", "messages-square", "users", "shield-check", "workflow", "cpu"} {
+	for _, icon := range []string{"activity", "radio-tower", "hash", "messages-square", "shield-check", "workflow", "cpu"} {
 		if n := strings.Count(admin, "icons.svg#"+icon+"\""); n != 1 {
 			t.Errorf("icon %s appears %d times in the admin sidebar, want 1", icon, n)
 		}
@@ -205,11 +205,11 @@ func TestAdminKeepsPowerFromAnyAddress(t *testing.T) {
 		return rec.Code, rec.Body.String()
 	}
 	status, body := asAdmin("/")
-	if status != http.StatusOK || !strings.Contains(body, `href="/accounts"`) || !strings.Contains(body, "Admin") {
+	if status != http.StatusOK || !strings.Contains(body, `href="/rooms"`) || !strings.Contains(body, "Admin") {
 		t.Fatalf("a remote admin keeps the admin pages: %d", status)
 	}
-	if status, _ = asAdmin("/accounts"); status != http.StatusOK {
-		t.Fatalf("a remote admin keeps /accounts: %d", status)
+	if status, _ = asAdmin("/rooms"); status != http.StatusOK {
+		t.Fatalf("a remote admin keeps /rooms: %d", status)
 	}
 
 	// A viewer from the same address stays a viewer, and admin routes still answer 403.
@@ -220,17 +220,17 @@ func TestAdminKeepsPowerFromAnyAddress(t *testing.T) {
 	}
 	rec := httptest.NewRecorder()
 	h.s.Handler().ServeHTTP(rec, r)
-	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), `href="/accounts"`) {
+	if rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), `href="/rooms"`) {
 		t.Fatalf("a remote viewer stays a viewer: %d", rec.Code)
 	}
-	r2 := httptest.NewRequest(http.MethodGet, "/accounts", nil)
+	r2 := httptest.NewRequest(http.MethodGet, "/rooms", nil)
 	for _, ck := range h.login(t, "viewer", "viewer").Jar.Cookies(u) {
 		r2.AddCookie(ck)
 	}
 	rec2 := httptest.NewRecorder()
 	h.s.Handler().ServeHTTP(rec2, r2)
 	if rec2.Code != http.StatusForbidden {
-		t.Fatalf("a remote viewer on /accounts: %d, want 403 (MON-AX-11)", rec2.Code)
+		t.Fatalf("a remote viewer on /rooms: %d, want 403 (MON-AX-11)", rec2.Code)
 	}
 }
 
@@ -421,7 +421,12 @@ func TestPartialKeepsPollingAndCarriesOutOfBandParts(t *testing.T) {
 	h := newHarness(t)
 	c := h.login(t, "viewer", "viewer")
 	_, body, header := get(t, c, h.ts.URL+"/ui/overview?range=15m", "HX-Request", "true")
-	for _, want := range []string{`id="overview-live"`, `hx-trigger="every 2s"`, `range=15m`, `id="stale-bar"`, `id="node-block"`, "868.000 MHz", "Uptime 3d 14h"} {
+	for _, want := range []string{
+		`id="overview-metrics-live"`, `hx-trigger="every 2s"`, `range=15m`,
+		`id="overview-charts-live" hx-swap-oob="true"`, `id="overview-recent-live" hx-swap-oob="true"`,
+		`id="overview-rooms-live" hx-swap-oob="true"`, `id="overview-automation-live" hx-swap-oob="true"`,
+		`id="stale-bar"`, `id="node-block"`, "868.000 MHz", "Uptime 3d 14h",
+	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("partial is missing %q", want)
 		}
@@ -432,6 +437,36 @@ func TestPartialKeepsPollingAndCarriesOutOfBandParts(t *testing.T) {
 	_, body, _ = get(t, c, h.ts.URL+"/ui/overview?range=bogus")
 	if !strings.Contains(body, `range=1h`) {
 		t.Error("an unknown range falls back to one hour")
+	}
+}
+
+// The overview page refreshes in five independent regions (MON-OV-11, DESIGN.md §7.1): each
+// region endpoint answers only its own div, so a two-second round never redraws the heading, the
+// tabs or the other regions. Only the metric strip carries the stale bar and the sidebar rides.
+func TestOverviewRegionEndpointsAnswerAlone(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer", "viewer")
+	_, metrics, header := get(t, c, h.ts.URL+"/ui/overview/metrics?range=15m", "HX-Request", "true")
+	for _, want := range []string{
+		`id="overview-metrics-live"`, `hx-get="/ui/overview/metrics?range=15m"`, `id="stale-bar"`, `id="node-block"`,
+	} {
+		if !strings.Contains(metrics, want) {
+			t.Errorf("metrics region is missing %q", want)
+		}
+	}
+	for _, bad := range []string{"Channel Utilization", "Recent packets", `id="pause"`} {
+		if strings.Contains(metrics, bad) {
+			t.Errorf("the metrics region must not carry %q; static heads and other regions never refresh", bad)
+		}
+	}
+	for _, part := range []string{"charts", "recent", "rooms", "automation"} {
+		_, body, _ := get(t, c, h.ts.URL+"/ui/overview/"+part+"?range=1h", "HX-Request", "true")
+		if !strings.Contains(body, `id="overview-`+part+`-live"`) || strings.Contains(body, `id="node-block"`) || strings.Contains(body, `id="stale-bar"`) {
+			t.Errorf("the %s region must answer alone: %s", part, body)
+		}
+	}
+	if header.Get("Cache-Control") != "no-store" {
+		t.Error("region answers must not be cached")
 	}
 }
 
@@ -682,7 +717,7 @@ func TestAssetsAreVendoredAndServed(t *testing.T) {
 	if !strings.Contains(string(res), `<symbol id="sun"`) {
 		t.Error("the sprite misses its icons")
 	}
-	for _, icon := range []string{"activity", "hash", "radio-tower", "messages-square", "users", "workflow", "cpu", "lock-keyhole"} {
+	for _, icon := range []string{"activity", "hash", "radio-tower", "messages-square", "users", "workflow", "cpu", "lock-open"} {
 		if !strings.Contains(string(res), `<symbol id="`+icon+`"`) {
 			t.Errorf("the sprite misses %q, needed by the sidebar", icon)
 		}
@@ -741,21 +776,19 @@ func TestOverviewUnavailableCountsSaySo(t *testing.T) {
 	}
 }
 
-// The pause control from MON-OV-11 with its icon and title, wired to the script.
+// The pause control from MON-OV-11 with its icon and title, wired to the script. It sits in the
+// page's static heading, which no live region ever refreshes, so its state survives every swap.
 func TestOverviewPauseControl(t *testing.T) {
 	h := newHarness(t)
 	c := h.login(t, "viewer", "viewer")
-	_, body, _ := get(t, c, h.ts.URL+"/ui/overview?range=15m", "HX-Request", "true")
+	_, body, _ := get(t, c, h.ts.URL+"/")
 	for _, want := range []string{
 		`id="pause"`, `aria-pressed="false"`, "Pause live refresh", `href="/static/icons.svg#pause"`,
+		`src="/static/live.js?v=` + AssetVersion + `"`,
 	} {
 		if !strings.Contains(body, want) {
-			t.Errorf("overview partial is missing %q", want)
+			t.Errorf("overview page is missing %q", want)
 		}
-	}
-	_, body, _ = get(t, c, h.ts.URL+"/")
-	if !strings.Contains(body, `src="/static/live.js?v=`+AssetVersion+`"`) {
-		t.Error("the page loads the pause script")
 	}
 }
 

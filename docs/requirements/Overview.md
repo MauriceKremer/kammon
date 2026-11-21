@@ -76,7 +76,7 @@ The chart's y axis carries a percent every 10 %, so the bands read as numbers. T
 | MON-OV-8 | Each room line shows "Last activity" from KAM's room list and posts in the last hour from `room` events. The wording says "remembered", not "online". | MUST |
 | MON-OV-9 | Admin sees the two newest clients per room with the activity indicator ([Rooms.md](Rooms.md)). Viewers see no client names. | MUST |
 | MON-OV-10 | The automation block shows the counts of the status snapshot's `automation` section (scripts ready, queue depth, dropped events). The last-run time, from `GET /scripts`'s `run` object, waits for KAM phase 5; until then the block shows only the counts. | SHOULD |
-| MON-OV-11 | The metric strip and the recent-packets table refresh on their own every 2 seconds (htmx). The page's pause control stops them. | MUST |
+| MON-OV-11 | The page refreshes in independent htmx regions — metric strip, chart with packet mix, recent packets, rooms and automation — each polling every 2 seconds on its own (`/ui/overview/<region>`). The heading, the range tabs and the pause control never refresh; the pause control stops every region. The metric strip's answer carries the stale-data bar and the sidebar blocks. | MUST |
 | MON-OV-12 | When the duty cycle is above 80 % of its limit the caption turns amber and says so in words. | SHOULD |
 | MON-OV-13 | When the link is `down`, the metric strip keeps the last values and the stale-data bar explains why. | MUST |
 

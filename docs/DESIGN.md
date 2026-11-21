@@ -147,7 +147,7 @@ Every request then walks the same short path:
 ```
 
 - Left sidebar, 224 px (190 px under 1100 px). Active item: soft fill, 2 px edge on the left, stronger text, `aria-current="page"`.
-- Every sidebar item leads with an icon; the four administrator pages (Rooms, Accounts, Automations, KISS modem) close with a grey lock — the lock only marks, the route is the guard (D34, D35).
+- Every sidebar item leads with an icon; the four administrator pages (Rooms, Accounts, Automations, KISS modem) close with a grey open lock — the lock only marks, the route is the guard (D34, D35).
 - The node block at the bottom of the sidebar shows the node name, link state, radio summary and uptime; under it the server statistics block answers for the box itself — administrator only (D33).
 - Under 768 px the sidebar becomes a top strip with a scrolling row of page buttons.
 - Time range and pause controls appear only on the Overview, the one page that uses them.

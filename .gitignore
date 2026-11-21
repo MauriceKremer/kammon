@@ -1,5 +1,6 @@
 /kammon
 /kammon.bytecoder.nl
+/kammon-arm64
 /kammon.local.yml
 *.test
 .DS_Store

@@ -1,10 +1,12 @@
-// Live refresh pause for the polled regions of a page (MON-OV-11, MON-TR-3). The pause control
-// stops the automatic two-second refresh so rows can be read; the filter and range controls still
-// work. Pages identify their polled region with an id ending in "-live".
+// Live refresh pause for the polled regions of a page (MON-OV-11, MON-TR-3). The overview page
+// refreshes in five independent regions and the traffic page in one; every polled region marks
+// itself with an id ending in "-live". The pause control sits in the static heading, so it is
+// never re-rendered by a swap, and it stops the automatic two-second rounds so rows can be read;
+// the filter and range controls still work.
 (function () {
   var paused = false;
 
-  // htmx 2.0.4 fires htmx:beforeRequest for every polling round and every manual refresh.
+  // htmx 2.0.4 fires htmx:beforeRequest for every region's polling round and every manual refresh.
   // Automatic rounds carry no triggeringEvent; preventing default cancels only that round, and
   // the two-second polling continues, so unpausing is instant.
   document.addEventListener("htmx:beforeRequest", function (evt) {
@@ -27,9 +29,6 @@
     }
     button.setAttribute("aria-pressed", String(paused));
   }
-
-  // The pause button is re-rendered by every swap; repaint it from the state this script keeps.
-  document.addEventListener("htmx:afterSwap", function () { paint(); });
 
   document.addEventListener("click", function (evt) {
     if (!evt.target.closest) return;
