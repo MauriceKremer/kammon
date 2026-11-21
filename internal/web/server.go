@@ -151,6 +151,9 @@ func (s *Server) routes() []route {
 		if p.Key == "overview" || p.Key == "traffic" || p.Key == "channels" || p.Key == "rooms" || p.Key == "automations" || p.Key == "web-users" {
 			continue
 		}
+		if p.External {
+			continue // not a route of this server; the browser does the navigation
+		}
 		level := viewer
 		if p.Admin {
 			level = admin
