@@ -52,6 +52,28 @@ func TestCanReadChannelText(t *testing.T) {
 	}
 }
 
+// The last sidebar entry links to the hosted manuals; it is external and open to every role (D38).
+func TestManualsLinkOpenToEveryRole(t *testing.T) {
+	for _, role := range []config.Role{config.RoleAdmin, config.RoleViewer} {
+		got := false
+		for _, p := range Pages(role) {
+			if p.Key != "manuals" {
+				continue
+			}
+			got = true
+			if !p.External || p.Admin || p.Path != "https://mauricekremer.github.io/kammon/" {
+				t.Errorf("the manuals entry is not the external link: %+v", p)
+			}
+		}
+		if !got {
+			t.Errorf("%s is not offered the manuals entry", role)
+		}
+	}
+	if len(Pages(config.RoleAdmin)) != len(Pages(config.RoleViewer))+4 {
+		t.Errorf("the manuals entry must not change the admin-only split")
+	}
+}
+
 // Server statistics are for the administrator (MON-SV-1).
 func TestCanSeeServerStats(t *testing.T) {
 	if CanSeeServerStats(config.RoleViewer) {

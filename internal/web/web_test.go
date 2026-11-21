@@ -176,6 +176,23 @@ func TestAdminOnlyNavItemsShowALock(t *testing.T) {
 	}
 }
 
+// The sidebar's Manuals entry opens the hosted manual site in a new browser tab (D38).
+func TestManualsLinkOpensInANewTab(t *testing.T) {
+	h := newHarness(t)
+	want := `<a href="https://mauricekremer.github.io/kammon/" target="_blank" rel="noopener">`
+	_, admin, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
+	if n := strings.Count(admin, want); n != 1 {
+		t.Errorf("the admin sidebar carries the manuals link %d times, want once with a new tab", n)
+	}
+	_, viewer, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/")
+	if n := strings.Count(viewer, want); n != 1 {
+		t.Errorf("the viewer sidebar carries the manuals link %d times, want once with a new tab", n)
+	}
+	if strings.Contains(admin, `href="https://mauricekremer.github.io/kammon/" aria-current`) {
+		t.Error("an external link is never the active item")
+	}
+}
+
 // Every sidebar entry leads with the icon of its page (D35); each appears exactly once.
 func TestNavItemsCarryTheirIcon(t *testing.T) {
 	h := newHarness(t)

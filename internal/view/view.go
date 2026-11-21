@@ -76,6 +76,7 @@ type Page struct {
 	Key, Title, Path string
 	Icon             string
 	Admin            bool
+	External         bool // true opens a different site in a new browser tab; never this server's route
 }
 
 var pages = []Page{
@@ -86,9 +87,10 @@ var pages = []Page{
 	{Key: "web-users", Title: "Web users", Path: "/web-users", Icon: "shield-check", Admin: true},
 	{Key: "automations", Title: "Automations", Path: "/automations", Icon: "workflow", Admin: true},
 	{Key: "modem", Title: "KISS modem", Path: "/modem", Icon: "cpu", Admin: true},
+	{Key: "manuals", Title: "Manuals", Path: "https://mauricekremer.github.io/kammon/", Icon: "arrow-up-right", External: true},
 }
 
-// Pages lists the sidebar entries a role may use (MON-AX-12).
+// Pages lists the sidebar entries a role may use (MON-AX-12). The manuals link (D38) is not a page: it lists with every role and has no route.
 func Pages(role config.Role) []Page {
 	out := make([]Page, 0, len(pages))
 	for _, p := range pages {
