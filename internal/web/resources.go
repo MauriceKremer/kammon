@@ -36,11 +36,14 @@ type messageRow struct {
 }
 
 type channelsData struct {
-	Channels                         []channelLink
-	Selected, KeyType, State         string
-	Query                            string
-	Metrics                          []channelMetric
-	CanRead, Hidden                  bool
+	Channels                 []channelLink
+	Selected, KeyType, State string
+	Query                    string
+	Metrics                  []channelMetric
+	CanRead, Hidden          bool
+	// FirstLoad asks the browser for the message list once on the rendered page. The
+	// partial never sets it, so a swapped-in list polls only (MON-CH-13).
+	FirstLoad                        bool
 	Events                           []eventRow
 	Messages                         []messageRow
 	MessageURL, MetricsURL, OlderURL string
@@ -50,7 +53,9 @@ type channelsData struct {
 }
 
 func (s *Server) channelsPage(w http.ResponseWriter, r *http.Request) {
-	s.render(w, r, http.StatusOK, "channels", s.pageFor(r, "channels", "Channels", "Decoded conversations and stored messages", s.channels(r)))
+	data := s.channels(r)
+	data.FirstLoad = data.CanRead
+	s.render(w, r, http.StatusOK, "channels", s.pageFor(r, "channels", "Channels", "Decoded conversations and stored messages", data))
 }
 
 func (s *Server) channels(r *http.Request) channelsData {

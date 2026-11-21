@@ -49,9 +49,9 @@ Plain words: **route** says how a packet travels. A *flood* is repeated by every
 |---|---|---|
 | MON-TR-1 | The table is built from the store's event ring. Opening the page makes no call to KAM. | MUST |
 | MON-TR-2 | Rows are newest first, 100 on first load, with a "Show 100 more" control up to what the store holds. | MUST |
-| MON-TR-3 | New rows appear at the top every 2 seconds. A "Pause" control stops the refresh so a row can be read. | MUST |
+| MON-TR-3 | New rows appear at the top every 2 seconds. A "Pause" control stops the refresh so a row can be read, and resuming refreshes at once. | MUST |
 | MON-TR-4 | Every `rx` event is shown, including repeats and packet types KAM does not handle. | MUST |
-| MON-TR-5 | Filters: free text on the source / destination text, packet type, direction, hide repeats. They combine with AND. | MUST |
+| MON-TR-5 | Filters: free text on the source / destination text, packet type, direction, hide repeats. They combine with AND. A changed filter applies on its own: a text field when it loses focus, a select or checkbox at once. | MUST |
 | MON-TR-6 | Filter state is in the URL query string so a view can be shared and survives a reload. | SHOULD |
 | MON-TR-7 | The type summary reflects the filter and the store contents, not just the 100 visible rows. | SHOULD |
 | MON-TR-8 | SNR and RSSI arrive with the events but are not displayed (decisions D19: behind a local repeater they describe the hop to KAM, not the sender). The measurement stays in the event feed for KAM's own status work. | MUST |

@@ -33,9 +33,9 @@ Keys are secrets. KAMmon never shows them and does not edit channels in version 
 |---|---|
 | **Channel list** (left) | One item per channel: name, key type (public, derived, explicit), enabled or disabled, messages in the last hour. |
 | **Detail header** | Channel name, key type, "Decoding enabled" or "Disabled". |
-| **Metric strip** (3) | Decoded messages in the last hour, with a small per-minute chart of that hour; last decoded message ("2 s ago"); received airtime in the last hour. Strip and channel list refresh on their own every 2 s, the message list every 10 s (MON-CH-13). |
+| **Metric strip** (3) | Decoded messages in the last hour, with a small per-minute chart of that hour; last decoded message ("2 s ago"); received airtime in the last hour. Strip and channel list refresh on their own every 2 s, the message list every 10 s (MON-CH-13). The first page render also asks for the message list once after a one-second delay, so a fresh page does not sit on the loading note until the first poll. A Pause control in the static detail header halts these automatic refreshes and resumes them at once (MON-CH-14). |
 | **Caption** | "Airtime attributed to decoded RX packets, not total radio occupancy. Messages KAM cannot decrypt are not assigned to a channel here." |
-| **Search box** | Sender or message text. |
+| **Search box** | Sender or message text. The search applies when the field loses focus, as well as on Enter or the Search button. |
 | **Messages** | Newest first: received time, sender, text, hop count. SNR and RSSI are not shown (D19). |
 | **Footnote** | "Channel keys and enabled states live in kam.yml. No key material is shown." |
 | **Unreadable** | "N group texts in the last hour could not be decoded (no matching channel key)." |
@@ -56,7 +56,8 @@ Keys are secrets. KAMmon never shows them and does not edit channels in version 
 | MON-CH-10 | The unreadable-text line counts `rx` events with `payload_type = GRP_TXT` and no `channel`, per hour. | SHOULD |
 | MON-CH-11 | Message text is escaped when rendered. Names and text from the radio are untrusted. | MUST |
 | MON-CH-12 | When KAM does not answer, the list shows the last cached page with the stale-data bar; with no cache it says "Messages are unavailable right now." | MUST |
-| MON-CH-13 | The metric strip (with its chart) and the counts in the channel list refresh on their own every 2 seconds — half the 1 s event poll — and the message list every 10 seconds — half the 5 s text cache — without a reload. No page region refreshes faster than once per second, and a partial must never re-fetch by refiring a `load` trigger on its own swapped-in markup. | MUST |
+| MON-CH-13 | The metric strip (with its chart) and the counts in the channel list refresh on their own every 2 seconds — half the 1 s event poll — and the message list every 10 seconds — half the 5 s text cache — without a reload. The full page asks for the message list once, one second after it renders, so KAM has time to answer the read queued by that render; that one-shot `load` trigger belongs to the full page only. No page region refreshes faster than once per second, and a partial must never re-fetch by refiring a `load` trigger on its own swapped-in markup. | MUST |
+| MON-CH-14 | A Pause control in the static detail header halts the automatic refresh of the metric strip, the channel-list counts and the message list; it resumes them at once. The control sits outside every refreshed region so a swap never changes its state. The search box applies its filter when it loses focus, as well as on Enter or the Search button. | MUST |
 
 ## 5. What KAMmon needs from KAM
 

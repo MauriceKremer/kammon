@@ -151,7 +151,7 @@ Every request then walks the same short path:
 - The last entry, **Manuals**, is an external link that opens the hosted manual site in a new browser tab; every role sees it, it has no route and is never the active item (D38, D23).
 - The node block at the bottom of the sidebar shows the node name, link state, radio summary and uptime; under it the server statistics block answers for the box itself — administrator only (D33).
 - Under 768 px the sidebar becomes a top strip with a scrolling row of page buttons.
-- Time range and pause controls appear only on the Overview, the one page that uses them.
+- Time range appears only on the Overview. A pause control appears on every page with automatically refreshed regions (Overview, Traffic and Channels).
 
 ### 4.2 Page patterns
 
@@ -245,7 +245,7 @@ Signal strength is never a column in a table or a footer on a message. KAM usual
 
 - Pages are real URLs that render fully on the server (`/`, `/traffic`, `/channels`, `/rooms`, `/automations`; `/accounts` and `/modem` are placeholders until their slices). Rooms and Automations are administrator pages: other roles get the 403 page (D34). Without JavaScript the page is a snapshot that refreshes when the browser reloads.
 - htmx makes parts of the page refresh by itself, for example `hx-get="/ui/overview/metrics" hx-trigger="every 2s" hx-swap="innerHTML"`. Parts that contain a form or an open editor never refresh themselves.
-- **Pause** (Overview) stops the timers on the page, not the poller.
+- **Pause** (Overview, Traffic, Channels) stops the timers on the page, not the poller; resuming refreshes the visible regions at once.
 - Data older than 10 seconds shows the stale-data bar; the numbers stay on screen.
 
 ### 7.2 Changes
