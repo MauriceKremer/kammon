@@ -60,3 +60,4 @@ Removed (D23, 2026-10-18): the manuals, their public `/manuals/` route and the s
 - Replace the hand-written phase-2 text fixtures with recorded KAM responses when available.
 - [x] Adapt the scaffold DTOs, fake KAM and fixtures to the clarified contract — event `next_after`, list envelopes, no pinned-room-role field. The reader, fake KAM and fixtures run against the pinned contract; the drift check is clean (2026-11-08).
 - Decide whether demo mode ships in the release binary.
+- [x] Web-user account management is separate from room accounts: see [PLAN-WebAccounts.md](PLAN-WebAccounts.md).

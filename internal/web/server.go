@@ -31,10 +31,11 @@ const (
 const AssetVersion = "kammon-18"
 
 type Deps struct {
-	Config config.Config
-	Store  *store.Store
-	Now    func() time.Time
-	Demo   bool
+	Config     config.Config
+	ConfigPath string
+	Store      *store.Store
+	Now        func() time.Time
+	Demo       bool
 	// KAM is the client for the admin's script calls; nil keeps the pages reading the store
 	// and the editor saying it is not connected (AGENTS rule 3).
 	KAM kam.Admin
@@ -47,6 +48,7 @@ type Server struct {
 	store    *store.Store
 	now      func() time.Time
 	demo     bool
+	userMgr  *userManager
 	sessions *auth.Sessions
 	slowdown *auth.Slowdown
 	sleep    func(time.Duration)
@@ -81,6 +83,7 @@ func New(d Deps) (*Server, error) {
 	}
 	s := &Server{
 		cfg: d.Config, store: d.Store, now: d.Now, demo: d.Demo, kam: d.KAM,
+		userMgr:  newUserManager(d.ConfigPath, d.Demo, d.Config.Users),
 		sessions: auth.NewSessions(d.Config.SessionIdle(), d.Now),
 		slowdown: auth.NewSlowdown(),
 		sleep:    d.Sleep,
@@ -90,7 +93,7 @@ func New(d Deps) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, name := range []string{"overview", "placeholder", "login", "traffic", "channels", "rooms", "automations"} {
+	for _, name := range []string{"overview", "placeholder", "login", "traffic", "channels", "rooms", "automations", "web-users"} {
 		clone, err := base.Clone()
 		if err != nil {
 			return nil, err
@@ -125,6 +128,9 @@ func (s *Server) routes() []route {
 		{"GET /ui/room-posts", admin, s.roomPostsPartial},
 		{"GET /ui/room-metrics", admin, s.roomMetricsPartial},
 		{"GET /automations", admin, s.automationsPage},
+		{"GET /web-users", admin, s.webUsersPage},
+		{"POST /ui/web-users/save", admin, s.webUsersSave},
+		{"DELETE /ui/web-users", admin, s.webUsersDelete},
 		{"GET /ui/script-list", admin, s.scriptListPartial},
 		{"POST /ui/script-validate", admin, s.scriptValidateSubmit},
 		{"POST /ui/script-dry-run", admin, s.scriptDryRunSubmit},
@@ -136,7 +142,7 @@ func (s *Server) routes() []route {
 	// Placeholder routes for the pages that are not built yet. Built pages register their own
 	// routes above; the overview and traffic pages take themselves out of this loop.
 	for _, p := range view.Pages(config.RoleAdmin) {
-		if p.Key == "overview" || p.Key == "traffic" || p.Key == "channels" || p.Key == "rooms" || p.Key == "automations" {
+		if p.Key == "overview" || p.Key == "traffic" || p.Key == "channels" || p.Key == "rooms" || p.Key == "automations" || p.Key == "web-users" {
 			continue
 		}
 		level := viewer
@@ -292,7 +298,7 @@ func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
 	if d := s.slowdown.Delay(auth.RemoteHost(r), s.now()); d > 0 {
 		s.sleep(d)
 	}
-	user, ok := auth.Check(s.cfg.Users, r.PostForm.Get("name"), r.PostForm.Get("password"))
+	user, ok := auth.Check(s.userMgr.list(), r.PostForm.Get("name"), r.PostForm.Get("password"))
 	if !ok {
 		s.slowdown.Fail(auth.RemoteHost(r), s.now())
 		s.renderLogin(w, r, http.StatusUnauthorized, "Wrong name or password.")

@@ -14,7 +14,7 @@ var t0 = time.Date(2026, 10, 11, 15, 0, 0, 0, time.UTC)
 func ptr[T any](v T) *T { return &v }
 
 func TestPagesHideAdminItemsFromViewers(t *testing.T) {
-	adminOnly := []string{"rooms", "accounts", "automations", "modem"}
+	adminOnly := []string{"rooms", "accounts", "web-users", "automations", "modem"}
 	forall := []string{"overview", "traffic", "channels"}
 	has := func(role config.Role, key string) bool {
 		for _, p := range Pages(role) {

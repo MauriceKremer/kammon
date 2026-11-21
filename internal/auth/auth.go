@@ -18,12 +18,16 @@ const maxSessions = 1000
 
 // Check compares a name and password with every configured user in constant time (MON-AX-5).
 // A wrong name and a wrong password are indistinguishable to the caller.
+// Stored passwords can be either PBKDF2 hashes or legacy plain text (MON-WA-3, MON-WA-4).
 func Check(users []config.User, name, password string) (config.User, bool) {
 	var found config.User
 	ok := 0
 	for _, u := range users {
 		nameOK := subtle.ConstantTimeCompare([]byte(u.Name), []byte(name))
-		passOK := subtle.ConstantTimeCompare([]byte(u.Password), []byte(password))
+		passOK := 0
+		if VerifyPassword(password, u.Password) {
+			passOK = 1
+		}
 		if nameOK&passOK == 1 {
 			found = u
 		}
@@ -95,6 +99,17 @@ func (s *Sessions) Delete(id string) {
 	s.mu.Lock()
 	delete(s.m, id)
 	s.mu.Unlock()
+}
+
+// RevokeUser deletes all active sessions for a given username (MON-WA-11).
+func (s *Sessions) RevokeUser(username string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, sess := range s.m {
+		if sess.user.Name == username {
+			delete(s.m, id)
+		}
+	}
 }
 
 // RemoteHost is the host part of the request's connection address — the key for per-address

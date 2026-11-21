@@ -50,6 +50,20 @@ func TestSessionsLifecycle(t *testing.T) {
 	if _, ok := s.Get(id2); ok {
 		t.Fatal("deleted session must be gone")
 	}
+
+	// RevokeUser (MON-WA-11)
+	s.Create(users[0])
+	s.Create(users[0])
+	idOther := s.Create(users[1])
+	s.RevokeUser(users[0].Name)
+	for _, sess := range s.m {
+		if sess.user.Name == users[0].Name {
+			t.Fatalf("RevokeUser failed to remove all sessions for %s", users[0].Name)
+		}
+	}
+	if _, ok := s.Get(idOther); !ok {
+		t.Fatalf("RevokeUser should not affect other users")
+	}
 }
 
 func TestSessionsAreBounded(t *testing.T) {
