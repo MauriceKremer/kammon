@@ -5,6 +5,8 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -75,7 +77,7 @@ func TestAdvertsPageShowsInventoryPlanAndCopyableText(t *testing.T) {
 // TestAdvertsMapFramesTheCountry pins the country-level default frame (D43, D44): about 260 km
 // around the configured node, never wider than the country; the fresh dot carries its last-heard
 // colour class; the basemap is referenced from the versioned asset, never drawn inline; and the
-// zoom controls step ±×2 from there.
+// interactive controls ride the markup, not the URL (MON-AD-15, D47).
 func TestAdvertsMapFramesTheCountry(t *testing.T) {
 	h := newHarness(t)
 	seedAdverts(t, h)
@@ -97,9 +99,14 @@ func TestAdvertsMapFramesTheCountry(t *testing.T) {
 		"Utrecht",
 		"Amsterdam",
 		`class="map-city-name"`,
-		`hx-get="/ui/adverts?mapzoom=2"`,
-		`hx-get="/ui/adverts?mapzoom=0.5"`,
-		`aria-label="Zoom in"`,
+		`viewBox=`,
+		`data-frame-width=`,
+		`data-map-zoom="in"`,
+		`data-map-zoom="out"`,
+		`data-map-reset`,
+		`aria-label="Reset to 100 km view"`,
+		"The view opens on a 100 km radius around the centre of the 1 node that advertised a position",
+		"Drag to pan, scroll or pinch to zoom",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page misses %q", want)
@@ -111,32 +118,55 @@ func TestAdvertsMapFramesTheCountry(t *testing.T) {
 	}
 }
 
-// TestAdvertsMapZoomSteps checks the zoomed frames: the words name the factor and ground width,
-// the next step's URL rides the buttons, the poller's live URL carries the zoom, and the bounds
-// disable their edge (MON-AD-15, D44).
-func TestAdvertsMapZoomSteps(t *testing.T) {
+// TestAdvertsMapOpensOnTheLocatedNodesCentre checks the interactive map's opening view and the
+// stateless live region: the SVG opens on a 100 km square view, held inside its own frame, the
+// camera rides no URL, and the client script is on the layout (MON-AD-15, D47).
+func TestAdvertsMapOpensOnTheLocatedNodesCentre(t *testing.T) {
 	h := newHarness(t)
 	seedAdverts(t, h)
 	c := h.login(t, "viewer", "viewer")
-	_, body, _ := get(t, c, h.ts.URL+"/adverts?mapzoom=4")
-	for _, want := range []string{
-		"Zoomed 4× in: about",
-		`hx-get="/ui/adverts?mapzoom=8"`,
-		`hx-get="/ui/adverts?mapzoom=2"`,
-		`hx-get="/ui/adverts?mapzoom=4"`, // the live region keeps its zoom on the poll
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("page misses %q", want)
-		}
+	_, body, _ := get(t, c, h.ts.URL+"/adverts")
+	pattern := regexp.MustCompile(`<svg class="chart advert-map" viewBox="([\d.\- ]+)" data-frame-width="(\d+)" data-frame-height="(\d+)"`)
+	found := pattern.FindStringSubmatch(body)
+	if found == nil {
+		t.Fatal("the map's opening view and frame are not in the markup")
 	}
-	_, body, _ = get(t, c, h.ts.URL+"/adverts?mapzoom=16")
-	if !strings.Contains(body, `aria-label="Zoom in" disabled`) {
-		t.Errorf("a 16× frame still offers zooming in")
+	nums := strings.Fields(found[1])
+	if len(nums) != 4 {
+		t.Fatalf("viewBox = %q, want four numbers", found[1])
 	}
-	_, body, _ = get(t, c, h.ts.URL+"/adverts?mapzoom=0.25")
-	if !strings.Contains(body, "Zoomed 4× out") || !strings.Contains(body, `aria-label="Zoom out" disabled`) {
-		t.Errorf("the ¼ frame misses its words or its zoom-out bound")
+	vw, vh := parseFloat(t, nums[2]), parseFloat(t, nums[3])
+	frameW, frameH := float64(parseInt(t, found[2])), float64(parseInt(t, found[3]))
+	if vw != vh {
+		t.Errorf("the opening view is not a square: %g×%g", vw, vh)
 	}
+	if vw >= frameW || vh >= frameH {
+		t.Errorf("the opening view %g×%g is not inside the frame %g×%g", vw, vh, frameW, frameH)
+	}
+	if strings.Contains(body, "mapzoom") || strings.Contains(body, `hx-get="/ui/adverts?`) {
+		t.Errorf("the map's zoom still rides the URL")
+	}
+	if !strings.Contains(body, `src="/static/adverts-map.js?v=kammon-24"`) {
+		t.Errorf("the client camera script is not on the page")
+	}
+}
+
+func parseFloat(t *testing.T, text string) float64 {
+	t.Helper()
+	value, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		t.Fatalf("not a number: %q", text)
+	}
+	return value
+}
+
+func parseInt(t *testing.T, text string) int {
+	t.Helper()
+	value, err := strconv.Atoi(text)
+	if err != nil {
+		t.Fatalf("not a number: %q", text)
+	}
+	return value
 }
 
 // TestAdvertsMapFramesTheNodesWithoutLocation checks the fallback: no location configured means

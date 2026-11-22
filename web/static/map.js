@@ -54,6 +54,19 @@
     if (found.card && !found.card.classList.contains("pinned")) found.card.hidden = true;
   }
 
+  // The map's client camera (adverts-map.js) moves the dots inside their SVG; every move re-places
+  // the cards it leaves open, so a pinned card follows its dot through pan and zoom (MON-AD-16).
+  document.addEventListener("advertsmapview", function (evt) {
+    var svg = evt.target && evt.target.closest ? evt.target.closest(".advert-map") : null;
+    if (!svg) return;
+    var box = svg.closest(".advert-map-box");
+    if (!box) return;
+    box.querySelectorAll(".map-card:not([hidden])").forEach(function (card) {
+      var node = svg.querySelector('[data-n="' + card.getAttribute("data-node") + '"]');
+      if (node) place(node, card);
+    });
+  });
+
   var dot = function (target) {
     return target && target.closest ? target.closest(".map-node") : null;
   };

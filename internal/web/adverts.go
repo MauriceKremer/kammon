@@ -24,6 +24,9 @@ const (
 	// Coordinates within ±0.01° of 0°N 0°E are a missing GPS fix, not a place (MON-AD-6, D43):
 	// the table keeps the advertised row, the map drops the dot and never frames for it.
 	noFixDegrees = 0.01
+	// viewRadiusKm is the radius of the view the map opens on, centred on the centre of the
+	// located nodes; the client script pans and zooms inside the frame around it (MON-AD-15, D47).
+	viewRadiusKm = 100.0
 )
 
 // scaleBarKm are the lengths the scale bar may take, so it always reads a round figure.
@@ -33,43 +36,6 @@ var scaleBarKm = []int{1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000}
 // configured node, never wider than the country's own outline (D43, D44) — wide enough to hold the
 // major cities of a Dutch-sized mesh.
 const defaultFrameKm = 260.0
-
-// mapZoomLevels are the zoom steps the controls step through: a plain span divisor, 1 the default.
-var mapZoomLevels = []float64{0.25, 0.5, 1, 2, 4, 8, 16}
-
-// mapZoom snaps the ?mapzoom= value onto the levels; anything unreadable is the default.
-func mapZoom(requested string) float64 {
-	raw, err := strconv.ParseFloat(requested, 64)
-	if err != nil {
-		return 1
-	}
-	pick, best := 1.0, math.Inf(1)
-	for _, level := range mapZoomLevels {
-		if d := math.Abs(math.Log2(raw / level)); d < best {
-			pick, best = level, d
-		}
-	}
-	return pick
-}
-
-// zoomToken is the canonical ?mapzoom= value of a level.
-func zoomToken(zoom float64) string { return strconv.FormatFloat(zoom, 'f', -1, 64) }
-
-// zoomNeighbours name the next level up and down, "" at a bound.
-func zoomNeighbours(zoom float64) (up, down string) {
-	for i, level := range mapZoomLevels {
-		if level != zoom {
-			continue
-		}
-		if i+1 < len(mapZoomLevels) {
-			up = zoomToken(mapZoomLevels[i+1])
-		}
-		if i > 0 {
-			down = zoomToken(mapZoomLevels[i-1])
-		}
-	}
-	return up, down
-}
 
 type advertRow struct {
 	Number     int
@@ -94,7 +60,7 @@ type advertsData struct {
 	Map                                                                             chartMarkup
 	HasMap                                                                          bool
 	MapNote, FrameNote, HomeNote, BandsNote, TruncationNote, FreshNote, MapSkipNote string
-	ZoomInURL, ZoomOutURL                                                           string
+	ResetLabel                                                                      string
 	Plan                                                                            string
 	EmptyMessage                                                                    string
 	LiveURL                                                                         string
@@ -115,11 +81,7 @@ func (s *Server) advertsPartial(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) adverts(r *http.Request) advertsData {
-	zoom := mapZoom(r.URL.Query().Get("mapzoom"))
 	data := advertsData{LiveURL: "/ui/adverts"}
-	if zoom != 1 {
-		data.LiveURL += "?mapzoom=" + zoomToken(zoom) // the 60s poll keeps the zoomed frame
-	}
 	list, kamTruncated, dropped := s.store.Adverts()
 	now := s.now()
 	status, _ := s.store.Status()
@@ -186,19 +148,11 @@ func (s *Server) adverts(r *http.Request) advertsData {
 		{Label: "Silent over 24 h", Value: thousands(silent), Caption: "Stale Node: no advert heard in a day"},
 	}
 
-	mapHTML, hasMap, notes := s.advertMap(list, nowKAM, zoom)
+	mapHTML, hasMap, notes := s.advertMap(list, nowKAM)
 	data.Map, data.HasMap = mapHTML, hasMap
 	data.MapNote, data.FrameNote, data.HomeNote, data.BandsNote, data.MapSkipNote =
 		notes.Map, notes.Frame, notes.Home, notes.Bands, notes.Skip
-	if hasMap {
-		up, down := zoomNeighbours(zoom)
-		if up != "" {
-			data.ZoomInURL = "/ui/adverts?mapzoom=" + up
-		}
-		if down != "" {
-			data.ZoomOutURL = "/ui/adverts?mapzoom=" + down
-		}
-	}
+	data.ResetLabel = notes.Reset
 
 	if kamTruncated {
 		data.TruncationNote = "KAM returned only the first rows of its advert table."
@@ -286,19 +240,21 @@ func osmURL(lat, lon float64) string {
 	return fmt.Sprintf("https://www.openstreetmap.org/?mlat=%.5f&mlon=%.5f#map=15/%.5f/%.5f", lat, lon, lat, lon)
 }
 
-// advertMapNotes is what the map says below itself, in words: what the dots are, how the frame is
-// chosen, and what the map left out.
+// advertMapNotes is what the map says below itself, in words: what the dots are, how the frame and
+// the opening view are chosen, and what the map left out. Reset is the label the client's reset
+// button shows.
 type advertMapNotes struct {
-	Map, Frame, Home, Bands, Skip string
+	Map, Frame, Home, Bands, Skip, Reset string
 }
 
 // advertMap frames the planned nodes: about 200 km around the configured location, never wider
-// than the country's own ring, with the zoom dividing the frame around its centre; the stored-node
-// fit remains the fallback when location is missing or unmatched (D43, D44). The frame never
-// widens for an advert, so a bad advertised coordinate cannot stretch the view. Nodes that
-// advertised no position draw on hop-distance bands around location; nodes outside the frame are
-// counted, not drawn.
-func (s *Server) advertMap(list []kam.Advert, nowKAM time.Time, zoom float64) (chartMarkup, bool, advertMapNotes) {
+// than the country's own ring, with the node fit as the fallback when location is missing or
+// unmatched (D43, D44). The frame never widens for an advert, so a bad advertised coordinate
+// cannot stretch the view. Nodes that advertised no position draw on hop-distance bands around
+// location; nodes outside the frame are counted, not drawn. The map opens on a 100 km view around
+// the centre of the nodes that advertised a position, and the client script pans and zooms inside
+// the frame (MON-AD-15, D47).
+func (s *Server) advertMap(list []kam.Advert, nowKAM time.Time) (chartMarkup, bool, advertMapNotes) {
 	type point struct{ lat, lon float64 }
 	home := (*point)(nil)
 	if s.cfg.Location != nil && s.cfg.Location.Latitude != nil && s.cfg.Location.Longitude != nil {
@@ -390,8 +346,8 @@ func (s *Server) advertMap(list []kam.Advert, nowKAM time.Time, zoom float64) (c
 		cx, cy = (xMin+xMax)/2, (yMin+yMax)/2
 		latMid = (latMin + latMax) / 2
 	}
-	spanX = max(spanX/zoom, 0.02)
-	spanY = max(spanY/zoom, 0.02)
+	spanX = max(spanX, 0.02)
+	spanY = max(spanY, 0.02)
 	xMin, xMax := cx-spanX/2, cx+spanX/2
 	yMin := cy - spanY/2 // the frame's southern edge in projected units; the top follows from the height
 	aspect := spanX / spanY
@@ -417,6 +373,33 @@ func (s *Server) advertMap(list []kam.Advert, nowKAM time.Time, zoom float64) (c
 	plan := mapPlan{
 		Width: width, Height: height, LonMin: xMin, MercMin: yMin,
 		PxPerLon: width / spanX, PxPerMerc: height / spanY,
+	}
+	// The opening view (MON-AD-15, D47): a viewRadiusKm square around the centre of the located
+	// nodes, held inside the frame's rectangle; without located nodes advertMapSVG opens on the
+	// whole frame. Web Mercator scales longitude and its y alike at one latitude, so one radius
+	// number serves both axes; the centre is clamped so the view still shows the frame.
+	if len(located) > 0 {
+		var latSum, lonSum float64
+		for _, node := range located {
+			latSum += node.lat
+			lonSum += node.lon
+		}
+		midLat, midLon := latSum/float64(len(located)), lonSum/float64(len(located))
+		cosMid := max(math.Cos(midLat*math.Pi/180), 0.2)
+		radius := viewRadiusKm / (kmPerDegreeLat * cosMid)
+		viewW, viewH := 2*radius*plan.PxPerLon, 2*radius*plan.PxPerMerc
+		midX := (midLon - xMin) * plan.PxPerLon
+		midY := plan.Height - (mercatorY(midLat)-yMin)*plan.PxPerMerc
+		centreWithin := func(centre, side, bound float64) float64 {
+			if side >= bound {
+				return bound / 2
+			}
+			return min(max(centre, side/2), bound-side/2)
+		}
+		cx := centreWithin(midX, viewW, plan.Width)
+		cy := centreWithin(midY, viewH, plan.Height)
+		plan.ViewX, plan.ViewY = cx-viewW/2, cy-viewH/2
+		plan.ViewW, plan.ViewH = viewW, viewH
 	}
 	for grid := math.Ceil(xMin/gridStep(xMax-xMin)) * gridStep(xMax-xMin); grid <= xMax; grid += gridStep(xMax - xMin) {
 		plan.Meridians = append(plan.Meridians, grid)
@@ -518,37 +501,32 @@ func (s *Server) advertMap(list []kam.Advert, nowKAM time.Time, zoom float64) (c
 	if home == nil {
 		notes.Map = "Only nodes that advertised a position are plotted. Add `location` (latitude and longitude) to kammon.yml to place the other nodes by hop distance."
 	}
-	notes.Frame = mapFrameNote(frame, countryName, home != nil, plan.Meridians, plan.Parallels, scaleKm, scaleLat, zoom, spanKm(spanX, spanY, scaleLat))
+	notes.Frame = mapFrameNote(frame, countryName, home != nil, len(located), plan.Meridians, plan.Parallels, scaleKm, scaleLat)
+	notes.Reset = "Reset view"
+	if len(located) > 0 {
+		notes.Reset = fmt.Sprintf("Reset to %s km view", thousands(int(viewRadiusKm)))
+	}
 	notes.Skip = mapSkipNote(noFix, outside)
 	return advertMapSVG(plan), true, notes
 }
 
-// spanKm is the larger ground-km width of the frame, said in the frame words.
-func spanKm(spanX, spanY, scaleLat float64) float64 {
-	kmPerUnit := kmPerDegreeLat * math.Cos(scaleLat*math.Pi/180)
-	return max(spanX, spanY) * kmPerUnit
-}
-
-// mapFrameNote says how the frame was chosen, how far it reaches, what the grid means.
-func mapFrameNote(frame, countryName string, hasHome bool, meridians, parallels []float64, scaleKm int, scaleLat float64, zoom, acrossKm float64) string {
+// mapFrameNote says how the frame was chosen, how the view opens on it, and what the grid means.
+func mapFrameNote(frame, countryName string, hasHome bool, located int, meridians, parallels []float64, scaleKm int, scaleLat float64) string {
 	var words string
-	span := fmt.Sprintf("about %s km across", thousandsSpan(acrossKm))
 	switch {
-	case frame == "country" && zoom == 1:
-		words = fmt.Sprintf("Framed about %s km around your node, from location in kammon.yml — never wider than %s, and the frame never widens for a node.", zoomToken(defaultFrameKm), countryName)
 	case frame == "country":
-		words = fmt.Sprintf("Zoomed %s× %s: %s around your node; the %s km default comes from location in kammon.yml.", zoomFactor(zoom), zoomDir(zoom), span, zoomToken(defaultFrameKm))
+		words = fmt.Sprintf("Framed about %.0f km around your node, from location in kammon.yml — never wider than %s, and the frame never widens for a node.", defaultFrameKm, countryName)
 	case hasHome:
-		words = fmt.Sprintf("The configured location did not match a country outline, so the frame fits the stored nodes, %s.", span)
-		if zoom != 1 {
-			words = fmt.Sprintf("Zoomed %s× %s into the fit of the stored nodes, %s; the %s km default needs location in kammon.yml.", zoomFactor(zoom), zoomDir(zoom), span, zoomToken(defaultFrameKm))
-		}
+		words = "The configured location did not match a country outline, so the frame fits the stored nodes."
 	default:
 		words = "The frame fits the stored nodes; add location (latitude, longitude) to kammon.yml to frame your country and its 200 km default."
-		if zoom != 1 {
-			words = "Zoomed " + zoomFactor(zoom) + "× " + zoomDir(zoom) + " into the fit of the stored nodes; the 200 km default needs location in kammon.yml."
-		}
 	}
+	if located > 0 {
+		words += fmt.Sprintf(" The view opens on a %s km radius around the centre of the %s that advertised a position.", thousands(int(viewRadiusKm)), pluralCount(located, "node"))
+	} else {
+		words += " The view opens on the whole frame."
+	}
+	words += " Drag to pan, scroll or pinch to zoom, and the buttons on the map step the zoom and reset the view."
 	words += " Grid lines every " + gridStepWord(meridians, parallels) + "."
 	if scaleKm > 0 {
 		words += fmt.Sprintf(" The scale bar is %s km, exact at %.1f°%s.", thousands(scaleKm), math.Abs(scaleLat), func() string {
@@ -559,26 +537,6 @@ func mapFrameNote(frame, countryName string, hasHome bool, meridians, parallels 
 		}())
 	}
 	return words
-}
-
-// zoomFactor and zoomDir say a zoom level in words: "2 in", "4 out".
-func zoomFactor(zoom float64) string {
-	if zoom >= 1 {
-		return zoomToken(zoom)
-	}
-	return zoomToken(1 / zoom)
-}
-
-func zoomDir(zoom float64) string {
-	if zoom >= 1 {
-		return "in"
-	}
-	return "out"
-}
-
-// thousandsSpan rounds a km width to a whole number for the words.
-func thousandsSpan(km float64) string {
-	return thousands(int(math.Round(km)))
 }
 
 // gridStepWord names the grid spacing in degrees; the two axes can differ.

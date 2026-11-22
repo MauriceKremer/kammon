@@ -24,13 +24,14 @@
         <div class="small muted">First heard {{.FirstHeard}} · clock {{.Drift}}</div>
       </div>
     </aside>{{end}}</div>
-    <div class="map-zoom">{{if .ZoomInURL}}<button type="button" aria-label="Zoom in" title="Zoom in" hx-get="{{.ZoomInURL}}" hx-target="#adverts-live" hx-swap="outerHTML">+</button>{{else}}<button type="button" aria-label="Zoom in" disabled>+</button>{{end}}{{if .ZoomOutURL}}<button type="button" aria-label="Zoom out" title="Zoom out" hx-get="{{.ZoomOutURL}}" hx-target="#adverts-live" hx-swap="outerHTML">−</button>{{else}}<button type="button" aria-label="Zoom out" disabled>−</button>{{end}}</div></div>{{else}}<p class="muted">{{.MapNote}}</p>{{end}}
+    <div class="map-zoom"><button type="button" data-map-zoom="in" aria-label="Zoom in" title="Zoom in">+</button><button type="button" data-map-zoom="out" aria-label="Zoom out" title="Zoom out">−</button><button type="button" data-map-reset class="map-reset" aria-label="{{.ResetLabel}}" title="{{.ResetLabel}}">Reset</button></div></div>{{else}}<p class="muted">{{.MapNote}}</p>{{end}}
     {{if .HasMap}}<ul class="map-legend small muted">
       <li><i class="map-key node" aria-hidden="true"></i>Advertised position</li>
       <li><i class="map-key probable" aria-hidden="true"></i>Probable: no position advertised, placed by hop count</li>
       <li><i class="map-key city" aria-hidden="true"></i>Major city (Natural Earth)</li>
       {{if .HomeNote}}<li><i class="map-key home" aria-hidden="true"></i>Your node (kammon.yml)</li>{{end}}
       <li>Dot colour follows Last heard: green fresh, blue recent, grey older, dashed silent for a day.</li>
+      <li>Drag to pan, scroll or pinch to zoom; + and − step the zoom; Reset returns to the opening view.</li>
       <li>Hover or click a dot for the advert's details.</li>
     </ul>{{end}}
     {{if .FrameNote}}<p class="small muted">{{.FrameNote}}</p>{{end}}

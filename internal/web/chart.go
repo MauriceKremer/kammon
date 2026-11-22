@@ -199,6 +199,10 @@ type mapPlan struct {
 	Width, Height       float64
 	LonMin, MercMin     float64 // the frame's left and bottom edge, in projected units
 	PxPerLon, PxPerMerc float64
+	// ViewX, ViewY, ViewW and ViewH are the view the map opens on, in frame pixels: a 100 km
+	// radius around the centre of the located nodes, or the whole frame when none advertise a
+	// position. The client script pans and zooms inside the frame, so this is only its start.
+	ViewX, ViewY, ViewW, ViewH float64
 	// Meridians and Parallels are the grid lines' longitudes and latitudes in degrees; the
 	// parallels project through mercatorY because Mercator spreads latitudes unevenly.
 	Meridians, Parallels []float64
@@ -217,8 +221,14 @@ type mapPlan struct {
 // charts the markup is built from numbers only, so no text from the radio can reach it (a test
 // enforces that).
 func advertMapSVG(p mapPlan) chartMarkup {
+	viewX, viewY, viewW, viewH := p.ViewX, p.ViewY, p.ViewW, p.ViewH
+	if viewW == 0 || viewH == 0 { // the whole frame is the view when no located node set it
+		viewX, viewY, viewW, viewH = 0, 0, p.Width, p.Height
+	}
+	// data-frame-width/height tell the client script the frame it may pan and zoom within.
 	var b strings.Builder
-	fmt.Fprintf(&b, `<svg class="chart advert-map" viewBox="0 0 %.0f %.0f" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Advert map: node positions, each dot announcing its row number">`, p.Width, p.Height)
+	fmt.Fprintf(&b, `<svg class="chart advert-map" viewBox="%.2f %.2f %.2f %.2f" data-frame-width="%.0f" data-frame-height="%.0f" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Advert map: node positions, each dot announcing its row number">`,
+		viewX, viewY, viewW, viewH, p.Width, p.Height)
 	fmt.Fprintf(&b, `<g transform="translate(0 %.2f) scale(%.8f %.8f) translate(%.8f %.8f)">`, p.Height, p.PxPerLon, -p.PxPerMerc, -p.LonMin, -p.MercMin)
 	fmt.Fprintf(&b, `<use href="/static/basemap.svg?v=%s#basemap"></use>`, AssetVersion)
 	b.WriteString(`</g>`)
