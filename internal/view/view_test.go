@@ -15,7 +15,7 @@ func ptr[T any](v T) *T { return &v }
 
 func TestPagesHideAdminItemsFromViewers(t *testing.T) {
 	adminOnly := []string{"rooms", "web-users", "automations", "modem"}
-	forall := []string{"overview", "traffic", "channels"}
+	forall := []string{"overview", "traffic", "adverts", "channels"}
 	has := func(role config.Role, key string) bool {
 		for _, p := range Pages(role) {
 			if p.Key == key {

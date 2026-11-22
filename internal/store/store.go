@@ -22,6 +22,10 @@ const (
 	MaxClientsPerRoom     = 100
 	MaxRoomNamesPerBucket = 64
 	MaxScripts            = 64 // a hobby node holds a handful; the snapshot truncates and says so
+	// MaxAdvertNodes bounds the advert inventory KAMmon keeps. KAM stores up to
+	// adverts.max_kept (default 10000) rows; one row is a few hundred bytes, so a
+	// thousand nodes is a megabyte at most and far more than a hobby mesh holds.
+	MaxAdvertNodes = 1000
 )
 
 // Bucket is one minute of events summed per packet class.
@@ -90,6 +94,11 @@ type Store struct {
 	scripts        []kam.Script
 	scriptsAt      time.Time
 	scriptsMore    int
+
+	adverts          []kam.Advert
+	advertsAt        time.Time
+	advertsTruncated bool
+	advertsDropped   int
 }
 
 // Option tunes a Store at construction.
@@ -326,6 +335,28 @@ func (s *Store) SetChannels(ch []kam.Channel, now time.Time) {
 	s.mu.Unlock()
 }
 
+// SetAdverts stores the advert inventory. KAM may return more rows than MaxAdvertNodes; the
+// surplus is counted and reported rather than kept (MON-DS-18).
+func (s *Store) SetAdverts(list []kam.Advert, truncated bool, now time.Time) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.advertsDropped = 0
+	if len(list) > MaxAdvertNodes {
+		s.advertsDropped = len(list) - MaxAdvertNodes
+		list = list[:MaxAdvertNodes]
+	}
+	s.adverts = append([]kam.Advert(nil), list...)
+	s.advertsTruncated = truncated
+	s.advertsAt = now
+}
+
+// Adverts returns the stored inventory and whether KAM or KAMmon cut it short.
+func (s *Store) Adverts() (list []kam.Advert, truncated bool, dropped int) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return append([]kam.Advert(nil), s.adverts...), s.advertsTruncated, s.advertsDropped
+}
+
 func (s *Store) SetRooms(rooms []kam.Room, clients map[string][]kam.RoomClient, now time.Time) {
 	s.mu.Lock()
 	// Hard limits from docs/requirements/DataStore.md §3 (MON-DS-18): 4 rooms, 100 clients each.
@@ -385,6 +416,9 @@ func (s *Store) Freshness(now time.Time) (Freshness, time.Time) {
 	if s.channelsAt.After(last) {
 		last = s.channelsAt
 	}
+	if s.advertsAt.After(last) {
+		last = s.advertsAt
+	}
 	return s.freshnessOf(last, now)
 }
 
@@ -402,9 +436,9 @@ func (s *Store) freshnessOf(last, now time.Time) (Freshness, time.Time) {
 }
 
 // SnapshotFreshness reports how recently one named snapshot was answered (MON-DS-13). Names are
-// the poller jobs: "events", "status", "channels", "rooms", "scripts". Successful event polling
-// says nothing about the other snapshots: they are judged separately, so a read that keeps
-// failing marks only its own panel stale.
+// the poller jobs: "events", "status", "channels", "rooms", "scripts", "adverts". Successful
+// event polling says nothing about the other snapshots: they are judged separately, so a read that
+// keeps failing marks only its own panel stale.
 func (s *Store) SnapshotFreshness(name string, now time.Time) (Freshness, time.Time) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -420,6 +454,8 @@ func (s *Store) SnapshotFreshness(name string, now time.Time) (Freshness, time.T
 		last = s.roomsAt
 	case "scripts":
 		last = s.scriptsAt
+	case "adverts":
+		last = s.advertsAt
 	default:
 		return Down, time.Time{}
 	}

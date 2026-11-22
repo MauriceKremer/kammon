@@ -1,0 +1,43 @@
+{
+  "adverts": [
+    {
+      "public_key": "ed8342bc8aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "node_hash": "8e",
+      "nickname": "Canal relay",
+      "is_chat_node": false,
+      "is_repeater": true,
+      "is_room_server": false,
+      "is_sensor": false,
+      "has_location": true,
+      "latitude": 52.7792,
+      "longitude": 6.9069,
+      "signature_valid": true,
+      "hop_count": 2,
+      "hop_stations": ["a1", "b2"],
+      "time_drift_seconds": 12,
+      "advert_timestamp": "2026-11-22T11:40:00.000Z",
+      "first_received_at": "2026-11-01T09:00:00.000Z",
+      "last_received_at": "2026-11-22T11:41:03.000Z"
+    },
+    {
+      "public_key": "72f188ca8aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "node_hash": "72",
+      "nickname": null,
+      "is_chat_node": false,
+      "is_repeater": false,
+      "is_room_server": false,
+      "is_sensor": false,
+      "has_location": false,
+      "latitude": null,
+      "longitude": null,
+      "signature_valid": false,
+      "hop_count": 0,
+      "hop_stations": [],
+      "time_drift_seconds": 0,
+      "advert_timestamp": "2026-11-22T11:30:00.000Z",
+      "first_received_at": null,
+      "last_received_at": "2026-11-22T11:39:00.000Z"
+    }
+  ],
+  "truncated": false
+}

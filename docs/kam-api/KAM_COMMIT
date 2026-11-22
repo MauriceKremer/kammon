@@ -1,2 +1,3 @@
 base commit: 3d1aa7f6e878ceec7cddfc2b6eb2cfe302074697
 copy: KAM @3d1aa7f (2026-11-07): phases 1-3 implemented on the unified listener; commits since the last pin add the modem routes (95b72de), periodic Starlark with timer_interval_minutes, on_timer, rest_get and room_post (b4e4399), the room limit raised to 10 (3f7aa27), the opt-in `system` section on GET /v1/status (3d1aa7f), and the read-only `timer_schedule` script field for cron-declared timers (2026-11-19)
+copy: KAM @7de8c01 (2026-11-22, PR #23): the read-only advert inventory (`GET /v1/adverts`, API-AD-1..5), on top of @3d1aa7f.

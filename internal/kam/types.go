@@ -186,6 +186,34 @@ type ChannelMessages struct {
 	NextBeforeID *int64           `json:"next_before_id"`
 }
 
+// Advert is one entry of GET /v1/adverts (API-AD-1): the newest advert KAM stored for one
+// public key. Names and positions are what that node last advertised, not identity or proof.
+type Advert struct {
+	PublicKey        string     `json:"public_key"`
+	NodeHash         string     `json:"node_hash"`
+	Nickname         *string    `json:"nickname"`
+	IsChatNode       bool       `json:"is_chat_node"`
+	IsRepeater       bool       `json:"is_repeater"`
+	IsRoomServer     bool       `json:"is_room_server"`
+	IsSensor         bool       `json:"is_sensor"`
+	HasLocation      bool       `json:"has_location"`
+	Latitude         *float64   `json:"latitude"`
+	Longitude        *float64   `json:"longitude"`
+	SignatureValid   bool       `json:"signature_valid"`
+	HopCount         int        `json:"hop_count"`
+	HopStations      []string   `json:"hop_stations"`
+	TimeDriftSeconds int64      `json:"time_drift_seconds"`
+	AdvertTimestamp  time.Time  `json:"advert_timestamp"`
+	FirstReceivedAt  *time.Time `json:"first_received_at"`
+	LastReceivedAt   time.Time  `json:"last_received_at"`
+}
+
+// AdvertList is GET /v1/adverts (API-AD-1). Truncated means KAM held more rows than it returned.
+type AdvertList struct {
+	Adverts   []Advert `json:"adverts"`
+	Truncated bool     `json:"truncated"`
+}
+
 // Room is one entry of GET /v1/rooms (API-RM-1).
 type Room struct {
 	ID                string            `json:"id"`

@@ -98,6 +98,18 @@ func TestFixturesDecodeStrictly(t *testing.T) {
 	if posts.Room != "lobby" || len(posts.Posts) != 1 || posts.Posts[0].Body == "" {
 		t.Fatalf("room posts = %+v", posts)
 	}
+
+	var adverts AdvertList
+	decodeStrict(t, "adverts.json", &adverts)
+	if len(adverts.Adverts) != 2 || adverts.Truncated {
+		t.Fatalf("adverts = %+v", adverts)
+	}
+	if first := adverts.Adverts[0]; first.Nickname == nil || *first.Nickname != "Canal relay" || first.Latitude == nil || !first.IsRepeater || len(first.HopStations) != 2 {
+		t.Fatalf("first advert = %+v", first)
+	}
+	if second := adverts.Adverts[1]; second.Nickname != nil || second.HasLocation || second.Latitude != nil || second.FirstReceivedAt != nil {
+		t.Fatalf("unlocated advert = %+v", second)
+	}
 }
 
 func TestHTTPReaderLoadsChannelHistoryAndRoomPosts(t *testing.T) {
@@ -148,5 +160,25 @@ func TestHTTPReaderMapsStatusCodes(t *testing.T) {
 	}
 	if resp, err := reader.Events(context.Background(), 7, "e1", 50); err != nil || resp.Epoch != "e1" {
 		t.Fatalf("events = %+v, %v", resp, err)
+	}
+}
+
+func TestHTTPReaderLoadsAdverts(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /v1/adverts", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("limit") != "1000" {
+			t.Errorf("advert limit query: %s", r.URL.RawQuery)
+		}
+		_, _ = w.Write([]byte(`{"adverts":[{"public_key":"ed83","node_hash":"8e","nickname":"Canal relay","is_chat_node":false,"is_repeater":true,"is_room_server":false,"is_sensor":false,"has_location":false,"latitude":null,"longitude":null,"signature_valid":true,"hop_count":2,"hop_stations":["a1"],"time_drift_seconds":4,"advert_timestamp":"2026-11-22T11:40:00Z","first_received_at":null,"last_received_at":"2026-11-22T11:41:03Z"}],"truncated":true}`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	reader := NewHTTP(srv.URL, time.Second)
+	list, err := reader.Adverts(context.Background())
+	if err != nil || len(list.Adverts) != 1 || !list.Truncated {
+		t.Fatalf("adverts = %+v, %v", list, err)
+	}
+	if advert := list.Adverts[0]; advert.Nickname == nil || *advert.Nickname != "Canal relay" || advert.HopCount != 2 || len(advert.HopStations) != 1 {
+		t.Fatalf("advert = %+v", advert)
 	}
 }

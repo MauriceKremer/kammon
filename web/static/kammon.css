@@ -332,3 +332,29 @@ body.login-page { display: block; }
 @media (prefers-reduced-motion: no-preference) {
   .nav a, button { transition: color 140ms ease, background-color 140ms ease; }
 }
+
+/* Adverts page: the inventory, the hop-band plan and its copyable text. */
+.advert-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.advert-map-box { border: 1px solid var(--border-default); background: var(--bg-1); padding: 8px; }
+.advert-map { display: block; width: 100%; height: auto; }
+.advert-map .map-land { fill: var(--bg-3); stroke: var(--border-default); stroke-width: 1; }
+.advert-map .map-border { stroke: var(--border-default); stroke-width: 1; opacity: .7; }
+.advert-map .map-band { fill: none; stroke: var(--warning); stroke-width: 1; stroke-dasharray: 4 4; opacity: .45; }
+.advert-map .map-home { stroke: var(--signal); stroke-width: 2; }
+.advert-map .map-node { fill: var(--signal); stroke: var(--bg-0); stroke-width: 1.5; }
+.advert-map .map-node.probable { fill: none; stroke: var(--warning); stroke-width: 1.5; stroke-dasharray: 3 2; }
+.advert-map .map-number { fill: var(--text-primary); font: 9px var(--font-code); }
+.map-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 12px 0 6px; padding: 0; list-style: none; }
+.map-legend li { display: inline-flex; align-items: center; }
+.map-key { display: inline-block; width: 10px; height: 10px; margin-right: 7px; border-radius: 50%; }
+.map-key.node { background: var(--signal); }
+.map-key.probable { border: 1.5px dashed var(--warning); }
+.map-key.home { width: 2px; height: 12px; border-radius: 0; background: var(--signal); }
+.plan-text { margin-top: 8px; }
+.plan-text summary { cursor: pointer; color: var(--signal); font-size: 13px; padding: 4px 0; }
+.plan-text pre { margin: 10px 0 0; padding: 14px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--bg-1); color: var(--text-secondary); font: 12px/1.6 var(--font-code); white-space: pre-wrap; overflow-x: auto; }
+
+@media (max-width: 767px) {
+  .advert-metrics { grid-template-columns: 1fr 1fr; }
+}
+.advert-map .map-grid { stroke: var(--border-subtle); stroke-width: 1; }

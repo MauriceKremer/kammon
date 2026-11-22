@@ -82,6 +82,7 @@ type Page struct {
 var pages = []Page{
 	{Key: "overview", Title: "Overview", Path: "/", Icon: "activity"},
 	{Key: "traffic", Title: "Traffic", Path: "/traffic", Icon: "radio-tower"},
+	{Key: "adverts", Title: "Adverts", Path: "/adverts", Icon: "map-pin"},
 	{Key: "channels", Title: "Channels", Path: "/channels", Icon: "hash"},
 	{Key: "rooms", Title: "Rooms", Path: "/rooms", Icon: "messages-square", Admin: true},
 	{Key: "web-users", Title: "Web users", Path: "/web-users", Icon: "shield-check", Admin: true},

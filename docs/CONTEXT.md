@@ -33,3 +33,7 @@ Use these words in code, tests, docs and screens.
 | **Viewer** | A logged-in user who can only look. |
 | **Admin** | A user with full control, wherever they log in from. KAMmon adds no transport rules; serving beyond the LAN is the operator's setup (D31). |
 | **Allow list** | `viewer_text_channels`: channels whose message text viewers may read. |
+| **Advert inventory** | KAM's stored adverts: the newest advert per public key, kept for `adverts.keep_days` (default 30). Not a log of every reception. |
+| **Advert plan** | The Adverts page's description of the inventory: table, map and copyable text. Descriptive, never advice. |
+| **Probable position** | A dot for a node that advertised no position, placed on a 15 km-per-hop band around the configured `location`. Not a measurement. |
+| **Hop band** | The ring between two hop distances on the advert map: hop 0 within 15 km, hop 1 within 30 km, and so on. |

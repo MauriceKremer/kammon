@@ -1,0 +1,54 @@
+{{define "content"}}{{template "adverts-page" .Content}}{{end}}
+
+{{define "adverts-page"}}{{template "adverts-live" .}}{{end}}
+
+{{define "adverts-live"}}
+<div id="adverts-live" hx-get="{{.LiveURL}}" hx-trigger="every 60s" hx-swap="outerHTML">
+{{if .Rows}}
+  <div class="section-head"><div><h2>Inventory</h2>{{if .FreshNote}}<p class="small muted">{{.FreshNote}}</p>{{end}}</div>
+    <button type="button" class="button" data-copy-target="advert-plan"><svg class="icon" aria-hidden="true"><use href="/static/icons.svg#copy"></use></svg>Copy plan</button>
+  </div>
+  <div class="resource-metrics advert-metrics">{{range .Metrics}}<div><span class="metric-label">{{.Label}}</span><strong>{{.Value}}</strong>{{if .Caption}}<span class="small muted">{{.Caption}}</span>{{end}}</div>{{end}}</div>
+  {{if .TruncationNote}}<p class="small muted">{{.TruncationNote}}</p>{{end}}
+
+  <section class="section">
+    <div class="section-head"><div><h3>Plan</h3>{{if .HomeNote}}<p class="small muted">{{.HomeNote}}</p>{{end}}</div></div>
+    {{if .HasMap}}<div class="advert-map-box">{{.Map}}</div>{{else}}<p class="muted">{{.MapNote}}</p>{{end}}
+    {{if .HasMap}}<ul class="map-legend small muted">
+      <li><i class="map-key node" aria-hidden="true"></i>Advertised position</li>
+      <li><i class="map-key probable" aria-hidden="true"></i>Probable: no position advertised, placed by hop count</li>
+      {{if .HomeNote}}<li><i class="map-key home" aria-hidden="true"></i>Your node (kammon.yml)</li>{{end}}
+    </ul>{{end}}
+    {{if .BandsNote}}<p class="small muted">{{.BandsNote}}</p>{{end}}
+    {{if .HasMap}}<p class="small muted">{{.MapNote}}</p>{{end}}
+  </section>
+
+  <section class="section">
+    <div class="section-head"><h3>Nodes</h3><span class="small muted">Newest heard first; numbers match the map</span></div>
+    <div class="table-scroll"><table>
+      <thead><tr><th>#</th><th>Name</th><th>Roles</th><th>Public key</th><th>Hops</th><th>Last heard</th><th>First heard</th><th>Clock</th><th>Position</th></tr></thead>
+      <tbody>{{range .Rows}}<tr>
+        <td class="mono muted">{{.Number}}</td>
+        <td>{{.Name}}</td>
+        <td class="small">{{.Roles}}</td>
+        <td class="mono muted" title="{{.FullKey}}">{{.ShortKey}}</td>
+        <td class="mono">{{.Hops}}</td>
+        <td title="{{.Ind.Title}}"><i class="ind {{.Ind.Class}}" aria-hidden="true"></i>{{.Ind.Text}} · <time class="mono">{{.LastHeard}}</time></td>
+        <td class="mono muted">{{.FirstHeard}}</td>
+        <td class="mono">{{.Drift}}</td>
+        <td>{{if .Located}}<a href="{{.OSM}}" target="_blank" rel="noopener" title="Open this position on OpenStreetMap">{{.Position}}</a>{{else}}<span class="muted">Not advertised</span>{{end}}</td>
+      </tr>{{end}}</tbody>
+    </table></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div><h3>Plan text</h3><p class="small muted">A description of what the adverts say, not advice.</p></div></div>
+    <details class="plan-text"><summary>Show the plan text</summary><pre id="advert-plan">{{.Plan}}</pre></details>
+  </section>
+
+  <p class="small muted">Names, roles and positions are what each node advertised; they are not verified identity or proof. Hop count is the path length of the packet that delivered the newest advert, so 0 means KAM heard it directly. KAM keeps the newest advert per public key for 30 days by default.</p>
+{{else}}
+  <p class="muted">{{.EmptyMessage}}</p>
+{{end}}
+</div>
+{{end}}

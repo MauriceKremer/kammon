@@ -1,10 +1,10 @@
 # KAMmon
 
-KAMmon is a web monitor for a [KAM](../kam) node. It shows what the radio hears, how busy the channel is, what the channels and rooms are doing, the KISS modem, and the Starlark scripts, in a calm dark (or light) console.
+KAMmon is a web monitor for a [KAM](../kam) node. It shows what the radio hears, how busy the channel is, which nodes advertise themselves and where they say they are, what the channels and rooms are doing, the KISS modem, and the Starlark scripts, in a calm dark (or light) console.
 
 KAM is the open system that does the work and runs fine without KAMmon. KAMmon only adds the screens and the login. It runs on the same computer as KAM and talks to it over KAM's local REST API.
 
-**Status:** A working monitor. Demo mode, login, and the Overview, Traffic, Channels, Rooms and Automations pages are built (Rooms and Automations for administrators); the KISS modem and Accounts pages are placeholders for their slices. Progress: [docs/PLAN.md](docs/PLAN.md).
+**Status:** A working monitor. Demo mode, login, and the Overview, Traffic, Adverts, Channels, Rooms and Automations pages are built (Rooms and Automations for administrators; Adverts is read-only for everyone); the KISS modem and Accounts pages are placeholders for their slices. Progress: [docs/PLAN.md](docs/PLAN.md).
 
 ## Try it
 
