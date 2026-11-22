@@ -58,6 +58,22 @@ func newHarness(t *testing.T) *harness {
 	return &harness{ts: ts, s: srv, st: st, now: &now}
 }
 
+// newGuestHarness is a server with guest_access set as given and an empty store; the guest
+// tests only need the login page and the route guard.
+func newGuestHarness(t *testing.T, guestAccess bool) *harness {
+	t.Helper()
+	now := t0
+	cfg := config.Demo()
+	cfg.GuestAccess = guestAccess
+	srv, err := New(Deps{Config: cfg, Store: store.New(), Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+	return &harness{ts: ts, s: srv, st: store.New(), now: &now}
+}
+
 func (h *harness) client(t *testing.T) *http.Client {
 	t.Helper()
 	jar, _ := cookiejar.New(nil)
@@ -128,6 +144,56 @@ func TestWrongPasswordGivesOneGenericMessage(t *testing.T) {
 		if resp.StatusCode != http.StatusUnauthorized || !strings.Contains(string(body), "Wrong name or password.") {
 			t.Fatalf("%v: %d", creds, resp.StatusCode)
 		}
+	}
+}
+
+// MON-AX-24: the Guest button appears only when guest_access is on.
+func TestGuestButtonFollowsGuestAccess(t *testing.T) {
+	off := newGuestHarness(t, false)
+	_, body, _ := get(t, off.client(t), off.ts.URL+"/login")
+	if strings.Contains(body, `action="/login/guest"`) || strings.Contains(body, ">Guest</button>") {
+		t.Fatalf("guest button shown with guest_access off")
+	}
+
+	on := newGuestHarness(t, true)
+	_, body, _ = get(t, on.client(t), on.ts.URL+"/login")
+	if !strings.Contains(body, `action="/login/guest"`) || !strings.Contains(body, ">Guest</button>") {
+		t.Fatalf("guest button missing with guest_access on")
+	}
+}
+
+// MON-AX-24: a guest is a viewer session, and the route refuses when the setting is off.
+func TestGuestLoginIsAViewerSession(t *testing.T) {
+	on := newGuestHarness(t, true)
+	c := on.client(t)
+	resp, err := c.PostForm(on.ts.URL+"/login/guest", url.Values{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/" {
+		t.Fatalf("guest login: %d %q", resp.StatusCode, resp.Header.Get("Location"))
+	}
+
+	status, body, _ := get(t, c, on.ts.URL+"/traffic")
+	if status != http.StatusOK {
+		t.Fatalf("guest cannot read a viewer page: %d", status)
+	}
+	if !strings.Contains(body, "Guest · Viewer") {
+		t.Errorf("the session does not say it is a guest viewer")
+	}
+	if status, _, _ = get(t, c, on.ts.URL+"/rooms"); status != http.StatusForbidden {
+		t.Fatalf("guest reached an admin page: %d", status)
+	}
+
+	off := newGuestHarness(t, false)
+	resp, err = off.client(t).PostForm(off.ts.URL+"/login/guest", url.Values{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("guest login with guest_access off: %d", resp.StatusCode)
 	}
 }
 

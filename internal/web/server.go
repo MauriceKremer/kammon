@@ -115,6 +115,7 @@ func (s *Server) routes() []route {
 		{"GET /static/", public, cachedFS(s.static)},
 		{"GET /login", public, s.loginPage},
 		{"POST /login", public, s.loginSubmit},
+		{"POST /login/guest", public, s.guestLogin}, // MON-AX-24
 		{"POST /logout", viewer, s.logout},
 		{"GET /{$}", viewer, s.overviewPage},
 		{"GET /ui/overview", viewer, s.overviewPartial},
@@ -294,9 +295,15 @@ func themeOf(r *http.Request) string {
 
 type loginData struct {
 	Theme, Error, Hint string
+	// GuestAccess shows the login page's Guest button (MON-AX-24).
+	GuestAccess bool
 	// StaticVersion is the static asset cache-buster, shared with the layout (AssetVersion).
 	StaticVersion string
 }
+
+// guestUser is the anonymous login allowed by guest_access: a viewer with no password
+// (MON-AX-24). It never exists in kammon.yml.
+var guestUser = config.User{Name: "Guest", Role: config.RoleViewer}
 
 func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.currentUser(r); ok {
@@ -307,7 +314,7 @@ func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, status int, message string) {
-	data := loginData{Theme: themeOf(r), Error: message, StaticVersion: AssetVersion}
+	data := loginData{Theme: themeOf(r), Error: message, GuestAccess: s.cfg.GuestAccess, StaticVersion: AssetVersion}
 	if s.demo {
 		data.Hint = "Demo mode: admin / admin or viewer / viewer."
 	}
@@ -330,11 +337,26 @@ func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
 		s.renderLogin(w, r, http.StatusUnauthorized, "Wrong name or password.")
 		return
 	}
+	s.startSession(w, r, user)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// guestLogin starts a viewer session without a name or password, but only while kammon.yml
+// answers guest_access: true (MON-AX-24).
+func (s *Server) guestLogin(w http.ResponseWriter, r *http.Request) {
+	if !s.cfg.GuestAccess {
+		http.NotFound(w, r)
+		return
+	}
+	s.startSession(w, r, guestUser)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request, user config.User) {
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Value: s.sessions.Create(user), Path: "/",
 		HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: secure(r),
 	})
-	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {

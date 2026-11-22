@@ -19,6 +19,11 @@
     <button class="primary" type="submit">Sign in</button>
     {{if .Hint}}<p class="small muted proto">{{.Hint}}</p>{{end}}
   </form>
+  {{if .GuestAccess}}
+  <form method="post" action="/login/guest">
+    <button type="submit">Guest</button>
+  </form>
+  {{end}}
 </main>
 </body>
 </html>{{end}}
