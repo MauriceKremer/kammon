@@ -26,9 +26,9 @@ const (
 )
 
 // AssetVersion is the cache-buster of the shared static assets (kammon.css, the static scripts
-// and the country basemap the adverts map references). Bump it when one of those files changes, so
-// browsers drop their cached copy instead of running or styling the pages with the old rules.
-const AssetVersion = "kammon-27"
+// and the vendored MapLibre files the adverts map uses). Bump it when one of those files changes,
+// so browsers drop their cached copy instead of running or styling the pages with the old rules.
+const AssetVersion = "kammon-30"
 
 type Deps struct {
 	Config     config.Config
@@ -113,9 +113,6 @@ func New(d Deps) (*Server, error) {
 func (s *Server) routes() []route {
 	routes := []route{
 		{"GET /static/", public, cachedFS(s.static)},
-		// The adverts map's one vendored asset (D42): the version ETag turns every later page view
-		// and poll swap into a 304 instead of resending the whole file.
-		{"GET /static/basemap.svg", public, basemapAsset},
 		{"GET /login", public, s.loginPage},
 		{"POST /login", public, s.loginSubmit},
 		{"POST /logout", viewer, s.logout},
@@ -188,29 +185,29 @@ func cachedFS(h http.Handler) http.HandlerFunc {
 	}
 }
 
-// basemapAsset serves the vendored country basemap that the adverts map references with one <use>
-// (D42). The asset version is the ETag, so a later page view or poll swap revalidates to a 304
-// instead of resending the whole projected map; retiring it bumps AssetVersion.
-func basemapAsset(w http.ResponseWriter, r *http.Request) {
-	etag := `"` + AssetVersion + `"`
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("ETag", etag)
-	if r.Header.Get("If-None-Match") == etag {
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-	w.Header().Set("Content-Type", "image/svg+xml")
-	fmt.Fprint(w, basemapSVG)
-}
-
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
-		h.Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+		policy := "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+		if mapPage(r.URL.Path) {
+			// The adverts map is the one page that reaches a third party (D57): OpenFreeMap's tiles,
+			// glyphs and sprites, plus the blob workers MapLibre starts. Everything else stays 'self'.
+			policy = "default-src 'self'; style-src 'self' 'unsafe-inline'; " +
+				"img-src 'self' data: blob: https://tiles.openfreemap.org; " +
+				"connect-src 'self' https://tiles.openfreemap.org; " +
+				"worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+		}
+		h.Set("Content-Security-Policy", policy)
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "same-origin")
 		next.ServeHTTP(w, r)
 	})
+}
+
+// mapPage reports whether a path is the adverts page or its live partial. Those responses carry the
+// relaxed CSP of D57; the partial matters because a swapped-in map runs under the document's policy.
+func mapPage(path string) bool {
+	return path == "/adverts" || path == "/ui/adverts"
 }
 
 type principal struct {

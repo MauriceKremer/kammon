@@ -1,18 +1,14 @@
 package web
 
 import (
-	"math"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
-	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"kammon.bytecoder.nl/internal/config"
 	"kammon.bytecoder.nl/internal/kam"
 )
 
@@ -58,7 +54,7 @@ func TestAdvertsPageShowsInventoryPlanAndCopyableText(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Canal relay", "Dalen relay", "PA3M",
-		`id="adverts-live"`, "advert-map", `class="map-node`, `class="map-home`,
+		`id="adverts-live"`, `class="advert-map"`, "data-geojson=", "data-map-anchor=",
 		"Copy plan", `id="advert-plan"`, "KAMmon advert plan",
 		"Nodes, newest heard first", "Hop count is the path length",
 		"https://www.openstreetmap.org/?mlat=52.77920",
@@ -72,142 +68,38 @@ func TestAdvertsPageShowsInventoryPlanAndCopyableText(t *testing.T) {
 		}
 	}
 	// Only the located node is drawn: no guessed hop-band placement reaches the map.
-	if strings.Count(body, `class="map-node`) != 1 {
-		t.Errorf("map dots = %d, want only the located node", strings.Count(body, `class="map-node`))
+	if got := len(mapGeoJSON(t, body).Features); got != 1 {
+		t.Errorf("map features = %d, want only the located node", got)
 	}
-	if strings.Contains(body, "map-node probable") || strings.Contains(body, "map-band") {
+	if strings.Contains(body, "map-band") {
 		t.Errorf("a non-GPS placement reached the map")
 	}
 }
 
-// TestAdvertsMapFramesTheCountry pins the country-level default frame (D43, D44): about 260 km
-// around the configured node, never wider than the country; the fresh dot carries its last-heard
-// colour class; the basemap is referenced from the versioned asset, never drawn inline; and the
-// interactive controls ride the markup, not the URL (MON-AD-15, D47).
-func TestAdvertsMapFramesTheCountry(t *testing.T) {
+// The unpositioned panel groups exactly the nodes the map leaves off — those that advertised no
+// usable position — so an operator reads them without hunting the table (MON-AD-7, D55).
+func TestAdvertsUnpositionedPanelListsUnplacedNodes(t *testing.T) {
 	h := newHarness(t)
 	seedAdverts(t, h)
 	c := h.login(t, "viewer", "viewer")
 	_, body, _ := get(t, c, h.ts.URL+"/adverts")
-	for _, want := range []string{
-		"Framed about 260 km around your node, from location in kammon.yml",
-		"never wider than Netherlands",
-		`class="map-node fresh"`,
-		`<use href="/static/basemap.svg?v=` + AssetVersion + `#basemap">`,
-		"Grid lines every",
-		`data-n="1"`, // the dot identifies itself by row number, not by a printed label
-		`aria-label="Advert 1"`,
-		`data-node="1"`, // and the hover/click card exists beside the map
-		"Click a dot for details",
-		`data-map-toggle="advertised"`,
-		`data-map-toggle="silent"`,
-		`data-map-toggle="base"`,
-		"Copy Public Key",
-		"Draw Line to Base",
-		"MHz",
-		"Groningen", // a NL city inside the frame, drawn from the vendored list
-		"Utrecht",
-		"Amsterdam",
-		`class="map-city-name"`,
-		`class="map-city-group" data-rank=`,
-		`viewBox=`,
-		`data-frame-width=`,
-		`data-map-zoom="in"`,
-		`data-map-zoom="out"`,
-		`data-map-reset`,
-		`aria-label="Reset to the 100 km view around your node"`,
-		"The view opens on a 100 km radius around your node, from location in kammon.yml",
-		"Drag to pan, scroll or pinch to zoom",
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("page misses %q", want)
+	start := strings.Index(body, `<details class="unplaced">`)
+	if start < 0 {
+		t.Fatal("no unpositioned panel")
+	}
+	rest := body[start:]
+	end := strings.Index(rest, "</details>")
+	if end < 0 {
+		t.Fatal("unclosed unpositioned panel")
+	}
+	panel := rest[:end]
+	for _, want := range []string{"Unpositioned nodes (2)", "Dalen relay", "PA3M", "not on the map"} {
+		if !strings.Contains(panel, want) {
+			t.Errorf("panel misses %q", want)
 		}
 	}
-	// The basemap no longer rides inside the page.
-	if strings.Contains(body, `d="M`) {
-		t.Errorf("the basemap path text reached the page")
-	}
-}
-
-// TestAdvertsMapOpensOnHomeCentre checks the interactive map's opening view and the stateless
-// live region: the SVG opens on a 100 km square view centred on the configured node (Emmen in the
-// demo), held inside its own frame; the camera rides no URL, and the client script is on the
-// layout (MON-AD-15, D50).
-func TestAdvertsMapOpensOnHomeCentre(t *testing.T) {
-	h := newHarness(t)
-	seedAdverts(t, h)
-	c := h.login(t, "viewer", "viewer")
-	_, body, _ := get(t, c, h.ts.URL+"/adverts")
-	pattern := regexp.MustCompile(`<svg class="chart advert-map" viewBox="([\d.\- ]+)" data-frame-width="(\d+)" data-frame-height="(\d+)"`)
-	found := pattern.FindStringSubmatch(body)
-	if found == nil {
-		t.Fatal("the map's opening view and frame are not in the markup")
-	}
-	nums := strings.Fields(found[1])
-	if len(nums) != 4 {
-		t.Fatalf("viewBox = %q, want four numbers", found[1])
-	}
-	vw, vh := parseFloat(t, nums[2]), parseFloat(t, nums[3])
-	vx, vy := parseFloat(t, nums[0]), parseFloat(t, nums[1])
-	frameW, frameH := float64(parseInt(t, found[2])), float64(parseInt(t, found[3]))
-	if vw != vh {
-		t.Errorf("the opening view is not a square: %g×%g", vw, vh)
-	}
-	if vw >= frameW || vh >= frameH {
-		t.Errorf("the opening view %g×%g is not inside the frame %g×%g", vw, vh, frameW, frameH)
-	}
-	// The frame is centred on the configured node, so a home-centred opening view sits at the
-	// frame's own centre (Emmen, 52.77920 N 6.90690 E in the demo).
-	if math.Abs(vx+vw/2-frameW/2) > 0.5 || math.Abs(vy+vh/2-frameH/2) > 0.5 {
-		t.Errorf("the opening view centre (%.2f, %.2f) is not the configured node at the frame centre (%.2f, %.2f)",
-			vx+vw/2, vy+vh/2, frameW/2, frameH/2)
-	}
-	if strings.Contains(body, "mapzoom") || strings.Contains(body, `hx-get="/ui/adverts?`) {
-		t.Errorf("the map's zoom still rides the URL")
-	}
-	if !strings.Contains(body, `src="/static/adverts-map.js?v=`+AssetVersion+`"`) {
-		t.Errorf("the client camera script is not on the page")
-	}
-}
-
-func parseFloat(t *testing.T, text string) float64 {
-	t.Helper()
-	value, err := strconv.ParseFloat(text, 64)
-	if err != nil {
-		t.Fatalf("not a number: %q", text)
-	}
-	return value
-}
-
-func parseInt(t *testing.T, text string) int {
-	t.Helper()
-	value, err := strconv.Atoi(text)
-	if err != nil {
-		t.Fatalf("not a number: %q", text)
-	}
-	return value
-}
-
-// TestAdvertsMapFramesTheNodesWithoutLocation checks the fallback: no location configured means
-// the old node fit, said in words (MON-AD-6, D43).
-func TestAdvertsMapFramesTheNodesWithoutLocation(t *testing.T) {
-	h := newHarness(t)
-	seedAdverts(t, h)
-	cfg := config.Demo()
-	cfg.Location = nil
-	srv, err := New(Deps{Config: cfg, Store: h.st, Now: func() time.Time { return t0 }})
-	if err != nil {
-		t.Fatal(err)
-	}
-	ts := httptest.NewServer(srv.Handler())
-	t.Cleanup(ts.Close)
-	c := loginOn(t, ts)
-	_, body, _ := get(t, c, ts.URL+"/adverts")
-	if !strings.Contains(body, "The frame fits the stored nodes; add location") {
-		t.Errorf("the frame note misses the node fit and the location hint")
-	}
-	if !strings.Contains(body, `class="map-node`) {
-		t.Errorf("the nodes are not drawn")
+	if strings.Contains(panel, "Canal relay") {
+		t.Errorf("the positioned node leaked into the unpositioned panel")
 	}
 }
 
@@ -226,8 +118,8 @@ func TestAdvertsMapDropsNoFixPositions(t *testing.T) {
 	if !strings.Contains(body, "1 advert sits within ±0.01° of 0°N 0°E") {
 		t.Errorf("the no-fix note is missing")
 	}
-	if strings.Contains(body, `class="map-node fresh"`) {
-		t.Errorf("the no-fix position drew a dot")
+	if got := len(mapGeoJSON(t, body).Features); got != 0 {
+		t.Errorf("the no-fix position drew %d dots", got)
 	}
 	// The table stays honest about what was advertised.
 	if !strings.Contains(body, `0.00000, 0.00000`) {
@@ -235,9 +127,9 @@ func TestAdvertsMapDropsNoFixPositions(t *testing.T) {
 	}
 }
 
-// TestAdvertsMapCountsNodesOutsideTheFrame checks that a node outside the country frame is
-// counted, not drawn, and never widens the frame (MON-AD-6, D43).
-func TestAdvertsMapCountsNodesOutsideTheFrame(t *testing.T) {
+// TestAdvertsMapPlotsEveryLocatedNode checks that a valid advertised position is plotted even when
+// it is far from the base: the Positron map has no fixed frame to fall outside of (MON-AD-6, D57).
+func TestAdvertsMapPlotsEveryLocatedNode(t *testing.T) {
 	h := newHarness(t)
 	seedAdverts(t, h)
 	far := []kam.Advert{{
@@ -248,11 +140,11 @@ func TestAdvertsMapCountsNodesOutsideTheFrame(t *testing.T) {
 	h.st.SetAdverts(append(baseAdverts(), far...), false, t0)
 	c := h.login(t, "viewer", "viewer")
 	_, body, _ := get(t, c, h.ts.URL+"/adverts")
-	if !strings.Contains(body, "1 node falls outside the frame and is not drawn") {
-		t.Errorf("the out-of-frame note is missing")
+	if got := len(mapGeoJSON(t, body).Features); got != 2 {
+		t.Errorf("map features = %d, want the Emmen and Perth nodes", got)
 	}
-	if strings.Count(body, `class="map-node fresh"`) != 1 {
-		t.Errorf("fresh dots = %d, want only the in-frame node", strings.Count(body, `class="map-node fresh"`))
+	if strings.Contains(body, "outside the frame") {
+		t.Errorf("the page still speaks of a frame")
 	}
 }
 
@@ -272,20 +164,38 @@ func loginOn(t *testing.T, ts *httptest.Server) *http.Client {
 	return c
 }
 
-// TestBasemapAsset serves the vendored basemap once, revalidated by the asset-version ETag (D42).
-func TestBasemapAsset(t *testing.T) {
+// TestMapCSPAllowsOnlyTheBasemapHost checks the one online exception (D57): the adverts page may
+// reach OpenFreeMap's tiles, glyphs and sprites and start MapLibre's blob workers, while every other
+// page keeps the strict same-origin policy.
+func TestMapCSPAllowsOnlyTheBasemapHost(t *testing.T) {
 	h := newHarness(t)
 	c := h.login(t, "viewer", "viewer")
-	status, body, header := get(t, c, h.ts.URL+"/static/basemap.svg")
-	if status != http.StatusOK || !strings.Contains(body, `id="basemap"`) {
-		t.Fatalf("basemap: %d", status)
+	_, _, header := get(t, c, h.ts.URL+"/adverts")
+	csp := header.Get("Content-Security-Policy")
+	for _, want := range []string{
+		"connect-src 'self' https://tiles.openfreemap.org",
+		"img-src 'self' data: blob: https://tiles.openfreemap.org",
+		"worker-src 'self' blob:",
+	} {
+		if !strings.Contains(csp, want) {
+			t.Errorf("adverts CSP misses %q, got %q", want, csp)
+		}
 	}
-	if header.Get("Content-Type") != "image/svg+xml" || header.Get("ETag") != `"`+AssetVersion+`"` {
-		t.Errorf("headers: %q %q", header.Get("Content-Type"), header.Get("ETag"))
+	_, _, header = get(t, c, h.ts.URL+"/")
+	if csp := header.Get("Content-Security-Policy"); strings.Contains(csp, "openfreemap") {
+		t.Errorf("the overview page carries the map's relaxed CSP: %q", csp)
 	}
-	status, _, _ = get(t, c, h.ts.URL+"/static/basemap.svg", "If-None-Match", `"`+AssetVersion+`"`)
-	if status != http.StatusNotModified {
-		t.Errorf("revalidation: %d, want 304", status)
+}
+
+// TestMapLibreAssets checks the prebuilt library is vendored and served same-origin (D57).
+func TestMapLibreAssets(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer", "viewer")
+	for _, asset := range []string{"/static/maplibre-gl.js", "/static/maplibre-gl.css"} {
+		status, body, _ := get(t, c, h.ts.URL+asset)
+		if status != http.StatusOK || len(body) < 1000 {
+			t.Errorf("%s: status %d, %d bytes", asset, status, len(body))
+		}
 	}
 }
 
