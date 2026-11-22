@@ -384,11 +384,11 @@ body.login-page { display: block; }
 .advert-map .map-hidden, .advert-map .map-node.filtered { display: none; }
 .advert-map .map-home-ring { fill: none; stroke: var(--text-primary); stroke-width: 1.2; vector-effect: non-scaling-stroke; opacity: .35; }
 .advert-map .map-home-star { fill: var(--text-primary); stroke: var(--bg-0); stroke-width: 1; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.advert-map .map-node { fill: var(--signal); stroke: var(--bg-0); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.advert-map .map-node { fill: var(--text-muted); stroke: var(--bg-0); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .advert-map .map-node:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
 .advert-map .map-node.clustered { display: none; }
 .advert-map .map-node.fresh { fill: var(--success); }
-.advert-map .map-node.recent { fill: var(--signal); }
+.advert-map .map-node.recent { fill: var(--warning); }
 .advert-map .map-node.older, .advert-map .map-node.unknown { fill: var(--text-muted); }
 .advert-map .map-node.stale { fill: var(--text-muted); stroke-dasharray: 2 1.5; }
 .advert-map .map-scale { stroke: var(--text-muted); stroke-width: 1.5; }
