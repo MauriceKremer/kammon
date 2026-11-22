@@ -341,8 +341,20 @@ body.login-page { display: block; }
 .map-zoom button:hover:not(:disabled) { background: var(--bg-3); color: var(--text-primary); }
 .map-zoom button:disabled { opacity: .35; cursor: default; }
 .map-zoom .map-reset { width: auto; padding: 0 12px; border-radius: 6px; font: 600 12px/1 var(--font-body); }
-.advert-map { display: block; width: 100%; max-height: 640px; height: auto; cursor: grab; touch-action: none; user-select: none; }
+.advert-map { position: relative; display: block; width: 100%; height: min(58vh, 520px); min-height: 320px; background: var(--bg-1); cursor: grab; }
 .advert-map:active { cursor: grabbing; }
+.advert-map .maplibregl-canvas { outline: none; }
+.advert-map .maplibregl-canvas:focus-visible { outline: 2px solid var(--signal); outline-offset: -2px; }
+.maplibregl-ctrl-scale { border-color: var(--border-default) !important; background: color-mix(in srgb, var(--bg-1) 82%, transparent) !important; color: var(--text-muted) !important; font: 10px/1 var(--font-code) !important; }
+.map-attribution { position: absolute; right: 10px; bottom: 8px; z-index: 5; padding: 3px 7px; border-radius: 4px; background: color-mix(in srgb, var(--bg-1) 86%, transparent); color: var(--text-muted); font-size: 10px; line-height: 1.4; }
+.map-attribution a { color: inherit; }
+.map-offline { position: absolute; left: 10px; top: 10px; z-index: 6; max-width: 320px; margin: 0; padding: 8px 10px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--bg-2); color: var(--text-secondary); }
+.map-a11y { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.map-a11y:focus-within { left: 8px; top: 8px; z-index: 8; width: min(300px, 82%); height: auto; max-height: 50%; overflow: auto; margin: 0; padding: 8px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--bg-2); list-style: none; }
+.map-a11y li { margin: 2px 0; }
+.map-a11y button { display: block; width: 100%; padding: 6px 8px; border: 0; border-radius: 4px; background: transparent; color: var(--text-secondary); font: 11px/1.35 var(--font-body); text-align: left; cursor: pointer; }
+.map-a11y button:hover:not(:disabled) { background: var(--bg-3); color: var(--text-primary); }
+.map-a11y button:focus-visible { background: var(--bg-3); color: var(--text-primary); }
 .map-cards { position: absolute; inset: 0; pointer-events: none; }
 .map-card { position: absolute; z-index: 6; min-width: 220px; max-width: 272px; padding: 12px 14px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--bg-2); font-size: 12px; pointer-events: auto; color: var(--text-primary); }
 .map-card[hidden] { display: none; }

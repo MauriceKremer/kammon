@@ -13,8 +13,18 @@
 
   <section class="section">
     <div class="section-head"><div><h3>Map</h3></div></div>
-    {{if .HasMap}}<div class="advert-map-box">{{.Map}}
-    <div class="map-cards">{{range .Rows}}<aside class="map-card map-glass" data-node="{{.Number}}" data-activity="{{.Ind.Class}}" hidden>
+    {{if .HasMap}}<div class="advert-map-box">
+    <div class="advert-map" id="advert-map" role="region" aria-label="Advert map: dots at advertised positions"
+      data-map-anchor="{{.MapAnchor}}"
+      data-geojson="{{.GeoJSON}}"
+      data-has-center="{{if .HasCenter}}1{{else}}0{{end}}"
+      data-center-lat="{{printf "%.6f" .CenterLat}}"
+      data-center-lon="{{printf "%.6f" .CenterLon}}"
+      data-radius-km="{{printf "%.0f" .RadiusKm}}"
+      data-has-home="{{if .HasHome}}1{{else}}0{{end}}"
+      data-home-lat="{{printf "%.6f" .HomeLat}}"
+      data-home-lon="{{printf "%.6f" .HomeLon}}"></div>
+    <div class="map-cards">{{range .Rows}}<aside class="map-card" data-node="{{.Number}}" data-activity="{{.Ind.Class}}" hidden>
       <div class="card-head"><strong>{{.Name}}</strong></div>
       <div class="card-key mono" title="{{.FullKey}}">{{.ShortKey}}</div>
       <dl class="card-facts">
@@ -37,8 +47,12 @@
       <button type="button" class="map-chip" data-map-toggle="advertised" aria-pressed="true"><span class="map-chip-mark" aria-hidden="true"></span>Advertised ({{.MapActive}})</button>
       <button type="button" class="map-chip" data-map-toggle="silent" aria-pressed="false"><span class="map-chip-mark" aria-hidden="true"></span>Silent ({{.MapSilent}})</button>
       {{if .HomeNote}}<button type="button" class="map-chip" data-map-toggle="base" aria-pressed="true"><span class="map-chip-mark" aria-hidden="true"></span>Base Node</button>{{end}}
-    </div></div>{{else}}<p class="muted">{{.MapNote}}</p>{{end}}
-    {{if .HasMap}}<p class="map-hint small muted">Click a dot for details · drag to pan · scroll or pinch to zoom · city names follow the zoom.</p>{{end}}
+    </div>
+    <div class="map-attribution">© <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></div>
+    <p class="map-offline small" data-map-offline hidden>Basemap unavailable: OpenFreeMap's tiles could not load. The dots are drawn from KAMmon's own store.</p>
+    <ul class="map-a11y">{{range .Rows}}{{if .Plotted}}<li><button type="button" data-map-node="{{.Number}}">Advert {{.Number}}: {{.Name}}{{if .Role}} · {{.Role}}{{end}}{{if .Hops}} · {{.Hops}}{{end}}</button></li>{{end}}{{end}}</ul>
+    </div>{{else}}<p class="muted">{{.MapNote}}</p>{{end}}
+    {{if .HasMap}}<p class="map-hint small muted">Click a dot for details · drag to pan · scroll or pinch to zoom.</p>{{end}}
     {{if .FrameNote}}<p class="small muted">{{.FrameNote}}</p>{{end}}
     {{if .HasMap}}<p class="small muted">{{.MapNote}}</p>{{end}}
     {{if .MapSkipNote}}<p class="small muted">{{.MapSkipNote}}</p>{{end}}
