@@ -32,6 +32,8 @@
 
   var initialised = new WeakSet();
   var savedCamera = null; // the camera of the last map, so a live refresh keeps the view
+  var STORE_KEY = "kammon:adverts:camera";
+  var persistTimer = 0;
 
   function clamp(value, low, high) { return Math.min(Math.max(value, low), high); }
 
@@ -46,6 +48,36 @@
   function readView(attribute) {
     var parts = (attribute || "").split(/[\s,]+/).map(Number);
     return { x: parts[0] || 0, y: parts[1] || 0, w: parts[2] || 0, h: parts[3] || 0 };
+  }
+
+  // Reload persistence (D56): the camera and layer toggles are kept in localStorage, keyed per
+  // origin, and restored on load only when the frame they were saved against still matches. The
+  // live 60 s refresh keeps using savedCamera, which outranks the stored copy.
+  function loadStored() {
+    try {
+      var raw = window.localStorage.getItem(STORE_KEY);
+      if (!raw) return null;
+      var obj = JSON.parse(raw);
+      if (!obj || typeof obj.x !== "number" || typeof obj.y !== "number" || typeof obj.w !== "number" || obj.w <= 0) return null;
+      return obj;
+    } catch (e) {
+      return null; // storage disabled or blocked: fall back to the opening view
+    }
+  }
+
+  function persist(state) {
+    try {
+      window.localStorage.setItem(STORE_KEY, JSON.stringify({
+        x: state.view.x, y: state.view.y, w: state.view.w, h: state.view.h,
+        frameW: state.frame.w, frameH: state.frame.h,
+        filters: state.filters,
+      }));
+    } catch (e) { /* storage disabled: the camera simply will not persist */ }
+  }
+
+  function schedulePersist(state) {
+    if (persistTimer) clearTimeout(persistTimer);
+    persistTimer = setTimeout(function () { persistTimer = 0; persist(state); }, 200);
   }
 
   function initState(svg) {
@@ -66,8 +98,20 @@
       filters: { advertised: true, silent: false, base: true },
     };
     // A swap may redraw the map: replay the camera only when the frame it rode on is the same.
-    if (savedCamera && Math.abs(savedCamera.frame.w - frame.w) < 1 && Math.abs(savedCamera.frame.h - frame.h) < 1) {
+    // On a fresh load, restore the stored camera and layer toggles for the same frame (D56).
+    var sameFrame = function (fw, fh) { return Math.abs(fw - frame.w) < 1 && Math.abs(fh - frame.h) < 1; };
+    var stored = loadStored();
+    if (savedCamera && sameFrame(savedCamera.frame.w, savedCamera.frame.h)) {
       state.view = { x: savedCamera.x, y: savedCamera.y, w: savedCamera.w, h: savedCamera.h };
+    } else if (stored && sameFrame(stored.frameW, stored.frameH)) {
+      state.view = { x: stored.x, y: stored.y, w: stored.w, h: stored.h };
+      if (stored.filters) {
+        state.filters = {
+          advertised: stored.filters.advertised !== false,
+          silent: stored.filters.silent === true,
+          base: stored.filters.base !== false,
+        };
+      }
     }
     return state;
   }
@@ -99,6 +143,7 @@
     updateCityLabels(state);
     updateHomeMarker(state);
     scheduleCluster(state);
+    schedulePersist(state);
   }
 
   // City names stay subtle and legible: one screen size at every zoom, with the lower Natural Earth
@@ -627,6 +672,7 @@
     ensureClusterLayer(state);
     apply(state);
     clusterNow(state);
+    if (state.home && !state.filters.base) state.home.el.classList.add("map-hidden");
 
     // A press on the map itself: register it and watch it on the window, so a drag may leave the
     // SVG without losing the pointer. Nothing is captured, so a still press clicks as before.
@@ -767,6 +813,7 @@
         var next = chip.getAttribute("aria-pressed") !== "true";
         chip.setAttribute("aria-pressed", next ? "true" : "false");
         state.filters[key] = next;
+        schedulePersist(state);
         if (key === "base") {
           if (state.home) state.home.el.classList.toggle("map-hidden", !next);
           return;
