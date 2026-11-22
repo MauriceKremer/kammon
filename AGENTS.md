@@ -17,7 +17,7 @@ KAMmon is for enthusiasts, like KAM: pragmatism and easy setup come before stric
 2. **Never import KAM code.** KAM's packages are `internal/`. The contract is [docs/kam-api/FeatureKamApi.md](docs/kam-api/FeatureKamApi.md); KAMmon defines its own types in `internal/kam`.
 3. **Pages read the store, never KAM.** One poller writes `internal/store`; handlers only read it. Admin actions are the only calls from a request to KAM.
 4. **The server decides access.** Every route is registered with a required role. Visibility rules live in `internal/view` only; templates never decide who sees what.
-5. **Radio text is untrusted.** Names, senders, message text and labels are escaped by `html/template`. Never use `template.HTML` except for the server-drawn SVG in `internal/web/chart.go`, whose text is numbers or vendored static names (Natural Earth city labels), never radio text (a test enforces this).
+5. **Radio text is untrusted.** Names, senders, message text and labels are escaped by `html/template`. Never use `template.HTML` except for the server-drawn SVG in `internal/web/chart.go`, whose text is numbers or vendored static names, never radio text (a test enforces this). Map node names ride as GeoJSON properties and are written to the DOM as text (D57).
 6. **Honest labels.** Say what a number means: "remembered", not "online"; "echo", not "verified"; "stale", not "expired" ([docs/DESIGN.md](docs/DESIGN.md) §8).
 7. **Memory is bounded.** Every buffer has a hard limit ([docs/requirements/DataStore.md](docs/requirements/DataStore.md) §3).
 

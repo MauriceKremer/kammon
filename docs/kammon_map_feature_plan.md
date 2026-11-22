@@ -1,6 +1,6 @@
 # KAMmon Map — OpenFreeMap Positron Plan
 
-**Status:** open — replace the generated Natural Earth SVG basemap on `/adverts` with OpenFreeMap's hosted **Positron** tiles. This is a deliberate change of direction; the flat operator-console overlay (D55) and the page's data rules stay.
+**Status:** implemented 2026-11-22 — the generated Natural Earth SVG basemap on `/adverts` is replaced by OpenFreeMap's hosted **Positron** tiles, drawn with MapLibre GL JS. This is a deliberate change of direction; the flat operator-console overlay (D55) and the page's data rules stay.
 
 ## Why this change
 
