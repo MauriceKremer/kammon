@@ -14,7 +14,7 @@ You need Go 1.25 or newer.
 go run ./cmd/kammon -demo
 ```
 
-Open <http://127.0.0.1:8080>. Sign in as `admin` / `admin` (administrator) or `viewer` / `viewer` (view only). Demo mode starts a fake KAM with generated traffic, so no radio is needed.
+Open <http://127.0.0.1:8080>. Sign in as `admin` / `admin` (administrator) or `viewer` / `viewer` (view only). Demo mode starts a fake KAM with generated traffic, so no radio is needed; it reads only `guest_access` from `kammon.yml` (everything else comes from the demo config).
 
 Stop the demo with `Ctrl-C`. If you lose track of a server you started in the background, `scripts/kill-kammon.sh` stops it.
 

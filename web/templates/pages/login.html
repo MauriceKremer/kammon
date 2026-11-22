@@ -16,7 +16,10 @@
     <label for="password">Password</label>
     <input id="password" name="password" type="password" autocomplete="current-password" required>
     {{if .Error}}<p class="error" role="alert">{{.Error}}</p>{{end}}
-    <button class="primary" type="submit">Sign in</button>
+    <div class="login-actions">
+      <button class="primary" type="submit">Sign in</button>
+      {{if .GuestAccess}}<button type="submit" formaction="/login/guest" formnovalidate>Guest</button></button>{{end}}
+    </div>
     {{if .Hint}}<p class="small muted proto">{{.Hint}}</p>{{end}}
   </form>
 </main>

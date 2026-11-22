@@ -68,6 +68,7 @@ Anything marked "No" is not rendered and its routes answer `403`.
 | MON-AX-5 | Passwords are compared in constant time. A wrong name and a wrong password give the same message. | MUST |
 | MON-AX-6 | Failed logins from one address are slowed: after 5 failures in a minute, answer each further attempt after 2 seconds. | SHOULD |
 | MON-AX-7 | A log-out button ends the session. | MUST |
+| MON-AX-24 | `guest_access: true` lets a visitor sign in without a name and password; the guest is a viewer and the login page shows a **Guest** button. Missing or `false` hides the button and the guest route answers `404`. | MAY |
 
 ### 4.2 Roles
 
@@ -114,6 +115,7 @@ Nothing for authentication. KAM must keep its listener loopback-only and unauthe
 ```yaml
 listen: ":8080"
 session_idle_hours: 8
+guest_access: false          # true adds the login page's Guest button (a viewer session)
 viewer_text_channels: ["#public"]
 users:
   - { name: maurice, password: "change-me", role: admin }
@@ -130,6 +132,7 @@ users:
 - A test that an admin session keeps admin power from a non-loopback, proxied request, and a viewer from the same address still gets `403` on an admin route (D31).
 - A test that no `GET` route changes state.
 - A test that a viewer's page source does not contain the text of a hidden message or a client label.
+- A test that the Guest button appears only with `guest_access: true`, that a guest session reaches viewer pages but not admin routes, and that the guest route refuses when the setting is off (MON-AX-24).
 
 ## 8. Open points
 

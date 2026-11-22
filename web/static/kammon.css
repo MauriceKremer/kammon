@@ -261,7 +261,8 @@ tr.traffic-detail > td { padding: 2px 12px 12px 0; }
 .login label { display: block; margin-top: 16px; font-size: 13px; color: var(--text-secondary); }
 .login input { width: 100%; margin-top: 6px; }
 .login .error { margin-top: 16px; color: var(--danger); font-size: 13px; }
-.login button { margin-top: 24px; }
+.login-actions { display: flex; gap: 10px; margin-top: 24px; }
+.login button { margin-top: 0; }
 body.login-page { display: block; }
 
 /* Automations (MON-AU-*): a narrower master list than channels and rooms, and a container only

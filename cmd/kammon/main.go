@@ -46,6 +46,10 @@ func run(configPath string, demo bool) error {
 	var cfg config.Config
 	if demo {
 		cfg = config.Demo()
+		// The demo keeps its own generated data and login list, but it still honours the
+		// guest_access key from kammon.yml so the Guest button follows the operator's choice
+		// (MON-AX-24).
+		cfg.GuestAccess = config.GuestAccessFrom(configPath)
 		kamURL, err := kamfake.Serve(ctx, kamfake.New(time.Now, time.Now().UnixNano()))
 		if err != nil {
 			return err

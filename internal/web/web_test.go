@@ -58,6 +58,22 @@ func newHarness(t *testing.T) *harness {
 	return &harness{ts: ts, s: srv, st: st, now: &now}
 }
 
+// newGuestHarness is a server with guest_access set as given and an empty store; the guest
+// tests only need the login page and the route guard.
+func newGuestHarness(t *testing.T, guestAccess bool) *harness {
+	t.Helper()
+	now := t0
+	cfg := config.Demo()
+	cfg.GuestAccess = guestAccess
+	srv, err := New(Deps{Config: cfg, Store: store.New(), Now: func() time.Time { return now }})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ts := httptest.NewServer(srv.Handler())
+	t.Cleanup(ts.Close)
+	return &harness{ts: ts, s: srv, st: store.New(), now: &now}
+}
+
 func (h *harness) client(t *testing.T) *http.Client {
 	t.Helper()
 	jar, _ := cookiejar.New(nil)
@@ -131,6 +147,89 @@ func TestWrongPasswordGivesOneGenericMessage(t *testing.T) {
 	}
 }
 
+// MON-AX-24: the Guest button appears only when guest_access is on.
+func TestGuestButtonFollowsGuestAccess(t *testing.T) {
+	off := newGuestHarness(t, false)
+	_, body, _ := get(t, off.client(t), off.ts.URL+"/login")
+	if strings.Contains(body, `formaction="/login/guest"`) || strings.Contains(body, ">Guest</button>") {
+		t.Fatalf("guest button shown with guest_access off")
+	}
+
+	on := newGuestHarness(t, true)
+	_, body, _ = get(t, on.client(t), on.ts.URL+"/login")
+	if !strings.Contains(body, `<div class="login-actions">`) || !strings.Contains(body, `formaction="/login/guest"`) || !strings.Contains(body, ">Guest</button>") {
+		t.Fatalf("guest button missing with guest_access on")
+	}
+	// It rides the sign-in form as a second submit button, so the two sit side by side.
+	signAt, guestAt := strings.Index(body, ">Sign in</button>"), strings.Index(body, `formaction="/login/guest"`)
+	if signAt < 0 || guestAt < signAt || strings.Contains(body[signAt:guestAt], "</form>") {
+		t.Fatalf("guest button is not next to sign in")
+	}
+
+	// Demo() alone has no guest access; main.go adds the file's guest_access via GuestAccessFrom.
+	demo := newHarness(t)
+	_, body, _ = get(t, demo.client(t), demo.ts.URL+"/login")
+	if strings.Contains(body, `formaction="/login/guest"`) {
+		t.Fatalf("demo mode must not show the guest button without guest_access")
+	}
+}
+
+// MON-AX-24: a guest is a viewer session, and the route refuses when the setting is off.
+func TestGuestLoginIsAViewerSession(t *testing.T) {
+	on := newGuestHarness(t, true)
+	c := on.client(t)
+	resp, err := c.PostForm(on.ts.URL+"/login/guest", url.Values{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther || resp.Header.Get("Location") != "/" {
+		t.Fatalf("guest login: %d %q", resp.StatusCode, resp.Header.Get("Location"))
+	}
+
+	status, body, _ := get(t, c, on.ts.URL+"/traffic")
+	if status != http.StatusOK {
+		t.Fatalf("guest cannot read a viewer page: %d", status)
+	}
+	if !strings.Contains(body, "Guest · Viewer") {
+		t.Errorf("the session does not say it is a guest viewer")
+	}
+	if status, _, _ = get(t, c, on.ts.URL+"/rooms"); status != http.StatusForbidden {
+		t.Fatalf("guest reached an admin page: %d", status)
+	}
+
+	off := newGuestHarness(t, false)
+	resp, err = off.client(t).PostForm(off.ts.URL+"/login/guest", url.Values{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("guest login with guest_access off: %d", resp.StatusCode)
+	}
+}
+
+// MON-AX-5 / MON-AX-24: blank credentials never start a session, even hand-made.
+func TestBlankCredentialsCannotLogin(t *testing.T) {
+	h := newHarness(t)
+	for _, creds := range [][2]string{{"", ""}, {"admin", ""}, {"", "admin"}} {
+		c := h.client(t)
+		resp, err := c.PostForm(h.ts.URL+"/login", url.Values{"name": {creds[0]}, "password": {creds[1]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized || !strings.Contains(string(body), "Wrong name or password.") {
+			t.Fatalf("blank %q/%q: status %d", creds[0], creds[1], resp.StatusCode)
+		}
+		status, _, header := get(t, c, h.ts.URL+"/")
+		if status != http.StatusSeeOther || header.Get("Location") != "/login" {
+			t.Fatalf("blank %q/%q started a session", creds[0], creds[1])
+		}
+	}
+}
+
 func TestViewerSeesOverviewButNotAdminPages(t *testing.T) {
 	h := newHarness(t)
 	c := h.login(t, "viewer", "viewer")
@@ -156,6 +255,50 @@ func TestViewerSeesOverviewButNotAdminPages(t *testing.T) {
 	}
 	if status, _, _ = get(t, c, h.ts.URL+"/modem"); status != http.StatusForbidden {
 		t.Fatalf("modem page: %d", status)
+	}
+}
+
+// A viewer may never perform an admin state change: every web-users and script mutation route answers
+// 403 before its handler runs. The requests carry the Origin and HX-Request headers the guard expects
+// (MON-AX-18), so the only thing standing between them and the action is the role check.
+func TestViewerCannotPerformAdminActions(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer", "viewer")
+
+	form := url.Values{"id": {"echo"}, "revision": {"4"}, "source": {"def x(): pass"}, "timeout": {"500"}}
+	cases := []struct {
+		method, path string
+		body         string
+	}{
+		{http.MethodPost, "/ui/web-users/save", url.Values{"name": {"pwned"}, "role": {"admin"}, "password": {"x"}}.Encode()},
+		{http.MethodDelete, "/ui/web-users", ""},
+		{http.MethodPost, "/ui/script-validate", form.Encode()},
+		{http.MethodPost, "/ui/script-dry-run", form.Encode()},
+		{http.MethodPost, "/ui/script-save", form.Encode()},
+		{http.MethodPost, "/ui/script-toggle", form.Encode()},
+		{http.MethodPost, "/ui/script-recover", form.Encode()},
+		{http.MethodDelete, "/ui/script", ""},
+	}
+	for _, tc := range cases {
+		var body io.Reader
+		if tc.body != "" {
+			body = strings.NewReader(tc.body)
+		}
+		req, err := http.NewRequest(tc.method, h.ts.URL+tc.path, body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", h.ts.URL)
+		req.Header.Set("HX-Request", "true")
+		resp, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Errorf("viewer %s %s: %d, want 403", tc.method, tc.path, resp.StatusCode)
+		}
 	}
 }
 
