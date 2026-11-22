@@ -257,8 +257,8 @@ func advertMapSVG(p mapPlan) chartMarkup {
 		b.WriteString(`</g>`)
 	}
 	if p.HasHome {
-		// The base node: a bold green star with a slow radar ring, kept a constant screen size by
-		// the camera script. The old cross was too easy to mistake for a grid intersection (D52).
+		// The base node: a bold neutral star with a static ring, kept a constant screen size by the
+		// camera script. It is an anchor, not a state, so it carries no status colour and no pulse (D55).
 		fmt.Fprintf(&b, `<g class="map-home" data-x="%.2f" data-y="%.2f" transform="translate(%.2f %.2f)">`, p.HomeX, p.HomeY, p.HomeX, p.HomeY)
 		b.WriteString(`<title>Base node</title>`)
 		b.WriteString(`<circle class="map-home-ring" r="10"></circle>`)

@@ -382,10 +382,8 @@ body.login-page { display: block; }
 }
 .advert-map .map-city-group.city-hidden .map-city-name { display: none; }
 .advert-map .map-hidden, .advert-map .map-node.filtered { display: none; }
-.advert-map .map-home-ring { fill: none; stroke: var(--success); stroke-width: 1.2; vector-effect: non-scaling-stroke; opacity: 0; transform-box: fill-box; transform-origin: center; animation: map-home-pulse 2.8s ease-out infinite; }
-.advert-map .map-home-star { fill: var(--success); stroke: var(--bg-0); stroke-width: 1; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-@keyframes map-home-pulse { 0% { transform: scale(.4); opacity: .55; } 70% { transform: scale(1.9); opacity: 0; } 100% { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .advert-map .map-home-ring { animation: none; opacity: .35; transform: none; } }
+.advert-map .map-home-ring { fill: none; stroke: var(--text-primary); stroke-width: 1.2; vector-effect: non-scaling-stroke; opacity: .35; }
+.advert-map .map-home-star { fill: var(--text-primary); stroke: var(--bg-0); stroke-width: 1; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .advert-map .map-node { fill: var(--signal); stroke: var(--bg-0); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .advert-map .map-node:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
 .advert-map .map-node.clustered { display: none; }
