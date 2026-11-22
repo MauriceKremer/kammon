@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"html/template"
+	"math"
 	"strings"
 	"time"
 
@@ -160,6 +161,78 @@ func squareSparkSVG(class string, values []int) chartMarkup {
 		}
 		fmt.Fprintf(&b, `<rect class="%s" x="%.2f" y="%.2f" width="%.2f" height="%.2f"/>`,
 			class, float64(i)*slot+0.5, height-side, side, side)
+	}
+	b.WriteString(`</svg>`)
+	return chartMarkup(b.String())
+}
+
+func gridStep(span float64) float64 {
+	target := span / 6
+	for _, step := range []float64{0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10} {
+		if step >= target {
+			return step
+		}
+	}
+	return 10
+}
+
+// mapNode is one advert node already projected into the map's pixel space. Probable means the
+// node advertised no position: it is drawn on a hop-distance band, not at a measured spot.
+type mapNode struct {
+	X, Y     float64
+	Number   int
+	Probable bool
+}
+
+// mapPlan is everything advertMapSVG draws, in pixels. The basemap is projected from
+// longitude/latitude with one scale per axis; the aspect ratio comes from the caller.
+type mapPlan struct {
+	Width, Height      float64
+	LonMin, LatMin     float64
+	PxPerLon, PxPerLat float64
+	Nodes              []mapNode
+	HomeX, HomeY       float64
+	HasHome            bool
+	Bands              []float64 // radii in pixels, smallest first
+}
+
+// advertMapSVG draws the advert plan: Natural Earth land and borders, hop-distance bands around
+// the node's own position, a mark for that position and one numbered dot per node. The numbering
+// matches the table, which is the text alternative. Like the other charts the markup is built from
+// numbers only, so no text from the radio can reach it (a test enforces that).
+func advertMapSVG(p mapPlan) chartMarkup {
+	var b strings.Builder
+	fmt.Fprintf(&b, `<svg class="chart advert-map" viewBox="0 0 %.0f %.0f" role="img" aria-label="Advert plan: node positions, numbered like the table below">`, p.Width, p.Height)
+	fmt.Fprintf(&b, `<g transform="translate(0 %.2f) scale(%.8f %.8f) translate(%.8f %.8f)">`, p.Height, p.PxPerLon, -p.PxPerLat, -p.LonMin, -p.LatMin)
+	fmt.Fprintf(&b, `<path class="map-land" fill-rule="evenodd" vector-effect="non-scaling-stroke" d="%s"/>`, basemapLand)
+	fmt.Fprintf(&b, `<path class="map-border" fill="none" vector-effect="non-scaling-stroke" d="%s"/>`, basemapBorders)
+	b.WriteString(`</g>`)
+	// A faint graticule gives the picture a scale; there are no labels, so it stays numbers-only.
+	latMax := p.LatMin + p.Height/p.PxPerLat
+	lonMax := p.LonMin + p.Width/p.PxPerLon
+	step := gridStep(math.Max(lonMax-p.LonMin, latMax-p.LatMin))
+	for lon := math.Ceil(p.LonMin/step) * step; lon <= lonMax; lon += step {
+		x := (lon - p.LonMin) * p.PxPerLon
+		fmt.Fprintf(&b, `<line class="map-grid" x1="%.2f" y1="0" x2="%.2f" y2="%.2f"/>`, x, x, p.Height)
+	}
+	for lat := math.Ceil(p.LatMin/step) * step; lat <= latMax; lat += step {
+		y := (latMax - lat) * p.PxPerLat
+		fmt.Fprintf(&b, `<line class="map-grid" x1="0" y1="%.2f" x2="%.2f" y2="%.2f"/>`, y, p.Width, y)
+	}
+	for i, radius := range p.Bands {
+		fmt.Fprintf(&b, `<circle class="map-band" cx="%.2f" cy="%.2f" r="%.2f" data-band="%d"/>`, p.HomeX, p.HomeY, radius, i+1)
+	}
+	if p.HasHome {
+		fmt.Fprintf(&b, `<line class="map-home" x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f"/>`, p.HomeX-5, p.HomeY, p.HomeX+5, p.HomeY)
+		fmt.Fprintf(&b, `<line class="map-home" x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f"/>`, p.HomeX, p.HomeY-5, p.HomeX, p.HomeY+5)
+	}
+	for _, node := range p.Nodes {
+		class := "map-node"
+		if node.Probable {
+			class += " probable"
+		}
+		fmt.Fprintf(&b, `<circle class="%s" cx="%.2f" cy="%.2f" r="4.5"><title>%d</title></circle>`, class, node.X, node.Y, node.Number)
+		fmt.Fprintf(&b, `<text class="map-number" x="%.2f" y="%.2f">%d</text>`, node.X+6.5, node.Y+3, node.Number)
 	}
 	b.WriteString(`</svg>`)
 	return chartMarkup(b.String())

@@ -82,6 +82,7 @@ func (p *Poller) jobs() []*job {
 		{name: "status", every: p.interval("status", 2*time.Second), run: p.Status},
 		{name: "rooms", every: p.interval("rooms", 10*time.Second), run: p.Rooms},
 		{name: "channels", every: p.interval("channels", 30*time.Second), run: p.Channels},
+		{name: "adverts", every: p.interval("adverts", 60*time.Second), run: p.Adverts},
 		{name: "scripts", every: p.interval("scripts", 10*time.Second), run: p.Scripts},
 	}
 }
@@ -207,6 +208,17 @@ func (p *Poller) Channels(ctx context.Context) error {
 		return err
 	}
 	p.Store.SetChannels(channels, p.Now())
+	return nil
+}
+
+// Adverts reads KAM's stored advert inventory. Adverts change slowly, so this runs about once a
+// minute; a failure keeps the previous snapshot and its own stale label (MON-DS-13).
+func (p *Poller) Adverts(ctx context.Context) error {
+	list, err := p.Reader.Adverts(ctx)
+	if err != nil {
+		return err
+	}
+	p.Store.SetAdverts(list.Adverts, list.Truncated, p.Now())
 	return nil
 }
 

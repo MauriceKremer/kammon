@@ -9,6 +9,7 @@ poll:
   status:     10s    # status, radio, duty cycle, counters, /v1/status
   rooms:      1s   # rooms and their clients, /v1/rooms
   channels:   1s   # channel list, /v1/channels
+  adverts:    60s  # stored advert inventory, /v1/adverts
   scripts:    1s   # script list and run information, /scripts
   timeout:    1s    # the timeout of every read
   not_served: 10m   # after a 404 the poller stops asking that read for this long
@@ -22,6 +23,13 @@ freshness:
 
 # Channels whose message text web viewers may read. Everyone else sees metadata only.
 viewer_text_channels: ["#public"]
+
+# Where this KAM node stands, in degrees. Optional: the Adverts page uses it only to place
+# nodes that did not advertise a position, by their hop distance (15 km per hop). Both keys
+# together; the page works without this block and says so.
+# location:
+#   latitude: 52.7792
+#   longitude: 6.9069
 
 # Passwords are plain text, like channel keys in kam.yml. KAMmon adds no transport
 # restrictions of its own: an admin keeps admin power from any address, wherever they

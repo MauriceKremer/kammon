@@ -24,6 +24,7 @@ type Reader interface {
 	Rooms(ctx context.Context) ([]Room, error)
 	RoomClients(ctx context.Context, roomID string) ([]RoomClient, error)
 	RoomPosts(ctx context.Context, roomID string, limit int) ([]RoomPost, error)
+	Adverts(ctx context.Context) (AdvertList, error)
 	Scripts(ctx context.Context) ([]Script, error)
 }
 
@@ -138,4 +139,13 @@ func (h *HTTP) RoomPosts(ctx context.Context, roomID string, limit int) ([]RoomP
 	}
 	err := h.get(ctx, "/v1/rooms/"+url.PathEscape(roomID)+"/posts", query, &out)
 	return out.Posts, err
+}
+
+// Adverts asks for the whole stored inventory. KAM bounds it by adverts.max_kept; the store
+// applies its own, smaller cap (docs/requirements/DataStore.md §3).
+func (h *HTTP) Adverts(ctx context.Context) (AdvertList, error) {
+	query := url.Values{"limit": {"1000"}} // the store keeps at most 1000; ask for no more
+	var out AdvertList
+	err := h.get(ctx, "/v1/adverts", query, &out)
+	return out, err
 }

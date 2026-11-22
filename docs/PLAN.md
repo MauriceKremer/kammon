@@ -51,6 +51,14 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 
 - [x] List, editor, validate, save, enable, recover, delete, dry run (MON-AU-1..23, D29, D30). The dry run works against KAM's phase-5 route; until KAM ships it the button stays hidden behind "Needs a newer KAM." (MON-AU-20)
 
+## Slice 8: Adverts
+
+- [x] KAM advert inventory (`GET /v1/adverts`, API-AD-1..5) in the KAM repository, contract first
+- [x] Reader, store snapshot (bounded, own freshness) and 60 s poll (MON-AD-2, 3)
+- [x] Inventory table, metric strip and honest labels (MON-AD-4, 5, 10)
+- [x] Offline map, advertised positions, hop bands and OpenStreetMap links (MON-AD-6..8)
+- [x] Copyable descriptive plan and viewer access (MON-AD-9, 11)
+
 ## Slice 4b: Manuals
 
 Removed (D23, 2026-10-18): the manuals, their public `/manuals/` route and the sidebar Help section left the interface; the app sidebar carries only its navigation list (one plain list, D26), and the pinned copies of KAM's manuals went with them.

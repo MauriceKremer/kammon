@@ -41,6 +41,7 @@ type Poll struct {
 	Status    time.Duration `yaml:"status"`
 	Rooms     time.Duration `yaml:"rooms"`
 	Channels  time.Duration `yaml:"channels"`
+	Adverts   time.Duration `yaml:"adverts"`
 	Scripts   time.Duration `yaml:"scripts"`
 	Timeout   time.Duration `yaml:"timeout"`
 	NotServed time.Duration `yaml:"not_served"`
@@ -53,6 +54,7 @@ func (p Poll) Every() map[string]time.Duration {
 		"status":   p.Status,
 		"rooms":    p.Rooms,
 		"channels": p.Channels,
+		"adverts":  p.Adverts,
 		"scripts":  p.Scripts,
 	}
 }
@@ -64,6 +66,14 @@ type Freshness struct {
 	DownAfter  time.Duration `yaml:"down_after"`
 }
 
+// Location is where this KAM node stands: latitude and longitude in degrees. It is optional and
+// only places advert nodes that do not advertise a position, by their hop distance. Both keys go
+// together.
+type Location struct {
+	Latitude  *float64 `yaml:"latitude"`
+	Longitude *float64 `yaml:"longitude"`
+}
+
 type Config struct {
 	Listen             string    `yaml:"listen"`
 	KamMonitorURL      string    `yaml:"kam_monitor_url"`
@@ -72,6 +82,7 @@ type Config struct {
 	SessionIdleHours   int       `yaml:"session_idle_hours"`
 	ViewerTextChannels []string  `yaml:"viewer_text_channels"`
 	Users              []User    `yaml:"users"`
+	Location           *Location `yaml:"location"`
 	TLSCert            string    `yaml:"tls_cert"` // optional: serve HTTPS directly (MON-AX-21)
 	TLSKey             string    `yaml:"tls_key"`
 }
@@ -85,7 +96,7 @@ func defaults() Config {
 	return Config{
 		Listen:           ":8080",
 		KamMonitorURL:    "http://127.0.0.1:8766",
-		Poll:             Poll{Events: time.Second, Status: 2 * time.Second, Rooms: 10 * time.Second, Channels: 30 * time.Second, Scripts: 10 * time.Second, Timeout: 3 * time.Second, NotServed: 10 * time.Minute},
+		Poll:             Poll{Events: time.Second, Status: 2 * time.Second, Rooms: 10 * time.Second, Channels: 30 * time.Second, Adverts: 60 * time.Second, Scripts: 10 * time.Second, Timeout: 3 * time.Second, NotServed: 10 * time.Minute},
 		Freshness:        Freshness{StaleAfter: 10 * time.Second, DownAfter: 2 * time.Minute}, // store's FreshFor/StaleFor (MON-DS-13)
 		SessionIdleHours: 8,
 	}
@@ -96,6 +107,8 @@ func Demo() Config {
 	cfg := defaults()
 	cfg.Listen = "127.0.0.1:8080"
 	cfg.ViewerTextChannels = []string{"#public"}
+	latitude, longitude := 52.7792, 6.9069 // Emmen
+	cfg.Location = &Location{Latitude: &latitude, Longitude: &longitude}
 	cfg.Users = []User{
 		{Name: "admin", Password: "admin", Role: RoleAdmin},
 		{Name: "viewer", Password: "viewer", Role: RoleViewer},
@@ -137,6 +150,7 @@ func (c *Config) normalize() error {
 		{"poll.status", c.Poll.Status},
 		{"poll.rooms", c.Poll.Rooms},
 		{"poll.channels", c.Poll.Channels},
+		{"poll.adverts", c.Poll.Adverts},
 		{"poll.scripts", c.Poll.Scripts},
 		{"poll.timeout", c.Poll.Timeout},
 		{"poll.not_served", c.Poll.NotServed},
@@ -149,6 +163,17 @@ func (c *Config) normalize() error {
 	}
 	if c.Freshness.DownAfter <= c.Freshness.StaleAfter {
 		return errors.New("freshness.down_after must be longer than freshness.stale_after")
+	}
+	if c.Location != nil {
+		if c.Location.Latitude == nil || c.Location.Longitude == nil {
+			return errors.New("location needs both latitude and longitude")
+		}
+		if *c.Location.Latitude < -90 || *c.Location.Latitude > 90 {
+			return fmt.Errorf("location latitude must be between -90 and 90, got %v", *c.Location.Latitude)
+		}
+		if *c.Location.Longitude < -180 || *c.Location.Longitude > 180 {
+			return fmt.Errorf("location longitude must be between -180 and 180, got %v", *c.Location.Longitude)
+		}
 	}
 	switch {
 	case c.TLSCert == "" && c.TLSKey == "":

@@ -38,7 +38,7 @@ func TestPollDefaultsAndOverrides(t *testing.T) {
 	if cfg.Poll.Events != 500*time.Millisecond || cfg.Poll.Status != 5*time.Second {
 		t.Fatalf("poll overrides not applied: %+v", cfg.Poll)
 	}
-	if cfg.Poll.Rooms != 10*time.Second || cfg.Poll.Channels != 30*time.Second || cfg.Poll.Timeout != 3*time.Second {
+	if cfg.Poll.Rooms != 10*time.Second || cfg.Poll.Channels != 30*time.Second || cfg.Poll.Adverts != 60*time.Second || cfg.Poll.Timeout != 3*time.Second {
 		t.Fatalf("poll defaults not kept: %+v", cfg.Poll)
 	}
 	if got := cfg.Poll.Every()["events"]; got != 500*time.Millisecond {
@@ -72,11 +72,27 @@ func TestLoadRejectsBadConfig(t *testing.T) {
 		"zero not served":  "poll: {not_served: 0s}\nusers:\n  - {name: a, password: p, role: viewer}\n",
 		"zero stale after": "freshness: {stale_after: 0s}\nusers:\n  - {name: a, password: p, role: viewer}\n",
 		"stale after down": "freshness: {stale_after: 3m, down_after: 2m}\nusers:\n  - {name: a, password: p, role: viewer}\n",
+		"latitude only":    "location: {latitude: 52.7}\nusers:\n  - {name: a, password: p, role: viewer}\n",
+		"latitude range":   "location: {latitude: 91, longitude: 6}\nusers:\n  - {name: a, password: p, role: viewer}\n",
+		"longitude range":  "location: {latitude: 52, longitude: -181}\nusers:\n  - {name: a, password: p, role: viewer}\n",
 	}
 	for name, body := range cases {
 		if _, err := Load(write(t, body)); err == nil {
 			t.Errorf("%s: expected an error", name)
 		}
+	}
+}
+
+func TestLocationIsOptionalAndValidated(t *testing.T) {
+	cfg, err := Load(write(t, "location: {latitude: 52.7792, longitude: 6.9069}\nusers:\n  - {name: a, password: p, role: viewer}\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Location == nil || cfg.Location.Latitude == nil || *cfg.Location.Latitude != 52.7792 || cfg.Location.Longitude == nil || *cfg.Location.Longitude != 6.9069 {
+		t.Fatalf("location = %+v", cfg.Location)
+	}
+	if plain, err := Load(write(t, "users:\n  - {name: a, password: p, role: viewer}\n")); err != nil || plain.Location != nil {
+		t.Fatalf("location must stay optional: %+v, %v", plain.Location, err)
 	}
 }
 

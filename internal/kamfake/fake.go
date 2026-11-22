@@ -193,6 +193,7 @@ func (f *Fake) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/rooms", f.rooms)
 	mux.HandleFunc("GET /v1/rooms/{id}/clients", f.roomClients)
 	mux.HandleFunc("GET /v1/rooms/{id}/posts", f.roomPosts)
+	mux.HandleFunc("GET /v1/adverts", f.adverts)
 	mux.HandleFunc("GET /scripts", f.handleScriptList)
 	mux.HandleFunc("POST /scripts", f.handleScriptCreate)
 	mux.HandleFunc("POST /scripts/validate", f.handleScriptValidate)
@@ -401,4 +402,39 @@ func (f *Fake) roomPosts(w http.ResponseWriter, r *http.Request) {
 		{ID: 91, CreatedAt: now.Add(-time.Minute), AuthorKey: clients[0], Body: "Hello Emmen"},
 		{ID: 90, CreatedAt: now.Add(-5 * time.Minute), AuthorKey: clients[1], Body: "Radio check"},
 	}})
+}
+
+// adverts is the stored inventory, newest heard first, with a mix of located and unlocated
+// nodes so the demo shows both the map and the hop-distance bands (API-AD-1).
+func (f *Fake) adverts(w http.ResponseWriter, r *http.Request) {
+	now := f.now().UTC().Truncate(time.Second)
+	name := func(value string) *string { return &value }
+	at := func(ago time.Duration) time.Time { return now.Add(-ago) }
+	first := func(ago time.Duration) *time.Time { value := now.Add(-ago); return &value }
+	lat := func(value float64) *float64 { return &value }
+	node := func(index int, nickname string, hops int, last, seen time.Duration, located bool, latitude, longitude float64, drift int64, repeater, room, chat, sensor bool) kam.Advert {
+		advert := kam.Advert{
+			PublicKey: fmt.Sprintf("%02x", index) + strings.Repeat("a", 62),
+			NodeHash:  fmt.Sprintf("%02x", index), Nickname: name(nickname),
+			IsRepeater: repeater, IsRoomServer: room, IsChatNode: chat, IsSensor: sensor,
+			SignatureValid: true, HopCount: hops, HopStations: []string{fmt.Sprintf("%02x", index+16)},
+			TimeDriftSeconds: drift, AdvertTimestamp: at(last + time.Minute),
+			FirstReceivedAt: first(seen), LastReceivedAt: at(last),
+		}
+		if located {
+			advert.HasLocation, advert.Latitude, advert.Longitude = true, lat(latitude), lat(longitude)
+		}
+		return advert
+	}
+	list := []kam.Advert{
+		node(1, "Emmen repeater", 0, 40*time.Second, 28*24*time.Hour, true, 52.7792, 6.9069, 12, true, false, false, false),
+		node(2, "Canal relay", 2, 6*time.Minute, 21*24*time.Hour, true, 52.8101, 6.9502, -4, true, false, false, false),
+		node(3, "North ridge", 3, 2*time.Hour, 14*24*time.Hour, true, 52.8500, 6.8000, 0, true, false, false, false),
+		node(4, "Dalen relay", 1, 12*time.Minute, 9*24*time.Hour, false, 0, 0, 8, true, false, false, false),
+		node(5, "Maurice", 1, 3*time.Minute, 30*24*time.Hour, true, 52.7700, 6.9100, 2, false, false, true, false),
+		node(6, "PA3M", 0, 25*time.Hour, 26*24*time.Hour, false, 0, 0, -11, false, false, true, true),
+		node(7, "Lobby", 2, time.Hour, 18*24*time.Hour, true, 52.7600, 6.9300, 5, false, true, false, false),
+		node(8, "", 2, 5*24*time.Hour, 27*24*time.Hour, false, 0, 0, 0, false, false, false, false),
+	}
+	writeJSON(w, kam.AdvertList{Adverts: list})
 }
