@@ -335,20 +335,37 @@ body.login-page { display: block; }
 
 /* Adverts page: the inventory, the hop-band plan and its copyable text. */
 .advert-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.advert-map-box { border: 1px solid var(--border-default); background: var(--bg-1); padding: 8px; }
-.advert-map { display: block; width: 100%; height: auto; }
-.advert-map .map-land { fill: var(--bg-3); stroke: var(--border-default); stroke-width: 1; }
-.advert-map .map-border { stroke: var(--border-default); stroke-width: 1; opacity: .7; }
+.advert-map-box { position: relative; border: 1px solid var(--border-default); background: var(--bg-1); padding: 8px; }
+.map-zoom { position: absolute; top: 16px; right: 16px; display: flex; flex-direction: column; gap: 6px; }
+.map-zoom button { width: 30px; height: 30px; padding: 0; font: 16px/1 var(--font-code); }
+.map-zoom button:disabled { opacity: .35; cursor: default; }
+.advert-map { display: block; width: 100%; max-height: 640px; height: auto; }
+.map-cards { position: absolute; inset: 0; pointer-events: none; }
+.map-card { position: absolute; z-index: 6; min-width: 200px; max-width: 250px; padding: 8px 10px; border: 1px solid var(--border-default); background: var(--bg-0); font-size: 12px; pointer-events: auto; color: var(--text-primary); }
+.map-card[hidden] { display: none; }
+.map-card .card-full { display: none; border-top: 1px solid var(--border-subtle); margin-top: 6px; padding-top: 6px; }
+.map-card.pinned .card-full { display: block; }
+/* The basemap is one external <use> (D42): its own stylesheet cannot reach inside, so the colours
+   flow through these custom properties into the vendored svg, with fallbacks there. */
+.advert-map { --map-land: var(--bg-3); --map-land-line: var(--border-subtle); --map-border: var(--border-default); --map-lake: var(--bg-1); }
+.advert-map .map-city { fill: var(--text-muted); }
+.advert-map .map-city-name { fill: var(--text-secondary); font: 8.5px var(--font-code); }
 .advert-map .map-band { fill: none; stroke: var(--warning); stroke-width: 1; stroke-dasharray: 4 4; opacity: .45; }
 .advert-map .map-home { stroke: var(--signal); stroke-width: 2; }
-.advert-map .map-node { fill: var(--signal); stroke: var(--bg-0); stroke-width: 1.5; }
+.advert-map .map-node { fill: var(--signal); stroke: var(--bg-0); stroke-width: 1; }
+.advert-map .map-node:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
+.advert-map .map-node.fresh { fill: var(--success); }
+.advert-map .map-node.recent { fill: var(--signal); }
+.advert-map .map-node.older, .advert-map .map-node.unknown { fill: var(--text-muted); }
+.advert-map .map-node.stale { fill: var(--text-muted); stroke-dasharray: 2 1.5; }
 .advert-map .map-node.probable { fill: none; stroke: var(--warning); stroke-width: 1.5; stroke-dasharray: 3 2; }
-.advert-map .map-number { fill: var(--text-primary); font: 9px var(--font-code); }
+.advert-map .map-scale { stroke: var(--text-muted); stroke-width: 1.5; }
 .map-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 12px 0 6px; padding: 0; list-style: none; }
 .map-legend li { display: inline-flex; align-items: center; }
 .map-key { display: inline-block; width: 10px; height: 10px; margin-right: 7px; border-radius: 50%; }
 .map-key.node { background: var(--signal); }
 .map-key.probable { border: 1.5px dashed var(--warning); }
+.map-key.city { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); margin-right: 7px; }
 .map-key.home { width: 2px; height: 12px; border-radius: 0; background: var(--signal); }
 .plan-text { margin-top: 8px; }
 .plan-text summary { cursor: pointer; color: var(--signal); font-size: 13px; padding: 4px 0; }

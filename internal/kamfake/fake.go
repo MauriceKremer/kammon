@@ -405,7 +405,8 @@ func (f *Fake) roomPosts(w http.ResponseWriter, r *http.Request) {
 }
 
 // adverts is the stored inventory, newest heard first, with a mix of located and unlocated
-// nodes so the demo shows both the map and the hop-distance bands (API-AD-1).
+// nodes so the demo shows the map's frame, the hop bands, an advert without a GPS fix (0°N 0°E)
+// and one far outside the country frame (API-AD-1, D43).
 func (f *Fake) adverts(w http.ResponseWriter, r *http.Request) {
 	now := f.now().UTC().Truncate(time.Second)
 	name := func(value string) *string { return &value }
@@ -435,6 +436,8 @@ func (f *Fake) adverts(w http.ResponseWriter, r *http.Request) {
 		node(6, "PA3M", 0, 25*time.Hour, 26*24*time.Hour, false, 0, 0, -11, false, false, true, true),
 		node(7, "Lobby", 2, time.Hour, 18*24*time.Hour, true, 52.7600, 6.9300, 5, false, true, false, false),
 		node(8, "", 2, 5*24*time.Hour, 27*24*time.Hour, false, 0, 0, 0, false, false, false, false),
+		node(9, "Test rig", 1, 8*time.Minute, 2*24*time.Hour, true, 0, 0, 3, false, false, true, false),
+		node(10, "Perth rover", 1, 6*time.Minute, 5*24*time.Hour, true, -31.9523, 115.8613, -9, false, false, true, false),
 	}
 	writeJSON(w, kam.AdvertList{Adverts: list})
 }

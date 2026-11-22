@@ -12,19 +12,35 @@
   {{if .TruncationNote}}<p class="small muted">{{.TruncationNote}}</p>{{end}}
 
   <section class="section">
-    <div class="section-head"><div><h3>Plan</h3>{{if .HomeNote}}<p class="small muted">{{.HomeNote}}</p>{{end}}</div></div>
-    {{if .HasMap}}<div class="advert-map-box">{{.Map}}</div>{{else}}<p class="muted">{{.MapNote}}</p>{{end}}
+    <div class="section-head"><div><h3>Map</h3>{{if .HomeNote}}<p class="small muted">{{.HomeNote}}</p>{{end}}</div></div>
+    {{if .HasMap}}<div class="advert-map-box">{{.Map}}
+    <div class="map-cards">{{range .Rows}}<aside class="map-card" data-node="{{.Number}}" hidden>
+      <div><strong>{{.Name}}</strong></div>
+      <div class="small muted">{{.Roles}} · {{.Hops}}</div>
+      <div class="small"><i class="ind {{.Ind.Class}}" aria-hidden="true"></i>{{.LastHeard}}</div>
+      <div class="card-full small">
+        <div>{{if .Located}}<a href="{{.OSM}}" target="_blank" rel="noopener" title="Open this position on OpenStreetMap">{{.Position}}</a>{{else}}Not advertised{{end}}</div>
+        <div class="mono muted" title="{{.FullKey}}">{{.ShortKey}}</div>
+        <div class="small muted">First heard {{.FirstHeard}} · clock {{.Drift}}</div>
+      </div>
+    </aside>{{end}}</div>
+    <div class="map-zoom">{{if .ZoomInURL}}<button type="button" aria-label="Zoom in" title="Zoom in" hx-get="{{.ZoomInURL}}" hx-target="#adverts-live" hx-swap="outerHTML">+</button>{{else}}<button type="button" aria-label="Zoom in" disabled>+</button>{{end}}{{if .ZoomOutURL}}<button type="button" aria-label="Zoom out" title="Zoom out" hx-get="{{.ZoomOutURL}}" hx-target="#adverts-live" hx-swap="outerHTML">−</button>{{else}}<button type="button" aria-label="Zoom out" disabled>−</button>{{end}}</div></div>{{else}}<p class="muted">{{.MapNote}}</p>{{end}}
     {{if .HasMap}}<ul class="map-legend small muted">
       <li><i class="map-key node" aria-hidden="true"></i>Advertised position</li>
       <li><i class="map-key probable" aria-hidden="true"></i>Probable: no position advertised, placed by hop count</li>
+      <li><i class="map-key city" aria-hidden="true"></i>Major city (Natural Earth)</li>
       {{if .HomeNote}}<li><i class="map-key home" aria-hidden="true"></i>Your node (kammon.yml)</li>{{end}}
+      <li>Dot colour follows Last heard: green fresh, blue recent, grey older, dashed silent for a day.</li>
+      <li>Hover or click a dot for the advert's details.</li>
     </ul>{{end}}
+    {{if .FrameNote}}<p class="small muted">{{.FrameNote}}</p>{{end}}
     {{if .BandsNote}}<p class="small muted">{{.BandsNote}}</p>{{end}}
     {{if .HasMap}}<p class="small muted">{{.MapNote}}</p>{{end}}
+    {{if .MapSkipNote}}<p class="small muted">{{.MapSkipNote}}</p>{{end}}
   </section>
 
   <section class="section">
-    <div class="section-head"><h3>Nodes</h3><span class="small muted">Newest heard first; numbers match the map</span></div>
+    <div class="section-head"><h3>Nodes</h3><span class="small muted">Newest heard first; hover or click a dot for the advert</span></div>
     <div class="table-scroll"><table>
       <thead><tr><th>#</th><th>Name</th><th>Roles</th><th>Public key</th><th>Hops</th><th>Last heard</th><th>First heard</th><th>Clock</th><th>Position</th></tr></thead>
       <tbody>{{range .Rows}}<tr>
