@@ -106,6 +106,29 @@ func TestGuestAccessIsOptIn(t *testing.T) {
 	}
 }
 
+// MON-AX-24: GuestAccessFrom reads only the guest_access key, so -demo can honour it.
+func TestGuestAccessFrom(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		yaml string
+		want bool
+	}{
+		{"true", "guest_access: true\n", true},
+		{"false", "guest_access: false\n", false},
+		{"missing", "listen: ':1'\n", false},
+		{"empty", "", false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if got := GuestAccessFrom(write(t, c.yaml)); got != c.want {
+				t.Fatalf("GuestAccessFrom = %v, want %v", got, c.want)
+			}
+		})
+	}
+	if GuestAccessFrom(filepath.Join(t.TempDir(), "nope.yml")) {
+		t.Fatal("a missing file must answer false")
+	}
+}
+
 func TestLocationIsOptionalAndValidated(t *testing.T) {
 	cfg, err := Load(write(t, "location: {latitude: 52.7792, longitude: 6.9069}\nusers:\n  - {name: a, password: p, role: viewer}\n"))
 	if err != nil {

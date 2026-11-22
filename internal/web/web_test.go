@@ -166,11 +166,11 @@ func TestGuestButtonFollowsGuestAccess(t *testing.T) {
 		t.Fatalf("guest button is not next to sign in")
 	}
 
-	// Demo mode never reads kammon.yml, so its config has no guest access and no button.
+	// Demo() alone has no guest access; main.go adds the file's guest_access via GuestAccessFrom.
 	demo := newHarness(t)
 	_, body, _ = get(t, demo.client(t), demo.ts.URL+"/login")
 	if strings.Contains(body, `formaction="/login/guest"`) {
-		t.Fatalf("demo mode must not show the guest button")
+		t.Fatalf("demo mode must not show the guest button without guest_access")
 	}
 }
 

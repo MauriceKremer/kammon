@@ -212,6 +212,23 @@ func (c *Config) normalize() error {
 	return nil
 }
 
+// GuestAccessFrom reads only the guest_access key from a kammon.yml. It answers false when the
+// file is missing, unreadable or the key is absent, so -demo can honour the operator's choice
+// without taking on the file's users, passwords or polling (MON-AX-24).
+func GuestAccessFrom(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var v struct {
+		GuestAccess bool `yaml:"guest_access"`
+	}
+	if err := yaml.Unmarshal(data, &v); err != nil {
+		return false
+	}
+	return v.GuestAccess
+}
+
 // NormalizeChannel lower-cases a channel name and gives it a leading '#', as KAM does.
 func NormalizeChannel(name string) string {
 	name = strings.ToLower(strings.TrimSpace(name))
