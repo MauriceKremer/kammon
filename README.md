@@ -28,7 +28,7 @@ stay the way to run KAMmon on its own.
 ## Run against a real KAM
 
 1. Copy [kammon.yml](kammon.yml) to `kammon.local.yml` and change the passwords.
-2. Start KAM. Its KAM API listens on loopback (port `8766` by default; see [docs/kam-api/FeatureKamApi.md](docs/kam-api/FeatureKamApi.md)).
+2. Start KAM. Its KAM API listens on loopback (port `8766` by default; see [docs/kam-api/FeatureKamApi.md](docs/kam-api/FeatureKamApi.md)). To run KAMmon on another device in your network instead, set `monitor.listen` in KAM's `kam.yml` to an IP address of the KAM machine (the contract allows this, D20) and point `kam_monitor_url` at that address.
 3. Run `go run ./cmd/kammon -config kammon.local.yml`.
 
 Passwords are plain text in the config file, like channel keys in KAM. KAMmon is written for the enthusiast and adds no hosting restrictions of its own, so the operator can choose what fits their setup: an `admin` user has admin power from any address. Serving the site beyond your LAN is that operator's decision — put the proper services (HTTPS through a reverse proxy, for example) in place first.
