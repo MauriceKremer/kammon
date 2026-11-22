@@ -26,9 +26,9 @@ const (
 )
 
 // AssetVersion is the cache-buster of the shared static assets (kammon.css, the static scripts
-// and the country basemap the adverts map references). Bump it when one of those files changes, so
-// browsers drop their cached copy instead of running or styling the pages with the old rules.
-const AssetVersion = "kammon-27"
+// and the vendored MapLibre files the adverts map uses). Bump it when one of those files changes,
+// so browsers drop their cached copy instead of running or styling the pages with the old rules.
+const AssetVersion = "kammon-28"
 
 type Deps struct {
 	Config     config.Config
@@ -206,11 +206,26 @@ func basemapAsset(w http.ResponseWriter, r *http.Request) {
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
-		h.Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+		policy := "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+		if mapPage(r.URL.Path) {
+			// The adverts map is the one page that reaches a third party (D57): OpenFreeMap's tiles,
+			// glyphs and sprites, plus the blob workers MapLibre starts. Everything else stays 'self'.
+			policy = "default-src 'self'; style-src 'self' 'unsafe-inline'; " +
+				"img-src 'self' data: blob: https://tiles.openfreemap.org; " +
+				"connect-src 'self' https://tiles.openfreemap.org; " +
+				"worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+		}
+		h.Set("Content-Security-Policy", policy)
 		h.Set("X-Content-Type-Options", "nosniff")
 		h.Set("Referrer-Policy", "same-origin")
 		next.ServeHTTP(w, r)
 	})
+}
+
+// mapPage reports whether a path is the adverts page or its live partial. Those responses carry the
+// relaxed CSP of D57; the partial matters because a swapped-in map runs under the document's policy.
+func mapPage(path string) bool {
+	return path == "/adverts" || path == "/ui/adverts"
 }
 
 type principal struct {

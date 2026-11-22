@@ -316,6 +316,41 @@ func TestBasemapAsset(t *testing.T) {
 	}
 }
 
+// TestMapCSPAllowsOnlyTheBasemapHost checks the one online exception (D57): the adverts page may
+// reach OpenFreeMap's tiles, glyphs and sprites and start MapLibre's blob workers, while every other
+// page keeps the strict same-origin policy.
+func TestMapCSPAllowsOnlyTheBasemapHost(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer", "viewer")
+	_, _, header := get(t, c, h.ts.URL+"/adverts")
+	csp := header.Get("Content-Security-Policy")
+	for _, want := range []string{
+		"connect-src 'self' https://tiles.openfreemap.org",
+		"img-src 'self' data: blob: https://tiles.openfreemap.org",
+		"worker-src 'self' blob:",
+	} {
+		if !strings.Contains(csp, want) {
+			t.Errorf("adverts CSP misses %q, got %q", want, csp)
+		}
+	}
+	_, _, header = get(t, c, h.ts.URL+"/")
+	if csp := header.Get("Content-Security-Policy"); strings.Contains(csp, "openfreemap") {
+		t.Errorf("the overview page carries the map's relaxed CSP: %q", csp)
+	}
+}
+
+// TestMapLibreAssets checks the prebuilt library is vendored and served same-origin (D57).
+func TestMapLibreAssets(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer", "viewer")
+	for _, asset := range []string{"/static/maplibre-gl.js", "/static/maplibre-gl.css"} {
+		status, body, _ := get(t, c, h.ts.URL+asset)
+		if status != http.StatusOK || len(body) < 1000 {
+			t.Errorf("%s: status %d, %d bytes", asset, status, len(body))
+		}
+	}
+}
+
 func TestAdvertsPageEscapesNamesAndHidesNoFacts(t *testing.T) {
 	h := newHarness(t)
 	h.st.SetAdverts([]kam.Advert{{
