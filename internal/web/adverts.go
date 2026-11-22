@@ -55,6 +55,7 @@ type advertRow struct {
 
 type advertsData struct {
 	Rows                                                                 []advertRow
+	Unplaced                                                             []advertRow // nodes with no usable advertised position
 	Metrics                                                              []channelMetric
 	Map                                                                  chartMarkup
 	HasMap                                                               bool
@@ -105,6 +106,7 @@ func (s *Server) adverts(r *http.Request) advertsData {
 	}
 
 	var located, repeaters, roomServers, silent int
+	var unplaced []advertRow
 	for i, advert := range list {
 		ind := view.Activity(nowKAM, &advert.LastReceivedAt)
 		row := advertRow{
@@ -125,11 +127,15 @@ func (s *Server) adverts(r *http.Request) advertsData {
 		} else {
 			row.FirstHeard = "unknown"
 		}
+		plottable := false
 		if advert.HasLocation && advert.Latitude != nil && advert.Longitude != nil {
 			located++
 			row.Located = true
 			row.Position = fmt.Sprintf("%.5f, %.5f", *advert.Latitude, *advert.Longitude)
 			row.OSM = osmURL(*advert.Latitude, *advert.Longitude)
+			// A position within ±noFixDegrees of 0°N 0°E is a missing fix (D43): it stays in the
+			// table but is never placed on the map, so it joins the unpositioned panel below it.
+			plottable = !(math.Abs(*advert.Latitude) <= noFixDegrees && math.Abs(*advert.Longitude) <= noFixDegrees)
 		} else {
 			row.Position = "Not advertised"
 		}
@@ -143,7 +149,11 @@ func (s *Server) adverts(r *http.Request) advertsData {
 			silent++
 		}
 		data.Rows = append(data.Rows, row)
+		if !plottable {
+			unplaced = append(unplaced, row)
+		}
 	}
+	data.Unplaced = unplaced
 
 	data.Metrics = []channelMetric{
 		{Label: "Nodes stored", Value: thousands(len(list)), Caption: "One row per public key; KAM keeps the newest advert"},

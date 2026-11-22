@@ -408,6 +408,9 @@ body.login-page { display: block; }
 .map-chip[aria-pressed="true"] .map-chip-mark { border-color: var(--signal); background: var(--signal); }
 .map-chip[aria-pressed="true"] .map-chip-mark::after { content: "✓"; font-weight: 700; }
 .map-hint { margin: 10px 4px 0; }
+.unplaced { margin: 10px 4px 0; }
+.unplaced summary { cursor: pointer; color: var(--signal); font-size: 13px; padding: 4px 0; }
+.unplaced-list { display: grid; gap: 4px; margin: 8px 0 0; padding-left: 18px; color: var(--text-secondary); font-size: 13px; }
 .plan-text { margin-top: 8px; }
 .plan-text summary { cursor: pointer; color: var(--signal); font-size: 13px; padding: 4px 0; }
 .plan-text pre { margin: 10px 0 0; padding: 14px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--bg-1); color: var(--text-secondary); font: 12px/1.6 var(--font-code); white-space: pre-wrap; overflow-x: auto; }

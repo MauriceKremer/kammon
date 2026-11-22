@@ -80,6 +80,33 @@ func TestAdvertsPageShowsInventoryPlanAndCopyableText(t *testing.T) {
 	}
 }
 
+// The unpositioned panel groups exactly the nodes the map leaves off — those that advertised no
+// usable position — so an operator reads them without hunting the table (MON-AD-7, D55).
+func TestAdvertsUnpositionedPanelListsUnplacedNodes(t *testing.T) {
+	h := newHarness(t)
+	seedAdverts(t, h)
+	c := h.login(t, "viewer", "viewer")
+	_, body, _ := get(t, c, h.ts.URL+"/adverts")
+	start := strings.Index(body, `<details class="unplaced">`)
+	if start < 0 {
+		t.Fatal("no unpositioned panel")
+	}
+	rest := body[start:]
+	end := strings.Index(rest, "</details>")
+	if end < 0 {
+		t.Fatal("unclosed unpositioned panel")
+	}
+	panel := rest[:end]
+	for _, want := range []string{"Unpositioned nodes (2)", "Dalen relay", "PA3M", "not on the map"} {
+		if !strings.Contains(panel, want) {
+			t.Errorf("panel misses %q", want)
+		}
+	}
+	if strings.Contains(panel, "Canal relay") {
+		t.Errorf("the positioned node leaked into the unpositioned panel")
+	}
+}
+
 // TestAdvertsMapFramesTheCountry pins the country-level default frame (D43, D44): about 260 km
 // around the configured node, never wider than the country; the fresh dot carries its last-heard
 // colour class; the basemap is referenced from the versioned asset, never drawn inline; and the

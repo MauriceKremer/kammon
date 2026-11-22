@@ -42,6 +42,10 @@
     {{if .FrameNote}}<p class="small muted">{{.FrameNote}}</p>{{end}}
     {{if .HasMap}}<p class="small muted">{{.MapNote}}</p>{{end}}
     {{if .MapSkipNote}}<p class="small muted">{{.MapSkipNote}}</p>{{end}}
+    {{if .Unplaced}}<details class="unplaced"><summary></summary>Unpositioned nodes ({{len .Unplaced}})</summary>
+      <p class="small muted">These nodes advertised no usable position, so they are not on the map. They stay in the table below.</p>
+      <ul class="unplaced-list">{{range .Unplaced}}<li><span class="mono muted">{{.ShortKey}}</span> · {{.Name}}{{if .Role}} · {{.Role}}{{end}} · {{.Hops}} · last heard {{.LastHeard}}</li>{{end}}</ul>
+    </details>{{end}}
   </section>
 
   <section class="section">
