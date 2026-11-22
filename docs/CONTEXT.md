@@ -37,5 +37,5 @@ Use these words in code, tests, docs and screens.
 | **Advert plan** | The Adverts page's description of the inventory: table, map and copyable text. Descriptive, never advice. |
 | **Advertised position** | A coordinate a node chose to include in its advert. Only these are plotted on the map; a node without one stays in the table and is counted, never placed by estimate (D48). |
 | **Cluster** | A numbered badge on the advert map for nearby dots. Activating it zooms into the group's bounds; at the deepest zoom overlapping dots spiderfy along a spiral (D49, D52, MON-AD-17). |
-| **Base node** | The node at `location` in kammon.yml, drawn as a green star with a radar pulse. The map opens and resets on it, and its layer chip can hide the marker (D50, D53, MON-AD-19). |
+| **Base node** | The node at `location` in kammon.yml, drawn as a neutral non-status anchor (no state colour, no radar pulse). The map opens and resets on it, and its layer chip can hide the marker (D50, D53, MON-AD-19). |
 | **Layer chip** | A toggle under the advert map that shows or hides a layer and carries its count; Advertised, Silent and Base Node (D53, MON-AD-20). |

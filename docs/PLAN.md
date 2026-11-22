@@ -56,7 +56,8 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 - [x] KAM advert inventory (`GET /v1/adverts`, API-AD-1..5) in the KAM repository, contract first
 - [x] Reader, store snapshot (bounded, own freshness) and 60 s poll (MON-AD-2, 3)
 - [x] Inventory table, metric strip and honest labels (MON-AD-4, 5, 10)
-- [x] Offline map, advertised positions and OpenStreetMap links (MON-AD-6..8); hop-band placement of unlocated nodes removed (D48); marker clustering with badge zoom and spiderfy (MON-AD-17, D49); cluster z-order and smooth spiderfy (D52); base marker, glass inspector and layer chips (D53)
+- [x] Offline map, advertised positions and OpenStreetMap links (MON-AD-6..8); hop-band placement of unlocated nodes removed (D48); marker clustering with badge zoom and spiderfy (MON-AD-17, D49); cluster z-order and smooth spiderfy (D52); base marker, inspector cards and layer chips (D53)
+- [ ] Flat operator-console restyle of the map: replace the glassmorphism (glass inspector cards, radar pulse, glass-tinted controls) with flat surfaces, no glow/shadow/blur, and correct colour semantics (D55, [kammon_map_feature_plan.md](kammon_map_feature_plan.md))
 - [x] Copyable descriptive plan and viewer access (MON-AD-9, 11)
 
 ## Slice 4b: Manuals
