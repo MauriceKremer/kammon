@@ -56,13 +56,13 @@ Keep the generated SVG basemap. If the goal is a lighter "Positron-like" backgro
 
 Dots encode last-heard state by colour (`fresh` = success, `recent` = signal, `older`/`unknown` = muted, `stale` = dotted). Confirm this reads as the activity indicator (the card and table already give the word) and that "recent" is not using blue as a *status* in a way that collides with "blue = headings/actions". If a state needs a distinct token, add it; meaning must never depend on colour alone.
 
-### 6. Unpositioned-nodes panel (optional)
+### 6. Unpositioned-nodes panel — done (MON-AD-7)
 
 Nodes without a valid position already appear in the Nodes table and are counted in the map notes. A collapsible panel grouping exactly those rows (search/sort by name, key, hops, last heard) would save scrolling; it must reuse `store.Adverts()` and never place or estimate them onto the map (`MON-AD-7`). The count is dynamic, not "3".
 
-### 7. Viewport persistence / URL sync (optional)
+### 7. Viewport persistence — done (D56, MON-AD-15)
 
-The camera deliberately carries no URL state today (D47). Persisting pan/zoom/chip state to `localStorage` or `?lat=&lon=&zoom=` is a possible convenience, but must keep the server-drawn-frame model and the 60 s refresh replay, and must never put radio text or keys into the URL.
+The camera deliberately carries no URL state today (D47). Persisting pan/zoom/chip state to `localStorage` or `?lat=&lon=&zoom=` is a possible convenience, but must keep the server-drawn-frame model and the 60 s refresh replay, and must never put radio text or keys into the URL. Implemented 2026-11-22 with `localStorage` only; URL sync was intentionally left out to keep D47's no-URL camera.
 
 ### 8. Relay-path overlay (open, blocked on KAM)
 
