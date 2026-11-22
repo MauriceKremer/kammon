@@ -55,7 +55,7 @@ flowchart LR
 
 ### 3.2 Technologies
 
-The technology list is deliberately short: one Go binary from the standard library, one small dependency, one vendored front-end script. No database, no front-end build step, no CDN.
+The technology list is deliberately short: one Go binary from the standard library, one small dependency, vendored front-end scripts. No database, no front-end build step, no CDN — except one deliberate choice: the Adverts map's basemap tiles come from OpenFreeMap (D57).
 
 | Where | Choice | Say more |
 |---|---|---|
@@ -64,7 +64,8 @@ The technology list is deliberately short: one Go binary from the standard libra
 | Pages | `html/template` | Server-rendered HTML; radio text is always escaped. The one `template.HTML` exception is the numbers-only SVG in `internal/web/chart.go`, watched by a test. |
 | Live updates | htmx 2.0.4 | One vendored file, `web/static/htmx.min.js`, served from the same origin. It refreshes small page parts; no framework, no build step. |
 | Page scripts | `web/static/*.js` | Hand-written helpers: `live.js` pauses the two-second refresh, `detail.js` keeps traffic row details open (D25), `editor.js` guards the script editor's unsaved text (MON-AU-14), `theme.js` carries the theme cookie. |
-| Charts | Server-drawn SVG | `internal/web/chart.go` writes `<svg>` from numbers and vendored static names (the basemap's Natural Earth city labels). No chart library, no drawing in the browser (A3 in §13). |
+| Charts | Server-drawn SVG | `internal/web/chart.go` writes `<svg>` from numbers and vendored static names. No chart library, no drawing in the browser (A3 in §13). |
+| Map | MapLibre GL JS + OpenFreeMap Positron | The Adverts map draws OpenFreeMap's hosted Positron tiles with MapLibre GL JS vendored in `web/static/` (no build step); the tiles are the page's one third-party request (D57). |
 | Styling | `web/static/kammon.css` | One stylesheet for dark and light; the colours are CSS custom properties (§5.1). |
 | Fonts and icons | Embedded files | Hanken Grotesk, Roboto Mono and Syncopate as woff2 in `web/static/fonts/`, icons as one SVG sprite. Nothing comes from Google or a CDN. |
 | Logging | `log/slog` | Plain lines; passwords never reach a log (MON-AX-16). |
@@ -393,7 +394,7 @@ viewer_text_channels: ["#public"]
 | D18 | Dry run | Synchronous, 500 ms default, 3000 ms maximum; at most 16 replies and 4096 captured bytes |
 | A1 | Room posts and client labels | Admin only (the allow list covers channel text only). Assumption: confirm before build. |
 | A2 | KAM events | Metadata only; message text is fetched on demand |
-| A3 | Charts | Server-drawn SVG, no JavaScript chart library |
+| A3 | Charts | Server-drawn SVG, no JavaScript chart library — the Adverts map is the exception, drawn with MapLibre in the browser (D57) |
 
 ## 14. Out of scope for version 1
 

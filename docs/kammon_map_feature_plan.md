@@ -1,98 +1,95 @@
-# KAMmon Map — Rework Plan
+# KAMmon Map — OpenFreeMap Positron Plan
 
-This is the plan for **reworking the map on the Adverts page** (`/adverts`) to meet the KAMmon operator-console standard. The map already works; the rework is about *how it looks and reads*, not about adding a second rendering engine.
+**Status:** open — replace the generated Natural Earth SVG basemap on `/adverts` with OpenFreeMap's hosted **Positron** tiles. This is a deliberate change of direction; the flat operator-console overlay (D55) and the page's data rules stay.
 
-**Status:** open — rework of the shipped Adverts map (Slice 8 in [PLAN.md](PLAN.md)).
+## Why this change
 
-## Why this rework exists
+The map currently draws a server-generated Natural Earth basemap (D42) so it can run with no tiles and no third-party request. That bought offline operation, but it reads as a schematic: hand-drawn coastlines and borders, with city names the operator has to reconcile against the familiar map in their head.
 
-The shipped map adopted a "glassmorphism" look that breaks the design system. The standard is [DESIGN.md](DESIGN.md) §5 and the short version in [`.github/skills/kammon-ui-style/SKILL.md`](../.github/skills/kammon-ui-style/SKILL.md): **no cards, gradients, glows or shadows (the toast is the only shadow)**, radius 6 px, 1 px rules, and **blue for headings/actions only — green/amber/red mean a state**. The map currently diverges:
+We are deliberately switching the basemap to **OpenFreeMap Positron**. Three reasons, in order:
 
-| Where | Now (non-standard) | Standard |
-|---|---|---|
-| `.map-card` (inspector) | `backdrop-filter: blur(14px)`, translucent fill, `box-shadow`, radius 14 px | flat `--bg-2` panel, 1 px `--border-default`, radius 6 px, no blur/shadow |
-| `.map-zoom button` (`+ − Reset`) | `backdrop-filter: blur(8px)`, translucent fill, `box-shadow`, radius 10 px | flat `--bg-2` control, radius 6 px, no blur/shadow |
-| `.map-chip` (layer toggles) | pill radius 999 px, translucent fill, `box-shadow` | radius 6 px, flat `--bg-2`, no shadow |
-| `.map-home-ring` / `map-home-pulse` | animated radar pulse = a glow | no glow; a static ring or none |
-| `.map-home-star` (base node) | green `--success` | green means a *state*; the base node is an anchor, so it needs a non-status treatment |
+1. **It is a selling point.** A real, familiar, high-quality basemap makes the product look finished and trustworthy next to the peers — MeshCore's internet map, MeshMonitor and MeshCore Open all run on tile maps.
+2. **Positron fits the console.** Positron is the light, desaturated, no-decoration style: the basemap recedes so the node dots are the subject. It matches [DESIGN.md](DESIGN.md) §5's calm principle better than any hand-tuned SVG.
+3. **It is free and open.** OpenFreeMap serves the tiles with no API key, no account and no usage cap at this scale, on the same OpenStreetMap data we already link to.
 
-Two things the earlier draft of this plan asked for are also out of scope for the same reason: a hosted **OpenFreeMap Positron** basemap (violates offline/no-tiles, `MON-AD-8`, and "charts are server-drawn SVG"), and **glassmorphism** popups (violates the no-cards/no-shadows rule).
+This is a *deliberate trade*, not an accident: the map stops working offline for its background, but the page's data never does.
 
-## What stays (baseline — do not regress)
+## What this reverses (be honest)
 
-The rework is restyling, not re-architecture. These already meet the standard and must keep working:
+The offline/no-tiles design was a real constraint, not a mistake, and we are reversing it on purpose. The affected decisions and requirements:
 
-- **Offline server-drawn basemap** — Natural Earth 1:50m land/borders/lakes, Web Mercator, one generated SVG asset (`internal/web/basemap_svg.go`) served at `/static/basemap.svg`, drawn with a same-origin `<use>` (D42, `MON-AD-6`). No tiles, no third-party requests.
-- **Country-level frame** — about 260 km around `location` in `kammon.yml`, clamped to the containing ring; node-fit fallback (D43, D44, `MON-AD-6`).
-- **Strict GPS filtering** — only valid advertised positions become dots; no-fix (0°N 0°E) and unlocated adverts are counted, not drawn, never placed by hop count (D48, `MON-AD-6/7`).
-- **Interactive camera** — 100 km opening view centred on `location` (Emmen only in the demo), drag/momentum, pinch, wheel, `+ −` ×2 steps, smooth `Reset`; camera lives in JS and survives the 60 s refresh (D47, D50, `MON-AD-15`).
-- **Clustering & spiderfy** — numbered badges, badge zoom-to-bounds, golden-angle spiderfy with legs, constant screen size (D49, D52, `MON-AD-17`).
-- **City labels** — constant small muted type with a halo, rank-based reveal, local + Dutch tiers (D45, D51, D54, `MON-AD-18`).
-- **Inspector content** — name, key prefix, role, hops from base, colour-coded last heard, base frequency, plus `Copy Public Key` and `Draw Line to Base` (the *content* stays; only the glass surface changes).
-- **Honest labels & copyable plan** — "advertised position", "hops = path length of the newest advert" (`MON-AD-9/10`).
+| Was | Becomes |
+|---|---|
+| Offline, no tiles, no third-party request (GL-2, `MON-AD-8`) | The basemap is the one online exception: tiles load from OpenFreeMap's CDN; everything else stays same-origin. |
+| Server-drawn SVG, browser only moves a window into it (A3, D42, D47) | MapLibre GL JS draws the basemap in the browser; the store still feeds the dots. |
+| No Leaflet/MapLibre/Supercluster, no build step (D49) | MapLibre GL JS is vendored like htmx (one prebuilt file, no npm build step); the no-build-step rule still holds. |
+| Vendored Natural Earth + Dutch city labels (D45, D51, D54) | Positron labels places itself; the bespoke label engine is removed. |
+
+The map needs the internet for its background. When tiles cannot load, the page says so honestly, and the dots — which come from the store, not the internet — still draw over a plain background. Radio data is never affected by a tile outage.
+
+## What stays
+
+- **Data from the store.** The poller and `store.Adverts()` are unchanged; the map still reads only the store, never KAM (rule 3).
+- **Only valid advertised positions are plotted.** No-fix (0°N 0°E) and unlocated nodes stay in the table and are counted, never guessed onto the map (D48, `MON-AD-6/7`).
+- **Flat operator-console overlay** (D55): no cards, gradients, glows or shadows; radius 6 px; blue for headings/actions only, green/amber/red for states. The inspector cards, zoom/reset controls and Advertised/Silent/Base chips keep their flat tokens.
+- **Honest labels** (`MON-AD-9/10`): "advertised position", "hops = path length", "stale", never "verified"/"online".
+- **Radio text is never `template.HTML`** (rule 5). In the new map, node names ride as GeoJSON properties and are written to the DOM as *text*, never as inner HTML; the `template.HTML` exception stays confined to `chart.go`'s numbers-only SVG.
+- **Opening view and Reset** (`MON-AD-15`, D50): the map still opens on the 100 km view around `location` (Emmen in the demo) and `Reset` returns there.
+
+## Target
+
+- **Library:** MapLibre GL JS, vendored in `web/static/` and served same-origin — no CDN for the code, no npm build step (the same pattern as htmx).
+- **Style:** OpenFreeMap Positron, loaded from `https://tiles.openfreemap.org/styles/positron`.
+- **Data layer:** the located adverts become a GeoJSON source with a circle layer carrying the table's last-heard colours; clustering uses MapLibre's built-in cluster source (numbered badges), with spiderfy kept for dots that still overlap at the deepest zoom.
+- **Attribution:** `© OpenFreeMap © OpenStreetMap contributors` — required by the tiles' terms, shown on the map.
+- **Offline:** a tile-load failure shows an honest "basemap unavailable" note; the dots still draw.
 
 ## Rework slices
 
-Each slice is test-first for anything server-side, browser-checked in `-demo` for styling, and cited against a requirement id and a decision. Work in this order.
+Work in this order; test first for anything server-side, check in `-demo` in a browser.
 
-### 1. Flat inspector cards
-
-Restyle `.map-card` and its `card-*` children in `web/static/kammon.css` to the standard: solid `--bg-2` (or `--bg-1` with a 1 px `--border-default`), radius 6 px, the existing type scale (13 px head, 12 px body, mono for the key), no `backdrop-filter`, no `box-shadow`, no translucent fill. Keep the card's position-follow behaviour in `web/static/map.js` untouched.
-
-### 2. Flat map controls and layer chips
-
-- `.map-zoom button`: flat `--bg-2`, 1 px `--border-default`, radius 6 px, no shadow/blur; keep the disabled state and `Reset`.
-- `.map-chip`: radius 6 px (drop the pill), flat surface, pressed state via `--signal` tint and border as today but without the shadow. Keep counts and `aria-pressed`.
-
-### 3. Base node without glow or state colour
-
-Remove the `map-home-pulse` animation (and the `@keyframes`) and the green `--success` fill on `.map-home-star`/`.map-home-ring`. Render the base node as a distinct, non-status anchor — a neutral marker (`--text-primary`/`--text-secondary`) or an outlined glyph that does not read as "healthy/error" — with the existing `Base Node` chip carrying the identity. Honour `prefers-reduced-motion`. Record the chosen glyph/colour in `DECISIONS.md`.
-
-### 4. Basemap stays offline
-
-Keep the generated SVG basemap. If the goal is a lighter "Positron-like" background, achieve it inside `scripts/gen-basemap.py` and the CSS custom properties on `.advert-map` (`--map-land`, `--map-border`, `--map-lake`), **not** by switching to OpenFreeMap or any hosted tile service.
-
-### 5. Review dot status colour semantics
-
-Dots encode last-heard state by colour (`fresh` = success, `recent` = signal, `older`/`unknown` = muted, `stale` = dotted). Confirm this reads as the activity indicator (the card and table already give the word) and that "recent" is not using blue as a *status* in a way that collides with "blue = headings/actions". If a state needs a distinct token, add it; meaning must never depend on colour alone.
-
-### 6. Unpositioned-nodes panel — done (MON-AD-7)
-
-Nodes without a valid position already appear in the Nodes table and are counted in the map notes. A collapsible panel grouping exactly those rows (search/sort by name, key, hops, last heard) would save scrolling; it must reuse `store.Adverts()` and never place or estimate them onto the map (`MON-AD-7`). The count is dynamic, not "3".
-
-### 7. Viewport persistence — done (D56, MON-AD-15)
-
-The camera deliberately carries no URL state today (D47). Persisting pan/zoom/chip state to `localStorage` or `?lat=&lon=&zoom=` is a possible convenience, but must keep the server-drawn-frame model and the 60 s refresh replay, and must never put radio text or keys into the URL. Implemented 2026-11-22 with `localStorage` only; URL sync was intentionally left out to keep D47's no-URL camera.
-
-### 8. Relay-path overlay (open, blocked on KAM)
-
-A "mesh backhaul" or route overlay is not derivable from the advert record: `hop_stations` has no per-hop coordinates and one-byte hashes collide (Adverts.md §8). Keep as a research item; it likely needs a KAM-side contract change first. `Draw Line to Base` already covers single-node anchoring.
+1. **Vendor MapLibre GL JS.** Add the prebuilt `maplibre-gl.js` and `maplibre-gl.css` to `web/static/`, serve them same-origin, and relax the CSP for the map only: allow OpenFreeMap's tile (and glyph/sprite) hosts in `connect-src`/`img-src`, plus `worker-src blob:` for MapLibre's workers.
+2. **Swap the basemap.** Replace the `<use href="/static/basemap.svg">` surface with a MapLibre container pointed at the Positron style, with attribution. Remove the generated basemap asset and `scripts/gen-basemap.py` once nothing else needs them.
+3. **Re-plumb the dots.** Emit the located adverts as GeoJSON (id = row number, coordinates, last-heard class); a circle layer draws them. No-fix and unlocated adverts stay counted, never in the GeoJSON.
+4. **Clustering and spiderfy.** Use MapLibre's cluster source for numbered badges (constant screen size), zoom-to-bounds on activation, and spiderfy at the deepest zoom so overlapping dots stay clickable. Drop the bespoke SVG union-find and the city-label engine.
+5. **Flat overlay follows the map.** Keep the inspector cards, zoom/reset and chips as flat DOM (unchanged tokens from D55), now positioned against MapLibre's camera instead of the SVG `viewBox`. `Copy Public Key` and `Draw Line to Base` keep working.
+6. **Honest offline and attribution.** Tile failure → "basemap unavailable" note while the dots still draw; attribution always present.
+7. **Docs and tests.** Amend `requirements/Adverts.md` (`MON-AD-6`, `MON-AD-8`, `MON-AD-15`), record `D57` in `DECISIONS.md`, and update the Adverts tests to pin the OpenFreeMap surface and attribution instead of `/static/basemap.svg`.
 
 ## Files
 
 | Path | What changes here |
 |---|---|
-| `web/static/kammon.css` | `.map-card`, `.map-zoom button`, `.map-chip`, `.map-home-star`, `.map-home-ring`, `@keyframes map-home-pulse`, `.advert-map` basemap tokens |
-| `web/static/adverts-map.js` | base-marker/anchor drawing if the glyph changes; no camera/cluster changes expected |
-| `web/static/map.js` | unchanged (card behaviour), unless a card needs a new field |
-| `web/templates/pages/adverts.html` | card markup only if structure changes; otherwise unchanged |
-| `internal/web/adverts.go` | only if the server markup for the anchor/cards changes |
-| `scripts/gen-basemap.py`, `internal/web/basemap_*.go` | only for slice 4 |
-| `docs/requirements/Adverts.md` | amend `MON-AD-16`, `MON-AD-19`, `MON-AD-20` to the flat standard |
-| `docs/DECISIONS.md` | `D55` records the flat restyle (supersedes D53's glass wording) |
+| `web/static/maplibre-gl.js`, `web/static/maplibre-gl.css` | New vendored MapLibre GL JS (no build step) |
+| `web/static/adverts-map.js` | MapLibre init, GeoJSON layer, clustering/spiderfy, camera → cards/chips; the bespoke SVG camera/cluster code is removed |
+| `web/static/kammon.css` | Map container and flat overlay tokens (kept from D55), attribution and offline-note styles |
+| `web/templates/pages/adverts.html` | Map surface + attribution + offline-note markup; GeoJSON emitted server-side with names still escaped |
+| `internal/web/adverts.go` | Serve the located adverts as GeoJSON and keep the store read; drop the basemap SVG render |
+| `internal/web/server.go` | CSP: allow OpenFreeMap's tile hosts and MapLibre workers for the map only |
+| `scripts/gen-basemap.py`, `internal/web/basemap_*.go` | Removed with the SVG basemap (city-label engine included) |
+| `docs/requirements/Adverts.md` | `MON-AD-6`, `MON-AD-8`, `MON-AD-15` and the map section now describe the OpenFreeMap Positron basemap |
+| `docs/DECISIONS.md` | `D57` records this change; D41/D42/D49 are superseded where they conflict |
+| `docs/PLAN.md` | Slice 8 line updated |
 
 ## Guardrails
 
-1. **Offline, no tiles, no third-party requests** (`MON-AD-8`). OpenStreetMap stays a link out only.
-2. **Server draws the whole frame; the browser only moves a window into it** (D47, A3). No Leaflet/Supercluster/build step (D49).
-3. **No cards, gradients, glows or shadows; radius 6 px; blue for headings/actions only.**
+1. **The map is the one online exception.** The library stays vendored and same-origin; the only third-party request is the basemap tiles and their glyphs (D57).
+2. **No build step.** MapLibre ships a prebuilt file; nothing is compiled or bundled.
+3. **Flat operator-console standard** (D55): no cards, gradients, glows or shadows; radius 6 px; blue for headings/actions only.
 4. **Only valid advertised positions are plotted**; nothing is placed by hop count (`MON-AD-6/7`).
-5. **Radio text stays out of the SVG** (`MON-AD-12`); colours come from CSS variables so theme switching needs no redraw.
-6. **Honest labels** (`MON-AD-10`): "advertised", "last heard", "stale", never "verified"/"online".
+5. **Radio text is never HTML.** Node names are written as text, never `template.HTML` (rule 5); the only `template.HTML` stays `chart.go`.
+6. **Honest labels** (`MON-AD-10`): "advertised", "last heard", "stale", never "verified"/"online"; a tile outage is said in words.
+7. **Bounded memory.** The GeoJSON is the same bounded `store.Adverts()` snapshot, never a second unbounded copy (DataStore §3).
+
+## Open questions
+
+- **Theme.** Positron is light; the default KAMmon theme is dark charcoal. Confirm the light basemap is the wanted look (it is the deliberate choice), and whether the dark theme should keep Positron or offer OpenFreeMap's dark style as a switch. Dots and cards must stay legible over the light basemap.
+- **Attribution placement and hosts.** MapLibre also fetches glyphs and sprites; confirm the exact OpenFreeMap hosts to allow in the CSP.
+- **Self-hosting.** OpenFreeMap can be self-hosted; note whether that is a later option without changing the plan now.
 
 ## How to implement
 
-1. Add/amend requirement ids in `requirements/Adverts.md` and a decision in `DECISIONS.md`.
-2. Implement test-first for server-side changes; check every slice in `go run ./cmd/kammon -demo` in a browser (both themes).
+1. Add/amend the requirement ids and record D57 first.
+2. Implement test-first for server-side changes (GeoJSON, CSP, attribution); check every slice in `go run ./cmd/kammon -demo` in a browser (both themes).
 3. Keep `go test -race ./...`, `go vet ./...` and `gofmt -l .` clean.
 4. Tick [PLAN.md](PLAN.md) and commit citing the requirement id in the message.

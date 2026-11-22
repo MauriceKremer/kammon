@@ -1,5 +1,7 @@
 # Adverts map: basemap resolution, projection and serving
 
+> **Superseded 2026-11-22:** the offline basemap this research produced was replaced by OpenFreeMap's hosted Positron tiles (D57). Kept as the record of the offline work.
+
 Status: implemented 2026-02-14 (the §6 plan; lakes and SVG text labels left out — this repo's SVGs are textless by design, the figures ride in the notes). Date: 2026-02-14. Research for improving the Adverts page country map (`internal/web/basemap_data.go`, `internal/web/chart.go advertMapSVG`). Today the map is Natural Earth 1:110m land and borders flattened into one SVG path pair (~50 KB), drawn server-side in equirectangular projection, inlined into the page HTML on every render and every 60-second htmx swap. Constraints that frame every option: offline (GL-2, MON-AD-8 — no tiles, no third-party requests), server-drawn SVG from numbers only (DESIGN §3.2, A3), no new Go dependency, no build step, runs on a Pi.
 
 ## 1. Resolution: 1:50m is the right step up, 1:10m is not worth it
