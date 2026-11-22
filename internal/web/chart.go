@@ -3,7 +3,6 @@ package web
 import (
 	"fmt"
 	"html/template"
-	"math"
 	"strings"
 	"time"
 
@@ -168,56 +167,83 @@ func squareSparkSVG(class string, values []int) chartMarkup {
 
 func gridStep(span float64) float64 {
 	target := span / 6
-	for _, step := range []float64{0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10} {
+	for _, step := range []float64{0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30} {
 		if step >= target {
 			return step
 		}
 	}
-	return 10
+	return 30
 }
 
 // mapNode is one advert node already projected into the map's pixel space. Probable means the
-// node advertised no position: it is drawn on a hop-distance band, not at a measured spot.
+// node advertised no position: it is drawn on a hop-distance band, not at a measured spot. Fresh
+// is the table's last-heard indicator class, so a dot reads like its table row (MON-AD-6).
 type mapNode struct {
 	X, Y     float64
 	Number   int
 	Probable bool
+	Fresh    string
 }
 
-// mapPlan is everything advertMapSVG draws, in pixels. The basemap is projected from
-// longitude/latitude with one scale per axis; the aspect ratio comes from the caller.
+// mapCity is one major city placed in the map's pixel space, with its vendored Natural Earth name
+// (never radio text: the list is generated data, D45).
+type mapCity struct {
+	Name string
+	X, Y float64
+}
+
+// mapPlan is everything advertMapSVG draws, in pixels. The basemap was projected once at generate
+// time into Web Mercator units (x = longitude, y = mercatorY(latitude)), so the frame is a plain
+// affine slice of it: shapes stay true and the fit decides only the aspect (D42, D43).
 type mapPlan struct {
-	Width, Height      float64
-	LonMin, LatMin     float64
-	PxPerLon, PxPerLat float64
-	Nodes              []mapNode
-	HomeX, HomeY       float64
-	HasHome            bool
-	Bands              []float64 // radii in pixels, smallest first
+	Width, Height       float64
+	LonMin, MercMin     float64 // the frame's left and bottom edge, in projected units
+	PxPerLon, PxPerMerc float64
+	// Meridians and Parallels are the grid lines' longitudes and latitudes in degrees; the
+	// parallels project through mercatorY because Mercator spreads latitudes unevenly.
+	Meridians, Parallels []float64
+	Cities               []mapCity
+	Nodes                []mapNode
+	HomeX, HomeY         float64
+	HasHome              bool
+	Bands                []float64 // radii in pixels, smallest first
+	ScaleEnd             float64   // the scale bar's right end in px (left = 14); 0 leaves it out
 }
 
-// advertMapSVG draws the advert plan: Natural Earth land and borders, hop-distance bands around
-// the node's own position, a mark for that position and one numbered dot per node. The numbering
-// matches the table, which is the text alternative. Like the other charts the markup is built from
-// numbers only, so no text from the radio can reach it (a test enforces that).
+// advertMapSVG draws the advert map: the vendored Natural Earth basemap through one <use>
+// reference, hop-distance bands around the node's own position, a mark for that position and one
+// fine dot per node inside the frame. Each dot announces its row number — the table is the text
+// alternative — and the hover and click cards are server-escaped HTML beside it. Like the other
+// charts the markup is built from numbers only, so no text from the radio can reach it (a test
+// enforces that).
 func advertMapSVG(p mapPlan) chartMarkup {
 	var b strings.Builder
-	fmt.Fprintf(&b, `<svg class="chart advert-map" viewBox="0 0 %.0f %.0f" role="img" aria-label="Advert plan: node positions, numbered like the table below">`, p.Width, p.Height)
-	fmt.Fprintf(&b, `<g transform="translate(0 %.2f) scale(%.8f %.8f) translate(%.8f %.8f)">`, p.Height, p.PxPerLon, -p.PxPerLat, -p.LonMin, -p.LatMin)
-	fmt.Fprintf(&b, `<path class="map-land" fill-rule="evenodd" vector-effect="non-scaling-stroke" d="%s"/>`, basemapLand)
-	fmt.Fprintf(&b, `<path class="map-border" fill="none" vector-effect="non-scaling-stroke" d="%s"/>`, basemapBorders)
+	fmt.Fprintf(&b, `<svg class="chart advert-map" viewBox="0 0 %.0f %.0f" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Advert map: node positions, each dot announcing its row number">`, p.Width, p.Height)
+	fmt.Fprintf(&b, `<g transform="translate(0 %.2f) scale(%.8f %.8f) translate(%.8f %.8f)">`, p.Height, p.PxPerLon, -p.PxPerMerc, -p.LonMin, -p.MercMin)
+	fmt.Fprintf(&b, `<use href="/static/basemap.svg?v=%s#basemap"></use>`, AssetVersion)
 	b.WriteString(`</g>`)
-	// A faint graticule gives the picture a scale; there are no labels, so it stays numbers-only.
-	latMax := p.LatMin + p.Height/p.PxPerLat
-	lonMax := p.LonMin + p.Width/p.PxPerLon
-	step := gridStep(math.Max(lonMax-p.LonMin, latMax-p.LatMin))
-	for lon := math.Ceil(p.LonMin/step) * step; lon <= lonMax; lon += step {
+	// A faint graticule gives the picture a scale; the steps are said in words below the map, and
+	// the parallel lines project through mercatorY, so they sit at their true Mercator height.
+	for _, lon := range p.Meridians {
 		x := (lon - p.LonMin) * p.PxPerLon
 		fmt.Fprintf(&b, `<line class="map-grid" x1="%.2f" y1="0" x2="%.2f" y2="%.2f"/>`, x, x, p.Height)
 	}
-	for lat := math.Ceil(p.LatMin/step) * step; lat <= latMax; lat += step {
-		y := (latMax - lat) * p.PxPerLat
+	for _, lat := range p.Parallels {
+		y := p.Height - (mercatorY(lat)-p.MercMin)*p.PxPerMerc
 		fmt.Fprintf(&b, `<line class="map-grid" x1="0" y1="%.2f" x2="%.2f" y2="%.2f"/>`, y, p.Width, y)
+	}
+	// The scale bar: one kilometre line with end ticks; its km figure is said in words below.
+	if p.ScaleEnd > 14 {
+		y := p.Height - 12
+		fmt.Fprintf(&b, `<line class="map-scale" x1="14" y1="%.2f" x2="%.2f" y2="%.2f"/>`, y, p.ScaleEnd, y)
+		fmt.Fprintf(&b, `<line class="map-scale" x1="14" y1="%.2f" x2="14" y2="%.2f"/>`, y-4, y)
+		fmt.Fprintf(&b, `<line class="map-scale" x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f"/>`, p.ScaleEnd, y-4, p.ScaleEnd, y)
+	}
+	// Major cities under the plan: small dots with their vendored names, filtered to the frame by
+	// the caller, so the operator orientates without any radio text reaching the SVG (D45).
+	for _, city := range p.Cities {
+		fmt.Fprintf(&b, `<circle class="map-city" cx="%.2f" cy="%.2f" r="1.8"/>`, city.X, city.Y)
+		fmt.Fprintf(&b, `<text class="map-city-name" x="%.2f" y="%.2f">%s</text>`, city.X+4, city.Y+3, city.Name)
 	}
 	for i, radius := range p.Bands {
 		fmt.Fprintf(&b, `<circle class="map-band" cx="%.2f" cy="%.2f" r="%.2f" data-band="%d"/>`, p.HomeX, p.HomeY, radius, i+1)
@@ -230,9 +256,12 @@ func advertMapSVG(p mapPlan) chartMarkup {
 		class := "map-node"
 		if node.Probable {
 			class += " probable"
+		} else if node.Fresh != "" {
+			class += " " + node.Fresh
 		}
-		fmt.Fprintf(&b, `<circle class="%s" cx="%.2f" cy="%.2f" r="4.5"><title>%d</title></circle>`, class, node.X, node.Y, node.Number)
-		fmt.Fprintf(&b, `<text class="map-number" x="%.2f" y="%.2f">%d</text>`, node.X+6.5, node.Y+3, node.Number)
+		// The SVG carries numbers only (MON-AD-12): the dot announces its row number for screen
+		// readers, and hover and click cards are server-escaped HTML beside the map (D46).
+		fmt.Fprintf(&b, `<circle class="%s" data-n="%d" tabindex="0" aria-label="Advert %d" cx="%.2f" cy="%.2f" r="3.2"></circle>`, class, node.Number, node.Number, node.X, node.Y)
 	}
 	b.WriteString(`</svg>`)
 	return chartMarkup(b.String())

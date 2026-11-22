@@ -64,7 +64,7 @@ The technology list is deliberately short: one Go binary from the standard libra
 | Pages | `html/template` | Server-rendered HTML; radio text is always escaped. The one `template.HTML` exception is the numbers-only SVG in `internal/web/chart.go`, watched by a test. |
 | Live updates | htmx 2.0.4 | One vendored file, `web/static/htmx.min.js`, served from the same origin. It refreshes small page parts; no framework, no build step. |
 | Page scripts | `web/static/*.js` | Hand-written helpers: `live.js` pauses the two-second refresh, `detail.js` keeps traffic row details open (D25), `editor.js` guards the script editor's unsaved text (MON-AU-14), `theme.js` carries the theme cookie. |
-| Charts | Server-drawn SVG | `internal/web/chart.go` writes `<svg>` from numbers only. No chart library, no drawing in the browser (A3 in §13). |
+| Charts | Server-drawn SVG | `internal/web/chart.go` writes `<svg>` from numbers and vendored static names (the basemap's Natural Earth city labels). No chart library, no drawing in the browser (A3 in §13). |
 | Styling | `web/static/kammon.css` | One stylesheet for dark and light; the colours are CSS custom properties (§5.1). |
 | Fonts and icons | Embedded files | Hanken Grotesk, Roboto Mono and Syncopate as woff2 in `web/static/fonts/`, icons as one SVG sprite. Nothing comes from Google or a CDN. |
 | Logging | `log/slog` | Plain lines; passwords never reach a log (MON-AX-16). |
