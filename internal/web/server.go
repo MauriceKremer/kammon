@@ -28,7 +28,7 @@ const (
 // AssetVersion is the cache-buster of the shared static assets (kammon.css, the static scripts
 // and the vendored MapLibre files the adverts map uses). Bump it when one of those files changes,
 // so browsers drop their cached copy instead of running or styling the pages with the old rules.
-const AssetVersion = "kammon-29"
+const AssetVersion = "kammon-30"
 
 type Deps struct {
 	Config     config.Config

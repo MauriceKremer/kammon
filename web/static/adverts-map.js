@@ -484,6 +484,7 @@
         });
       }
       clearSpider(map, state);
+      emit(state.box, "advertsmapclosecards");
       map.easeTo({
         center: feature.geometry.coordinates,
         zoom: Math.min(zoom + 0.05, map.getMaxZoom()),
