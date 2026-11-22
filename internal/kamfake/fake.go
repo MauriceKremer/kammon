@@ -329,7 +329,7 @@ func (f *Fake) status(w http.ResponseWriter, r *http.Request) {
 	var st kam.Status
 	st.APIVersion, st.Epoch, st.Now, st.StartedAt, st.NodeName = 1, f.epoch, f.now().UTC(), f.started.UTC(), "kam"
 	st.Modem.Link, st.Modem.DeviceName, st.Modem.FirmwareVersion = "up", "Emmen KISS", 1
-	st.Radio = kam.Radio{FrequencyHz: 868_000_000, BandwidthHz: 125_000, SpreadingFactor: 8, CodingRate: 5, TxPowerDBm: ptr(uint8(14)), Source: "modem_echo"}
+	st.Radio = kam.Radio{FrequencyHz: 868_080_000, BandwidthHz: 125_000, SpreadingFactor: 8, CodingRate: 5, TxPowerDBm: ptr(uint8(14)), Source: "modem_echo"}
 	st.DutyCycle.ConfiguredPercent, st.DutyCycle.UsedMS, st.DutyCycle.WindowS = 1.0, 21600, 3600
 	st.Rooms.Enabled, st.Rooms.Count = true, 1
 	st.Automation.Enabled, st.Automation.ScriptsEnabled = f.automationOn, enabled
@@ -405,8 +405,8 @@ func (f *Fake) roomPosts(w http.ResponseWriter, r *http.Request) {
 }
 
 // adverts is the stored inventory, newest heard first, with a mix of located and unlocated
-// nodes so the demo shows the map's frame, the hop bands, an advert without a GPS fix (0°N 0°E)
-// and one far outside the country frame (API-AD-1, D43).
+// nodes so the demo shows the map's frame, the count of nodes left off it, an advert without a
+// GPS fix (0°N 0°E) and one far outside the country frame (API-AD-1, D43, D48).
 func (f *Fake) adverts(w http.ResponseWriter, r *http.Request) {
 	now := f.now().UTC().Truncate(time.Second)
 	name := func(value string) *string { return &value }

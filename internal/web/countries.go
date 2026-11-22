@@ -49,9 +49,11 @@ func mercatorY(lat float64) float64 {
 // cityPlace is one major city of the vendored Natural Earth list: its name and scaled rank, 0 the
 // most major. Names are generated data, never radio text (D45).
 type cityPlace struct {
-	name     string
-	lon, lat float64
-	rank     int
+	name       string
+	lon, lat   float64
+	rank       int
+	population int
+	local      bool // from the curated addendum rather than Natural Earth
 }
 
 var (
@@ -59,33 +61,77 @@ var (
 	citiesParsed []cityPlace
 )
 
-// cities reads the generated city list, most major first, so a frame cap keeps the big ones.
+// cities reads the generated city list plus the small local addendum, most major first, so a
+// frame cap keeps the big ones.
 func cities() []cityPlace {
 	cityOnce.Do(func() {
-		for line := range strings.SplitSeq(cityPlaces, "\n") {
-			name, rest, ok := strings.Cut(line, "|")
-			if !ok {
-				continue
-			}
-			lon, rest, ok := strings.Cut(rest, "|")
-			if !ok {
-				continue
-			}
-			lat, rankText, ok := strings.Cut(rest, "|")
-			if !ok {
-				continue
-			}
-			x, errX := strconv.ParseFloat(lon, 64)
-			y, errY := strconv.ParseFloat(lat, 64)
-			rank, errRank := strconv.Atoi(rankText)
-			if !ok || errX != nil || errY != nil || errRank != nil || name == "" {
-				continue
-			}
-			citiesParsed = append(citiesParsed, cityPlace{name: name, lon: x, lat: y, rank: rank})
+		citiesParsed = parseCityPlaces(cityPlaces, citiesParsed, false)
+		for _, city := range parseCityPlaces(localPlaces, nil, true) {
+			citiesParsed = mergeCity(citiesParsed, city) // a future Natural Earth drop may already name it
 		}
-		slices.SortFunc(citiesParsed, func(a, b cityPlace) int { return a.rank - b.rank })
+		for _, city := range parseCityPlaces(dutchPlaces, nil, false) {
+			citiesParsed = mergeCity(citiesParsed, city) // Natural Earth may already name the larger ones
+		}
+		slices.SortFunc(citiesParsed, func(a, b cityPlace) int {
+			if a.rank != b.rank {
+				return a.rank - b.rank
+			}
+			if a.local != b.local { // the curated local tier leads its rank
+				if a.local {
+					return -1
+				}
+				return 1
+			}
+			if a.population != b.population { // the principal city wins a dense area's spacing
+				return b.population - a.population
+			}
+			return strings.Compare(a.name, b.name)
+		})
 	})
 	return citiesParsed
+}
+
+func mergeCity(list []cityPlace, city cityPlace) []cityPlace {
+	for i := range list {
+		if samePlace(list[i], city) {
+			if city.population > list[i].population {
+				list[i].population = city.population
+			}
+			return list
+		}
+	}
+	return append(list, city)
+}
+
+func samePlace(a, b cityPlace) bool {
+	return strings.EqualFold(a.name, b.name) && math.Abs(a.lon-b.lon) < 0.1 && math.Abs(a.lat-b.lat) < 0.1
+}
+
+func parseCityPlaces(data string, into []cityPlace, local bool) []cityPlace {
+	for line := range strings.SplitSeq(data, "\n") {
+		name, rest, ok := strings.Cut(line, "|")
+		if !ok {
+			continue
+		}
+		lon, rest, ok := strings.Cut(rest, "|")
+		if !ok {
+			continue
+		}
+		lat, rankRest, ok := strings.Cut(rest, "|")
+		if !ok {
+			continue
+		}
+		rankText, populationText, _ := strings.Cut(rankRest, "|")
+		x, errX := strconv.ParseFloat(lon, 64)
+		y, errY := strconv.ParseFloat(lat, 64)
+		rank, errRank := strconv.Atoi(rankText)
+		population, _ := strconv.Atoi(populationText)
+		if errX != nil || errY != nil || errRank != nil || name == "" {
+			continue
+		}
+		into = append(into, cityPlace{name: name, lon: x, lat: y, rank: rank, population: population, local: local})
+	}
+	return into
 }
 
 func countryData() countryIndex {

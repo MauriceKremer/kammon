@@ -35,5 +35,7 @@ Use these words in code, tests, docs and screens.
 | **Allow list** | `viewer_text_channels`: channels whose message text viewers may read. |
 | **Advert inventory** | KAM's stored adverts: the newest advert per public key, kept for `adverts.keep_days` (default 30). Not a log of every reception. |
 | **Advert plan** | The Adverts page's description of the inventory: table, map and copyable text. Descriptive, never advice. |
-| **Probable position** | A dot for a node that advertised no position, placed on a 15 km-per-hop band around the configured `location`. Not a measurement. |
-| **Hop band** | The ring between two hop distances on the advert map: hop 0 within 15 km, hop 1 within 30 km, and so on. |
+| **Advertised position** | A coordinate a node chose to include in its advert. Only these are plotted on the map; a node without one stays in the table and is counted, never placed by estimate (D48). |
+| **Cluster** | A numbered badge on the advert map for nearby dots. Activating it zooms into the group's bounds; at the deepest zoom overlapping dots spiderfy along a spiral (D49, D52, MON-AD-17). |
+| **Base node** | The node at `location` in kammon.yml, drawn as a green star with a radar pulse. The map opens and resets on it, and its layer chip can hide the marker (D50, D53, MON-AD-19). |
+| **Layer chip** | A toggle under the advert map that shows or hides a layer and carries its count; Advertised, Silent and Base Node (D53, MON-AD-20). |

@@ -175,21 +175,22 @@ func gridStep(span float64) float64 {
 	return 30
 }
 
-// mapNode is one advert node already projected into the map's pixel space. Probable means the
-// node advertised no position: it is drawn on a hop-distance band, not at a measured spot. Fresh
-// is the table's last-heard indicator class, so a dot reads like its table row (MON-AD-6).
+// mapNode is one advert node already projected into the map's pixel space. Only nodes with a
+// valid advertised position become map nodes. Fresh is the table's last-heard indicator class, so
+// a dot reads like its table row (MON-AD-6).
 type mapNode struct {
-	X, Y     float64
-	Number   int
-	Probable bool
-	Fresh    string
+	X, Y   float64
+	Number int
+	Fresh  string
 }
 
 // mapCity is one major city placed in the map's pixel space, with its vendored Natural Earth name
-// (never radio text: the list is generated data, D45).
+// and scalerank (0 the most major) (never radio text: the list is generated data, D45). The rank
+// lets the client hide the lower-priority names at the wide opening view.
 type mapCity struct {
 	Name string
 	X, Y float64
+	Rank int
 }
 
 // mapPlan is everything advertMapSVG draws, in pixels. The basemap was projected once at generate
@@ -210,16 +211,14 @@ type mapPlan struct {
 	Nodes                []mapNode
 	HomeX, HomeY         float64
 	HasHome              bool
-	Bands                []float64 // radii in pixels, smallest first
-	ScaleEnd             float64   // the scale bar's right end in px (left = 14); 0 leaves it out
+	ScaleEnd             float64 // the scale bar's right end in px (left = 14); 0 leaves it out
 }
 
 // advertMapSVG draws the advert map: the vendored Natural Earth basemap through one <use>
-// reference, hop-distance bands around the node's own position, a mark for that position and one
-// fine dot per node inside the frame. Each dot announces its row number — the table is the text
-// alternative — and the hover and click cards are server-escaped HTML beside it. Like the other
-// charts the markup is built from numbers only, so no text from the radio can reach it (a test
-// enforces that).
+// reference, a mark for the configured own position and one fine dot per node with a valid
+// advertised position. Each dot announces its row number — the table is the text alternative — and
+// the hover and click cards are server-escaped HTML beside it. Like the other charts the markup is
+// built from numbers only, so no text from the radio can reach it (a test enforces that).
 func advertMapSVG(p mapPlan) chartMarkup {
 	viewX, viewY, viewW, viewH := p.ViewX, p.ViewY, p.ViewW, p.ViewH
 	if viewW == 0 || viewH == 0 { // the whole frame is the view when no located node set it
@@ -252,21 +251,23 @@ func advertMapSVG(p mapPlan) chartMarkup {
 	// Major cities under the plan: small dots with their vendored names, filtered to the frame by
 	// the caller, so the operator orientates without any radio text reaching the SVG (D45).
 	for _, city := range p.Cities {
+		fmt.Fprintf(&b, `<g class="map-city-group" data-rank="%d">`, city.Rank)
 		fmt.Fprintf(&b, `<circle class="map-city" cx="%.2f" cy="%.2f" r="1.8"/>`, city.X, city.Y)
 		fmt.Fprintf(&b, `<text class="map-city-name" x="%.2f" y="%.2f">%s</text>`, city.X+4, city.Y+3, city.Name)
-	}
-	for i, radius := range p.Bands {
-		fmt.Fprintf(&b, `<circle class="map-band" cx="%.2f" cy="%.2f" r="%.2f" data-band="%d"/>`, p.HomeX, p.HomeY, radius, i+1)
+		b.WriteString(`</g>`)
 	}
 	if p.HasHome {
-		fmt.Fprintf(&b, `<line class="map-home" x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f"/>`, p.HomeX-5, p.HomeY, p.HomeX+5, p.HomeY)
-		fmt.Fprintf(&b, `<line class="map-home" x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f"/>`, p.HomeX, p.HomeY-5, p.HomeX, p.HomeY+5)
+		// The base node: a bold green star with a slow radar ring, kept a constant screen size by
+		// the camera script. The old cross was too easy to mistake for a grid intersection (D52).
+		fmt.Fprintf(&b, `<g class="map-home" data-x="%.2f" data-y="%.2f" transform="translate(%.2f %.2f)">`, p.HomeX, p.HomeY, p.HomeX, p.HomeY)
+		b.WriteString(`<title>Base node</title>`)
+		b.WriteString(`<circle class="map-home-ring" r="10"></circle>`)
+		b.WriteString(`<polygon class="map-home-star" points="0,-7.5 1.88,-2.59 7.13,-2.32 3.04,0.99 4.41,6.07 0,3.2 -4.41,6.07 -3.04,0.99 -7.13,-2.32 -1.88,-2.59"></polygon>`)
+		b.WriteString(`</g>`)
 	}
 	for _, node := range p.Nodes {
 		class := "map-node"
-		if node.Probable {
-			class += " probable"
-		} else if node.Fresh != "" {
+		if node.Fresh != "" {
 			class += " " + node.Fresh
 		}
 		// The SVG carries numbers only (MON-AD-12): the dot announces its row number for screen

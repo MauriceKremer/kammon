@@ -12,30 +12,34 @@
   {{if .TruncationNote}}<p class="small muted">{{.TruncationNote}}</p>{{end}}
 
   <section class="section">
-    <div class="section-head"><div><h3>Map</h3>{{if .HomeNote}}<p class="small muted">{{.HomeNote}}</p>{{end}}</div></div>
+    <div class="section-head"><div><h3>Map</h3></div></div>
     {{if .HasMap}}<div class="advert-map-box">{{.Map}}
-    <div class="map-cards">{{range .Rows}}<aside class="map-card" data-node="{{.Number}}" hidden>
-      <div><strong>{{.Name}}</strong></div>
-      <div class="small muted">{{.Roles}} · {{.Hops}}</div>
-      <div class="small"><i class="ind {{.Ind.Class}}" aria-hidden="true"></i>{{.LastHeard}}</div>
-      <div class="card-full small">
-        <div>{{if .Located}}<a href="{{.OSM}}" target="_blank" rel="noopener" title="Open this position on OpenStreetMap">{{.Position}}</a>{{else}}Not advertised{{end}}</div>
-        <div class="mono muted" title="{{.FullKey}}">{{.ShortKey}}</div>
+    <div class="map-cards">{{range .Rows}}<aside class="map-card map-glass" data-node="{{.Number}}" data-activity="{{.Ind.Class}}" hidden>
+      <div class="card-head"><strong>{{.Name}}</strong></div>
+      <div class="card-key mono" title="{{.FullKey}}">{{.ShortKey}}</div>
+      <dl class="card-facts">
+        <div><dt>Role</dt><dd>{{.Role}}</dd></div>
+        <div><dt>Hops from base</dt><dd>{{.Hops}}</dd></div>
+        <div><dt>Last heard</dt><dd class="heard {{.Ind.Class}}" title="{{.Ind.Title}}"><i class="ind {{.Ind.Class}}" aria-hidden="true"></i>{{.LastHeard}}</dd></div>
+        <div><dt>Frequency</dt><dd>{{$.Frequency}}</dd></div>
+      </dl>
+      <div class="card-full">
+        <div class="small">{{if .Located}}<a href="{{.OSM}}" target="_blank" rel="noopener" title="Open this position on OpenStreetMap">{{.Position}}</a>{{else}}Not advertised{{end}}</div>
         <div class="small muted">First heard {{.FirstHeard}} · clock {{.Drift}}</div>
+        <div class="card-actions">
+          <button type="button" class="card-action" data-copy-key="{{.FullKey}}">Copy Public Key</button>
+          <button type="button" class="card-action" data-draw-base="{{.Number}}" aria-pressed="false">Draw Line to Base</button>
+        </div>
       </div>
     </aside>{{end}}</div>
-    <div class="map-zoom"><button type="button" data-map-zoom="in" aria-label="Zoom in" title="Zoom in">+</button><button type="button" data-map-zoom="out" aria-label="Zoom out" title="Zoom out">−</button><button type="button" data-map-reset class="map-reset" aria-label="{{.ResetLabel}}" title="{{.ResetLabel}}">Reset</button></div></div>{{else}}<p class="muted">{{.MapNote}}</p>{{end}}
-    {{if .HasMap}}<ul class="map-legend small muted">
-      <li><i class="map-key node" aria-hidden="true"></i>Advertised position</li>
-      <li><i class="map-key probable" aria-hidden="true"></i>Probable: no position advertised, placed by hop count</li>
-      <li><i class="map-key city" aria-hidden="true"></i>Major city (Natural Earth)</li>
-      {{if .HomeNote}}<li><i class="map-key home" aria-hidden="true"></i>Your node (kammon.yml)</li>{{end}}
-      <li>Dot colour follows Last heard: green fresh, blue recent, grey older, dashed silent for a day.</li>
-      <li>Drag to pan, scroll or pinch to zoom; + and − step the zoom; Reset returns to the opening view.</li>
-      <li>Hover or click a dot for the advert's details.</li>
-    </ul>{{end}}
+    <div class="map-zoom"><button type="button" data-map-zoom="in" aria-label="Zoom in" title="Zoom in">+</button><button type="button" data-map-zoom="out" aria-label="Zoom out" title="Zoom out">−</button><button type="button" data-map-reset class="map-reset" aria-label="{{.ResetLabel}}" title="{{.ResetLabel}}">Reset</button></div>
+    <div class="map-chips" role="group" aria-label="Map layers">
+      <button type="button" class="map-chip" data-map-toggle="advertised" aria-pressed="true"><span class="map-chip-mark" aria-hidden="true"></span>Advertised ({{.MapActive}})</button>
+      <button type="button" class="map-chip" data-map-toggle="silent" aria-pressed="false"><span class="map-chip-mark" aria-hidden="true"></span>Silent ({{.MapSilent}})</button>
+      {{if .HomeNote}}<button type="button" class="map-chip" data-map-toggle="base" aria-pressed="true"><span class="map-chip-mark" aria-hidden="true"></span>Base Node</button>{{end}}
+    </div></div>{{else}}<p class="muted">{{.MapNote}}</p>{{end}}
+    {{if .HasMap}}<p class="map-hint small muted">Click a dot for details · drag to pan · scroll or pinch to zoom · city names follow the zoom.</p>{{end}}
     {{if .FrameNote}}<p class="small muted">{{.FrameNote}}</p>{{end}}
-    {{if .BandsNote}}<p class="small muted">{{.BandsNote}}</p>{{end}}
     {{if .HasMap}}<p class="small muted">{{.MapNote}}</p>{{end}}
     {{if .MapSkipNote}}<p class="small muted">{{.MapSkipNote}}</p>{{end}}
   </section>
