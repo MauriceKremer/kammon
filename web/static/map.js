@@ -15,6 +15,12 @@
   // The SVG scales with its box, so the dot's pixel spot is measured against the box each time.
   function place(dot, card) {
     var dotRect = dot.getBoundingClientRect();
+    // A clustered dot is hidden; its card has no place to sit until the cluster fans out.
+    if (!dotRect.width && !dotRect.height) {
+      card.classList.remove("pinned");
+      card.hidden = true;
+      return;
+    }
     var boxRect = dot.closest(".advert-map-box").getBoundingClientRect();
     var x = dotRect.left - boxRect.left + dotRect.width / 2;
     var y = dotRect.top - boxRect.top;
@@ -73,7 +79,7 @@
 
   document.addEventListener("mouseover", function (evt) {
     var node = dot(evt.target);
-    if (node && !node.classList.contains("probable")) open(node, false);
+    if (node) open(node, false);
   });
   document.addEventListener("mouseout", function (evt) {
     var node = dot(evt.target);

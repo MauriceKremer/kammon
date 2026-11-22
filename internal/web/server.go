@@ -28,7 +28,7 @@ const (
 // AssetVersion is the cache-buster of the shared static assets (kammon.css, the static scripts
 // and the country basemap the adverts map references). Bump it when one of those files changes, so
 // browsers drop their cached copy instead of running or styling the pages with the old rules.
-const AssetVersion = "kammon-24"
+const AssetVersion = "kammon-27"
 
 type Deps struct {
 	Config     config.Config

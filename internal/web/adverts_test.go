@@ -1,6 +1,7 @@
 package web
 
 import (
+	"math"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -15,7 +16,8 @@ import (
 	"kammon.bytecoder.nl/internal/kam"
 )
 
-// baseAdverts sits in the Emmen frame: one located node, two unlocated ones on hop bands.
+// baseAdverts sits in the Emmen frame: one located node and two unlocated ones that must stay
+// off the map.
 func baseAdverts() []kam.Advert {
 	return []kam.Advert{
 		{
@@ -56,21 +58,25 @@ func TestAdvertsPageShowsInventoryPlanAndCopyableText(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Canal relay", "Dalen relay", "PA3M",
-		`id="adverts-live"`, "advert-map", `class="map-node`, `class="map-node probable"`,
-		`class="map-band"`, `class="map-home"`,
+		`id="adverts-live"`, "advert-map", `class="map-node`, `class="map-home`,
 		"Copy plan", `id="advert-plan"`, "KAMmon advert plan",
 		"Nodes, newest heard first", "Hop count is the path length",
 		"https://www.openstreetmap.org/?mlat=52.77920",
-		"kammon.yml", "assuming at most 15 km per hop",
+		"kammon.yml", "2 nodes advertised no position, so they are not plotted",
+		"Nearby dots group into a numbered cluster", "Advertised (", "Silent (", "Base Node",
+		"Click a dot for details", "Copy Public Key", "Draw Line to Base", "Frequency", "Hops from base",
 		"Advertised a position", "Silent over 24 h",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("page misses %q", want)
 		}
 	}
-	// The unlocated node is placed on a hop band; the located one is a solid dot.
-	if strings.Count(body, `class="map-node probable"`) != 2 {
-		t.Errorf("probable dots = %d", strings.Count(body, `class="map-node probable"`))
+	// Only the located node is drawn: no guessed hop-band placement reaches the map.
+	if strings.Count(body, `class="map-node`) != 1 {
+		t.Errorf("map dots = %d, want only the located node", strings.Count(body, `class="map-node`))
+	}
+	if strings.Contains(body, "map-node probable") || strings.Contains(body, "map-band") {
+		t.Errorf("a non-GPS placement reached the map")
 	}
 }
 
@@ -92,20 +98,25 @@ func TestAdvertsMapFramesTheCountry(t *testing.T) {
 		`data-n="1"`, // the dot identifies itself by row number, not by a printed label
 		`aria-label="Advert 1"`,
 		`data-node="1"`, // and the hover/click card exists beside the map
-		"hover or click a dot",
-		"Dot colour follows Last heard",
-		"Major city (Natural Earth)",
+		"Click a dot for details",
+		`data-map-toggle="advertised"`,
+		`data-map-toggle="silent"`,
+		`data-map-toggle="base"`,
+		"Copy Public Key",
+		"Draw Line to Base",
+		"MHz",
 		"Groningen", // a NL city inside the frame, drawn from the vendored list
 		"Utrecht",
 		"Amsterdam",
 		`class="map-city-name"`,
+		`class="map-city-group" data-rank=`,
 		`viewBox=`,
 		`data-frame-width=`,
 		`data-map-zoom="in"`,
 		`data-map-zoom="out"`,
 		`data-map-reset`,
-		`aria-label="Reset to 100 km view"`,
-		"The view opens on a 100 km radius around the centre of the 1 node that advertised a position",
+		`aria-label="Reset to the 100 km view around your node"`,
+		"The view opens on a 100 km radius around your node, from location in kammon.yml",
 		"Drag to pan, scroll or pinch to zoom",
 	} {
 		if !strings.Contains(body, want) {
@@ -118,10 +129,11 @@ func TestAdvertsMapFramesTheCountry(t *testing.T) {
 	}
 }
 
-// TestAdvertsMapOpensOnTheLocatedNodesCentre checks the interactive map's opening view and the
-// stateless live region: the SVG opens on a 100 km square view, held inside its own frame, the
-// camera rides no URL, and the client script is on the layout (MON-AD-15, D47).
-func TestAdvertsMapOpensOnTheLocatedNodesCentre(t *testing.T) {
+// TestAdvertsMapOpensOnHomeCentre checks the interactive map's opening view and the stateless
+// live region: the SVG opens on a 100 km square view centred on the configured node (Emmen in the
+// demo), held inside its own frame; the camera rides no URL, and the client script is on the
+// layout (MON-AD-15, D50).
+func TestAdvertsMapOpensOnHomeCentre(t *testing.T) {
 	h := newHarness(t)
 	seedAdverts(t, h)
 	c := h.login(t, "viewer", "viewer")
@@ -136,6 +148,7 @@ func TestAdvertsMapOpensOnTheLocatedNodesCentre(t *testing.T) {
 		t.Fatalf("viewBox = %q, want four numbers", found[1])
 	}
 	vw, vh := parseFloat(t, nums[2]), parseFloat(t, nums[3])
+	vx, vy := parseFloat(t, nums[0]), parseFloat(t, nums[1])
 	frameW, frameH := float64(parseInt(t, found[2])), float64(parseInt(t, found[3]))
 	if vw != vh {
 		t.Errorf("the opening view is not a square: %g×%g", vw, vh)
@@ -143,10 +156,16 @@ func TestAdvertsMapOpensOnTheLocatedNodesCentre(t *testing.T) {
 	if vw >= frameW || vh >= frameH {
 		t.Errorf("the opening view %g×%g is not inside the frame %g×%g", vw, vh, frameW, frameH)
 	}
+	// The frame is centred on the configured node, so a home-centred opening view sits at the
+	// frame's own centre (Emmen, 52.77920 N 6.90690 E in the demo).
+	if math.Abs(vx+vw/2-frameW/2) > 0.5 || math.Abs(vy+vh/2-frameH/2) > 0.5 {
+		t.Errorf("the opening view centre (%.2f, %.2f) is not the configured node at the frame centre (%.2f, %.2f)",
+			vx+vw/2, vy+vh/2, frameW/2, frameH/2)
+	}
 	if strings.Contains(body, "mapzoom") || strings.Contains(body, `hx-get="/ui/adverts?`) {
 		t.Errorf("the map's zoom still rides the URL")
 	}
-	if !strings.Contains(body, `src="/static/adverts-map.js?v=kammon-24"`) {
+	if !strings.Contains(body, `src="/static/adverts-map.js?v=`+AssetVersion+`"`) {
 		t.Errorf("the client camera script is not on the page")
 	}
 }

@@ -39,6 +39,56 @@ func TestCountryAtFrameRing(t *testing.T) {
 	}
 }
 
+// TestCitiesIncludeLocalTier checks the local addendum (D54): Emmen and Coevorden are absent from
+// Natural Earth's 10m populated places, so the vendored local list supplies them at the 100 km tier,
+// and the combined list stays ordered most major first.
+func TestCitiesIncludeLocalTier(t *testing.T) {
+	byName := map[string]cityPlace{}
+	counts := map[string]int{}
+	for _, city := range cities() {
+		counts[city.name]++
+		byName[city.name] = city
+	}
+	for _, name := range []string{"Emmen", "Coevorden"} {
+		if counts[name] != 1 {
+			t.Errorf("%s appears %d times in cities(), want once", name, counts[name])
+		}
+		city, ok := byName[name]
+		if !ok {
+			t.Fatalf("%s is missing from cities()", name)
+		}
+		if city.rank > 7 {
+			t.Errorf("%s rank = %d, want it labelled at the 100 km view", name, city.rank)
+		}
+	}
+	// The national Dutch tier covers towns Natural Earth omits at this size.
+	for _, name := range []string{"Tilburg", "Amersfoort", "Delft", "Deventer", "Almere", "Apeldoorn", "Nijmegen", "Breda"} {
+		city, ok := byName[name]
+		if !ok {
+			t.Errorf("%s is missing from the national Dutch tier", name)
+			continue
+		}
+		if city.rank > 7 {
+			t.Errorf("%s rank = %d, want it labelled at the 100 km view", name, city.rank)
+		}
+	}
+	if _, ok := byName["Amsterdam-Zuidoost"]; ok {
+		t.Errorf("a PPLX city section leaked into the Dutch tier")
+	}
+	// Population from the Dutch tier is merged into a Natural Earth duplicate, so the principal
+	// city is placed before its satellites when labels are thinned.
+	if utrecht := byName["Utrecht"]; utrecht.population < 300000 {
+		t.Errorf("Utrecht population = %d, want the GeoNames figure merged in", utrecht.population)
+	}
+	all := cities()
+	for i := 1; i < len(all); i++ {
+		if all[i-1].rank > all[i].rank {
+			t.Fatalf("cities() is not ordered most major first: %s (%d) before %s (%d)",
+				all[i-1].name, all[i-1].rank, all[i].name, all[i].rank)
+		}
+	}
+}
+
 // TestCountryAtTiny checks the fallback for countries the 110m polygons leave out (MON-AD-6).
 func TestCountryAtTiny(t *testing.T) {
 	name, west, east, south, north, ok := countryAt(35.9375, 14.3754) // Malta

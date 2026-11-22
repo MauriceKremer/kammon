@@ -18,9 +18,7 @@ import (
 )
 
 const (
-	kmPerDegreeLat = 111.32 // for the hop bands; the earth is a sphere here, which is plenty
-	hopBandKm      = 15.0   // the assumed maximum range of one LoRa hop
-	maxHopBand     = 4      // hop 4 and beyond share the outer band
+	kmPerDegreeLat = 111.32 // the earth is a sphere here, which is plenty for framing and scale
 	// Coordinates within ±0.01° of 0°N 0°E are a missing GPS fix, not a place (MON-AD-6, D43):
 	// the table keeps the advertised row, the map drops the dot and never frames for it.
 	noFixDegrees = 0.01
@@ -51,19 +49,22 @@ type advertRow struct {
 	Position   string
 	OSM        string
 	Located    bool
+	Role       string
 	Ind        view.Indicator
 }
 
 type advertsData struct {
-	Rows                                                                            []advertRow
-	Metrics                                                                         []channelMetric
-	Map                                                                             chartMarkup
-	HasMap                                                                          bool
-	MapNote, FrameNote, HomeNote, BandsNote, TruncationNote, FreshNote, MapSkipNote string
-	ResetLabel                                                                      string
-	Plan                                                                            string
-	EmptyMessage                                                                    string
-	LiveURL                                                                         string
+	Rows                                                                 []advertRow
+	Metrics                                                              []channelMetric
+	Map                                                                  chartMarkup
+	HasMap                                                               bool
+	MapNote, FrameNote, HomeNote, TruncationNote, FreshNote, MapSkipNote string
+	ResetLabel                                                           string
+	Plan                                                                 string
+	EmptyMessage                                                         string
+	LiveURL                                                              string
+	Frequency                                                            string
+	MapActive, MapSilent                                                 int
 }
 
 func (s *Server) advertsPage(w http.ResponseWriter, r *http.Request) {
@@ -85,6 +86,7 @@ func (s *Server) adverts(r *http.Request) advertsData {
 	list, kamTruncated, dropped := s.store.Adverts()
 	now := s.now()
 	status, _ := s.store.Status()
+	data.Frequency = frequencyText(status.Radio.FrequencyHz)
 	nowKAM := status.Now
 	if nowKAM.IsZero() {
 		nowKAM = now.Add(s.store.ClockOffset())
@@ -104,16 +106,18 @@ func (s *Server) adverts(r *http.Request) advertsData {
 
 	var located, repeaters, roomServers, silent int
 	for i, advert := range list {
+		ind := view.Activity(nowKAM, &advert.LastReceivedAt)
 		row := advertRow{
 			Number:    i + 1,
 			Name:      advertName(advert),
 			Roles:     advertRoles(advert),
+			Role:      advertRoleSummary(advert),
 			FullKey:   advert.PublicKey,
 			ShortKey:  shortKey(advert.PublicKey),
 			HopCount:  advert.HopCount,
 			Hops:      hopsText(advert.HopCount),
 			Drift:     driftText(advert.TimeDriftSeconds),
-			Ind:       view.Activity(nowKAM, &advert.LastReceivedAt),
+			Ind:       ind,
 			LastHeard: ago(max(nowKAM.Sub(advert.LastReceivedAt), 0)),
 		}
 		if advert.FirstReceivedAt != nil {
@@ -143,15 +147,16 @@ func (s *Server) adverts(r *http.Request) advertsData {
 
 	data.Metrics = []channelMetric{
 		{Label: "Nodes stored", Value: thousands(len(list)), Caption: "One row per public key; KAM keeps the newest advert"},
-		{Label: "Advertised a position", Value: thousands(located), Caption: "The rest are shown by hop distance only"},
+		{Label: "Advertised a position", Value: thousands(located), Caption: "Only these nodes are plotted on the map"},
 		{Label: "Repeaters", Value: thousands(repeaters), Caption: pluralCount(roomServers, "room server")},
 		{Label: "Silent over 24 h", Value: thousands(silent), Caption: "Stale Node: no advert heard in a day"},
 	}
 
 	mapHTML, hasMap, notes := s.advertMap(list, nowKAM)
 	data.Map, data.HasMap = mapHTML, hasMap
-	data.MapNote, data.FrameNote, data.HomeNote, data.BandsNote, data.MapSkipNote =
-		notes.Map, notes.Frame, notes.Home, notes.Bands, notes.Skip
+	data.MapActive, data.MapSilent = notes.Active, notes.Silent
+	data.MapNote, data.FrameNote, data.HomeNote, data.MapSkipNote =
+		notes.Map, notes.Frame, notes.Home, notes.Skip
 	data.ResetLabel = notes.Reset
 
 	if kamTruncated {
@@ -191,6 +196,24 @@ func advertRoles(a kam.Advert) string {
 	}
 	if len(roles) == 0 {
 		return "—"
+	}
+	return strings.Join(roles, " · ")
+}
+
+// advertRoleSummary names the advertised role for the inspector card. A node that claims no role
+// is a plain client; several claimed roles are all named, highest duty first.
+func advertRoleSummary(a kam.Advert) string {
+	var roles []string
+	for _, role := range []struct {
+		on   bool
+		name string
+	}{{a.IsRepeater, "Repeater"}, {a.IsRoomServer, "Room Server"}, {a.IsChatNode, "Client"}, {a.IsSensor, "Sensor"}} {
+		if role.on {
+			roles = append(roles, role.name)
+		}
+	}
+	if len(roles) == 0 {
+		return "Client"
 	}
 	return strings.Join(roles, " · ")
 }
@@ -240,20 +263,29 @@ func osmURL(lat, lon float64) string {
 	return fmt.Sprintf("https://www.openstreetmap.org/?mlat=%.5f&mlon=%.5f#map=15/%.5f/%.5f", lat, lon, lat, lon)
 }
 
+// frequencyText is the base radio's frequency, as the inspector cards show it.
+func frequencyText(hz uint32) string {
+	if hz == 0 {
+		return "Unknown"
+	}
+	return fmt.Sprintf("%.3f MHz", float64(hz)/1e6)
+}
+
 // advertMapNotes is what the map says below itself, in words: what the dots are, how the frame and
 // the opening view are chosen, and what the map left out. Reset is the label the client's reset
 // button shows.
 type advertMapNotes struct {
-	Map, Frame, Home, Bands, Skip, Reset string
+	Map, Frame, Home, Skip, Reset string
+	Active, Silent                int // the dots actually drawn inside the frame, by activity
 }
 
 // advertMap frames the planned nodes: about 200 km around the configured location, never wider
 // than the country's own ring, with the node fit as the fallback when location is missing or
 // unmatched (D43, D44). The frame never widens for an advert, so a bad advertised coordinate
-// cannot stretch the view. Nodes that advertised no position draw on hop-distance bands around
-// location; nodes outside the frame are counted, not drawn. The map opens on a 100 km view around
-// the centre of the nodes that advertised a position, and the client script pans and zooms inside
-// the frame (MON-AD-15, D47).
+// cannot stretch the view. Only nodes with a valid advertised position are plotted; nodes without
+// one are counted, not drawn, so the map stays geographically honest. The map opens on a 100 km
+// view around the centre of the located nodes, and the client script pans and zooms inside the
+// frame (MON-AD-15, D47).
 func (s *Server) advertMap(list []kam.Advert, nowKAM time.Time) (chartMarkup, bool, advertMapNotes) {
 	type point struct{ lat, lon float64 }
 	home := (*point)(nil)
@@ -266,10 +298,8 @@ func (s *Server) advertMap(list []kam.Advert, nowKAM time.Time) (chartMarkup, bo
 		number   int
 		fresh    string
 	}
-	type probableNode struct{ number, hops int }
 	var located []locatedNode
-	var probables []probableNode
-	noFix := 0
+	noFix, unlocated := 0, 0
 	for i, advert := range list {
 		number := i + 1
 		if advert.HasLocation && advert.Latitude != nil && advert.Longitude != nil {
@@ -283,20 +313,13 @@ func (s *Server) advertMap(list []kam.Advert, nowKAM time.Time) (chartMarkup, bo
 			})
 			continue
 		}
-		probables = append(probables, probableNode{number: number, hops: advert.HopCount})
+		unlocated++ // no advertised position: kept in the table, never guessed onto the map
 	}
-	maxBand := 0
-	for _, probable := range probables {
-		maxBand = max(maxBand, min(probable.hops, maxHopBand))
-	}
-	if home != nil && len(probables) > 0 && maxBand == 0 {
-		maxBand = 1
-	}
-	if len(located) == 0 && (home == nil || len(probables) == 0) {
+	if len(located) == 0 && home == nil {
 		notes := advertMapNotes{
 			Map: "No node has advertised a position, so there is nothing to place on a map. The table and plan still list every node.",
 		}
-		notes.Skip = mapSkipNote(noFix, 0)
+		notes.Skip = mapSkipNote(noFix, 0, 0)
 		return "", false, notes
 	}
 
@@ -332,14 +355,6 @@ func (s *Server) advertMap(list []kam.Advert, nowKAM time.Time) (chartMarkup, bo
 		}
 		if home != nil {
 			add(home.lat, home.lon)
-			if maxBand > 0 {
-				cosLat := max(math.Cos(home.lat*math.Pi/180), 0.2)
-				d := float64(maxBand+1) * hopBandKm / (kmPerDegreeLat * cosLat)
-				dLat := d * cosLat
-				xMin, xMax = min(xMin, home.lon-d), max(xMax, home.lon+d)
-				yMin, yMax = min(yMin, mercatorY(home.lat)-d), max(yMax, mercatorY(home.lat)+d)
-				latMin, latMax = min(latMin, home.lat-dLat), max(latMax, home.lat+dLat)
-			}
 		}
 		spanX = max(xMax-xMin, 0.02) * pad
 		spanY = max(yMax-yMin, 0.02) * pad
@@ -374,22 +389,30 @@ func (s *Server) advertMap(list []kam.Advert, nowKAM time.Time) (chartMarkup, bo
 		Width: width, Height: height, LonMin: xMin, MercMin: yMin,
 		PxPerLon: width / spanX, PxPerMerc: height / spanY,
 	}
-	// The opening view (MON-AD-15, D47): a viewRadiusKm square around the centre of the located
-	// nodes, held inside the frame's rectangle; without located nodes advertMapSVG opens on the
-	// whole frame. Web Mercator scales longitude and its y alike at one latitude, so one radius
-	// number serves both axes; the centre is clamped so the view still shows the frame.
-	if len(located) > 0 {
+	// The opening view (MON-AD-15, D50): a viewRadiusKm square around the configured home
+	// (`location` in kammon.yml, Emmen in the demo). Without a home it falls back to the centre of
+	// the located nodes, and without either advertMapSVG opens on the whole frame. The view is held
+	// inside the frame's rectangle. Web Mercator scales longitude and its y alike at one latitude,
+	// so one radius number serves both axes; the centre is clamped so the view still shows the
+	// frame.
+	centreLat, centreLon, hasCentre := 0.0, 0.0, false
+	if home != nil {
+		centreLat, centreLon, hasCentre = home.lat, home.lon, true
+	} else if len(located) > 0 {
 		var latSum, lonSum float64
 		for _, node := range located {
 			latSum += node.lat
 			lonSum += node.lon
 		}
-		midLat, midLon := latSum/float64(len(located)), lonSum/float64(len(located))
-		cosMid := max(math.Cos(midLat*math.Pi/180), 0.2)
+		centreLat, centreLon = latSum/float64(len(located)), lonSum/float64(len(located))
+		hasCentre = true
+	}
+	if hasCentre {
+		cosMid := max(math.Cos(centreLat*math.Pi/180), 0.2)
 		radius := viewRadiusKm / (kmPerDegreeLat * cosMid)
 		viewW, viewH := 2*radius*plan.PxPerLon, 2*radius*plan.PxPerMerc
-		midX := (midLon - xMin) * plan.PxPerLon
-		midY := plan.Height - (mercatorY(midLat)-yMin)*plan.PxPerMerc
+		midX := (centreLon - xMin) * plan.PxPerLon
+		midY := plan.Height - (mercatorY(centreLat)-yMin)*plan.PxPerMerc
 		centreWithin := func(centre, side, bound float64) float64 {
 			if side >= bound {
 				return bound / 2
@@ -412,7 +435,7 @@ func (s *Server) advertMap(list []kam.Advert, nowKAM time.Time) (chartMarkup, bo
 	// minimum label distance so the names stay readable, capped so a dense country stays calm.
 	kept := 0
 	for _, city := range cities() {
-		if kept >= 24 {
+		if kept >= 40 { // room for the national Dutch tier without evicting rank-7 majors (D54)
 			break
 		}
 		x := (city.lon - xMin) * plan.PxPerLon
@@ -424,16 +447,18 @@ func (s *Server) advertMap(list []kam.Advert, nowKAM time.Time) (chartMarkup, bo
 			continue
 		}
 		closeOne := false
-		for _, placed := range plan.Cities {
-			if math.Hypot(placed.X-x, placed.Y-y) < 24 {
-				closeOne = true
-				break
+		if !city.local { // the curated local tier is allowed to sit closer
+			for _, placed := range plan.Cities {
+				if math.Hypot(placed.X-x, placed.Y-y) < 24 {
+					closeOne = true
+					break
+				}
 			}
 		}
 		if closeOne {
 			continue
 		}
-		plan.Cities = append(plan.Cities, mapCity{Name: city.name, X: x, Y: y})
+		plan.Cities = append(plan.Cities, mapCity{Name: city.name, X: x, Y: y, Rank: city.rank})
 		kept++
 	}
 
@@ -455,10 +480,10 @@ func (s *Server) advertMap(list []kam.Advert, nowKAM time.Time) (chartMarkup, bo
 	// deterministically, so every render spreads them the same way (D43).
 	seen := map[[2]int]int{}
 	outside := 0
-	place := func(x, y float64, number int, probable bool, fresh string) {
+	place := func(x, y float64, number int, fresh string) bool {
 		if x < -4 || y < -4 || x > plan.Width+4 || y > plan.Height+4 {
 			outside++
-			return
+			return false
 		}
 		key := [2]int{int(math.Round(x)), int(math.Round(y))}
 		if n := seen[key]; n > 0 {
@@ -468,45 +493,42 @@ func (s *Server) advertMap(list []kam.Advert, nowKAM time.Time) (chartMarkup, bo
 			y += step * math.Sin(angle)
 		}
 		seen[key]++
-		plan.Nodes = append(plan.Nodes, mapNode{X: x, Y: y, Number: number, Probable: probable, Fresh: fresh})
+		plan.Nodes = append(plan.Nodes, mapNode{X: x, Y: y, Number: number, Fresh: fresh})
+		return true
 	}
+	active, silentDots := 0, 0
 	for _, node := range located {
 		x := (node.lon - xMin) * plan.PxPerLon
 		y := height - (mercatorY(node.lat)-yMin)*plan.PxPerMerc
-		place(x, y, node.number, false, node.fresh)
+		if place(x, y, node.number, node.fresh) {
+			if node.fresh == "stale" {
+				silentDots++
+			} else {
+				active++
+			}
+		}
 	}
 	notes := advertMapNotes{
-		Map: "Solid dots are advertised positions. Hollow dots are nodes that advertised no position: they sit at a probable distance by hop count, not at a measured place.",
+		Map: "Solid dots are advertised positions. Nodes that advertised no position are not plotted, so every dot is a coordinate the node itself chose. Nearby dots group into a numbered cluster: click it to zoom in, and overlapping dots fan out at the closest zoom.",
 	}
 	if home != nil {
 		notes.Home = fmt.Sprintf("Your node: %.5f, %.5f (from kammon.yml).", home.lat, home.lon)
 		plan.HomeX = (home.lon - xMin) * plan.PxPerLon
 		plan.HomeY = height - (mercatorY(home.lat)-yMin)*plan.PxPerMerc
 		plan.HasHome = true
-		pxPerKmHome := plan.PxPerMerc / (kmPerDegreeLat * max(math.Cos(home.lat*math.Pi/180), 0.2))
-		for band := 1; band <= maxBand; band++ {
-			plan.Bands = append(plan.Bands, float64(band)*hopBandKm*pxPerKmHome)
-		}
-		for _, probable := range probables {
-			band := min(probable.hops, maxHopBand)
-			radius := (float64(band) + 0.5) * hopBandKm * pxPerKmHome
-			angle := float64(probable.number) * 2.399963229728653
-			place(plan.HomeX+radius*math.Cos(angle), plan.HomeY+radius*math.Sin(angle), probable.number, true, "")
-		}
-		notes.Bands = fmt.Sprintf("Hop bands are drawn at %d km intervals, assuming at most %.0f km per hop.", int(hopBandKm), hopBandKm)
-		if len(plan.Bands) > 0 {
-			notes.Bands += " A band past the frame is clipped, and the frame never widens for it."
-		}
 	}
 	if home == nil {
-		notes.Map = "Only nodes that advertised a position are plotted. Add `location` (latitude and longitude) to kammon.yml to place the other nodes by hop distance."
+		notes.Map = "Only nodes that advertised a position are plotted; nodes without one stay in the table. Nearby dots group into a numbered cluster: click it to zoom in, and overlapping dots fan out at the closest zoom."
 	}
 	notes.Frame = mapFrameNote(frame, countryName, home != nil, len(located), plan.Meridians, plan.Parallels, scaleKm, scaleLat)
 	notes.Reset = "Reset view"
-	if len(located) > 0 {
+	if home != nil {
+		notes.Reset = fmt.Sprintf("Reset to the %s km view around your node", thousands(int(viewRadiusKm)))
+	} else if len(located) > 0 {
 		notes.Reset = fmt.Sprintf("Reset to %s km view", thousands(int(viewRadiusKm)))
 	}
-	notes.Skip = mapSkipNote(noFix, outside)
+	notes.Skip = mapSkipNote(noFix, outside, unlocated)
+	notes.Active, notes.Silent = active, silentDots
 	return advertMapSVG(plan), true, notes
 }
 
@@ -521,9 +543,12 @@ func mapFrameNote(frame, countryName string, hasHome bool, located int, meridian
 	default:
 		words = "The frame fits the stored nodes; add location (latitude, longitude) to kammon.yml to frame your country and its 200 km default."
 	}
-	if located > 0 {
+	switch {
+	case hasHome:
+		words += fmt.Sprintf(" The view opens on a %s km radius around your node, from location in kammon.yml.", thousands(int(viewRadiusKm)))
+	case located > 0:
 		words += fmt.Sprintf(" The view opens on a %s km radius around the centre of the %s that advertised a position.", thousands(int(viewRadiusKm)), pluralCount(located, "node"))
-	} else {
+	default:
 		words += " The view opens on the whole frame."
 	}
 	words += " Drag to pan, scroll or pinch to zoom, and the buttons on the map step the zoom and reset the view."
@@ -553,13 +578,19 @@ func gridStepWord(meridians, parallels []float64) string {
 }
 
 // mapSkipNote counts what the map left out, so the drawing cannot quietly drop a node.
-func mapSkipNote(noFix, outside int) string {
+func mapSkipNote(noFix, outside, unlocated int) string {
 	var parts []string
 	switch {
 	case noFix == 1:
 		parts = append(parts, "1 advert sits within ±0.01° of 0°N 0°E: an advert without a GPS fix, so not plotted.")
 	case noFix > 1:
 		parts = append(parts, fmt.Sprintf("%s adverts sit within ±0.01° of 0°N 0°E: adverts without a GPS fix, so not plotted.", thousands(noFix)))
+	}
+	switch {
+	case unlocated == 1:
+		parts = append(parts, "1 node advertised no position, so it is not plotted.")
+	case unlocated > 1:
+		parts = append(parts, fmt.Sprintf("%s nodes advertised no position, so they are not plotted.", thousands(unlocated)))
 	}
 	switch {
 	case outside == 1:
