@@ -108,7 +108,6 @@ func Demo() Config {
 	cfg := defaults()
 	cfg.Listen = "127.0.0.1:8080"
 	cfg.ViewerTextChannels = []string{"#public"}
-	cfg.GuestAccess = true                 // the demo shows the login page's Guest button
 	latitude, longitude := 52.7792, 6.9069 // Emmen
 	cfg.Location = &Location{Latitude: &latitude, Longitude: &longitude}
 	cfg.Users = []User{

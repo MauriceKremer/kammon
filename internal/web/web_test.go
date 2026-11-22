@@ -166,11 +166,11 @@ func TestGuestButtonFollowsGuestAccess(t *testing.T) {
 		t.Fatalf("guest button is not next to sign in")
 	}
 
-	// Demo mode never reads kammon.yml, so its own config must show the button.
+	// Demo mode never reads kammon.yml, so its config has no guest access and no button.
 	demo := newHarness(t)
 	_, body, _ = get(t, demo.client(t), demo.ts.URL+"/login")
-	if !strings.Contains(body, `formaction="/login/guest"`) {
-		t.Fatalf("demo mode must show the guest button")
+	if strings.Contains(body, `formaction="/login/guest"`) {
+		t.Fatalf("demo mode must not show the guest button")
 	}
 }
 
@@ -206,6 +206,27 @@ func TestGuestLoginIsAViewerSession(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("guest login with guest_access off: %d", resp.StatusCode)
+	}
+}
+
+// MON-AX-5 / MON-AX-24: blank credentials never start a session, even hand-made.
+func TestBlankCredentialsCannotLogin(t *testing.T) {
+	h := newHarness(t)
+	for _, creds := range [][2]string{{"", ""}, {"admin", ""}, {"", "admin"}} {
+		c := h.client(t)
+		resp, err := c.PostForm(h.ts.URL+"/login", url.Values{"name": {creds[0]}, "password": {creds[1]}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized || !strings.Contains(string(body), "Wrong name or password.") {
+			t.Fatalf("blank %q/%q: status %d", creds[0], creds[1], resp.StatusCode)
+		}
+		status, _, header := get(t, c, h.ts.URL+"/")
+		if status != http.StatusSeeOther || header.Get("Location") != "/login" {
+			t.Fatalf("blank %q/%q started a session", creds[0], creds[1])
+		}
 	}
 }
 
