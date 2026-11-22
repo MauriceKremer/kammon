@@ -258,6 +258,50 @@ func TestViewerSeesOverviewButNotAdminPages(t *testing.T) {
 	}
 }
 
+// A viewer may never perform an admin state change: every web-users and script mutation route answers
+// 403 before its handler runs. The requests carry the Origin and HX-Request headers the guard expects
+// (MON-AX-18), so the only thing standing between them and the action is the role check.
+func TestViewerCannotPerformAdminActions(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "viewer", "viewer")
+
+	form := url.Values{"id": {"echo"}, "revision": {"4"}, "source": {"def x(): pass"}, "timeout": {"500"}}
+	cases := []struct {
+		method, path string
+		body         string
+	}{
+		{http.MethodPost, "/ui/web-users/save", url.Values{"name": {"pwned"}, "role": {"admin"}, "password": {"x"}}.Encode()},
+		{http.MethodDelete, "/ui/web-users", ""},
+		{http.MethodPost, "/ui/script-validate", form.Encode()},
+		{http.MethodPost, "/ui/script-dry-run", form.Encode()},
+		{http.MethodPost, "/ui/script-save", form.Encode()},
+		{http.MethodPost, "/ui/script-toggle", form.Encode()},
+		{http.MethodPost, "/ui/script-recover", form.Encode()},
+		{http.MethodDelete, "/ui/script", ""},
+	}
+	for _, tc := range cases {
+		var body io.Reader
+		if tc.body != "" {
+			body = strings.NewReader(tc.body)
+		}
+		req, err := http.NewRequest(tc.method, h.ts.URL+tc.path, body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Origin", h.ts.URL)
+		req.Header.Set("HX-Request", "true")
+		resp, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusForbidden {
+			t.Errorf("viewer %s %s: %d, want 403", tc.method, tc.path, resp.StatusCode)
+		}
+	}
+}
+
 // The admin-only menu items (rooms, web users, automations, KISS modem) each show a light grey open lock
 // at the right of their label (MON-AX-12); a viewer is offered none of them, so sees no lock at all.
 func TestAdminOnlyNavItemsShowALock(t *testing.T) {
