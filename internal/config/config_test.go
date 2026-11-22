@@ -83,6 +83,29 @@ func TestLoadRejectsBadConfig(t *testing.T) {
 	}
 }
 
+// MON-AX-24: guest access is opt-in; a missing setting means off.
+func TestGuestAccessIsOptIn(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		yaml string
+		want bool
+	}{
+		{"missing", "", false},
+		{"on", "guest_access: true\n", true},
+		{"off", "guest_access: false\n", false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			cfg, err := Load(write(t, c.yaml+"users:\n  - {name: a, password: p, role: viewer}\n"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.GuestAccess != c.want {
+				t.Fatalf("guest_access = %v, want %v", cfg.GuestAccess, c.want)
+			}
+		})
+	}
+}
+
 func TestLocationIsOptionalAndValidated(t *testing.T) {
 	cfg, err := Load(write(t, "location: {latitude: 52.7792, longitude: 6.9069}\nusers:\n  - {name: a, password: p, role: viewer}\n"))
 	if err != nil {

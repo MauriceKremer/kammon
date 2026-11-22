@@ -80,6 +80,7 @@ type Config struct {
 	Poll               Poll      `yaml:"poll"`
 	Freshness          Freshness `yaml:"freshness"`
 	SessionIdleHours   int       `yaml:"session_idle_hours"`
+	GuestAccess        bool      `yaml:"guest_access"` // anonymous viewer login; missing means false (MON-AX-24)
 	ViewerTextChannels []string  `yaml:"viewer_text_channels"`
 	Users              []User    `yaml:"users"`
 	Location           *Location `yaml:"location"`
