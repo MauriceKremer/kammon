@@ -113,9 +113,6 @@ func New(d Deps) (*Server, error) {
 func (s *Server) routes() []route {
 	routes := []route{
 		{"GET /static/", public, cachedFS(s.static)},
-		// The adverts map's one vendored asset (D42): the version ETag turns every later page view
-		// and poll swap into a 304 instead of resending the whole file.
-		{"GET /static/basemap.svg", public, basemapAsset},
 		{"GET /login", public, s.loginPage},
 		{"POST /login", public, s.loginSubmit},
 		{"POST /logout", viewer, s.logout},
@@ -186,21 +183,6 @@ func cachedFS(h http.Handler) http.HandlerFunc {
 		w.Header().Set("Cache-Control", "no-cache")
 		h.ServeHTTP(w, r)
 	}
-}
-
-// basemapAsset serves the vendored country basemap that the adverts map references with one <use>
-// (D42). The asset version is the ETag, so a later page view or poll swap revalidates to a 304
-// instead of resending the whole projected map; retiring it bumps AssetVersion.
-func basemapAsset(w http.ResponseWriter, r *http.Request) {
-	etag := `"` + AssetVersion + `"`
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("ETag", etag)
-	if r.Header.Get("If-None-Match") == etag {
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
-	w.Header().Set("Content-Type", "image/svg+xml")
-	fmt.Fprint(w, basemapSVG)
 }
 
 func securityHeaders(next http.Handler) http.Handler {

@@ -376,42 +376,6 @@ body.login-page { display: block; }
 .card-action:hover:not(:disabled) { background: var(--bg-3); color: var(--text-primary); }
 .card-action[aria-pressed="true"] { border-color: color-mix(in srgb, var(--success) 60%, transparent); color: var(--success); }
 .card-action:disabled { opacity: .7; cursor: default; }
-/* The basemap is one external <use> (D42): its own stylesheet cannot reach inside, so the colours
-   flow through these custom properties into the vendored svg, with fallbacks there. */
-.advert-map { --map-land: var(--bg-3); --map-land-line: var(--border-subtle); --map-border: var(--border-default); --map-lake: var(--bg-1); }
-.advert-map .map-city { fill: var(--text-muted); opacity: .55; }
-.advert-map .map-city-name {
-  fill: var(--text-muted);
-  font-family: var(--font-code);
-  font-size: 7px;      /* fallback only; the camera sets a constant screen size */
-  font-weight: 400;
-  letter-spacing: .01em;
-  paint-order: stroke fill;
-  stroke: var(--bg-1);
-  stroke-width: 1.8px; /* fallback only; the camera sets a constant screen halo */
-  stroke-opacity: .92;
-  stroke-linejoin: round;
-}
-.advert-map .map-city-group.city-hidden .map-city-name { display: none; }
-.advert-map .map-hidden, .advert-map .map-node.filtered { display: none; }
-.advert-map .map-home-ring { fill: none; stroke: var(--text-primary); stroke-width: 1.2; vector-effect: non-scaling-stroke; opacity: .35; }
-.advert-map .map-home-star { fill: var(--text-primary); stroke: var(--bg-0); stroke-width: 1; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
-.advert-map .map-node { fill: var(--text-muted); stroke: var(--bg-0); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.advert-map .map-node:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
-.advert-map .map-node.clustered { display: none; }
-.advert-map .map-node.fresh { fill: var(--success); }
-.advert-map .map-node.recent { fill: var(--warning); }
-.advert-map .map-node.older, .advert-map .map-node.unknown { fill: var(--text-muted); }
-.advert-map .map-node.stale { fill: var(--text-muted); stroke-dasharray: 2 1.5; }
-.advert-map .map-scale { stroke: var(--text-muted); stroke-width: 1.5; }
-.advert-map .map-cluster { cursor: pointer; }
-.advert-map .map-cluster-hit { fill: transparent; pointer-events: all; }
-.advert-map .map-cluster-disc { fill: var(--signal); stroke: var(--bg-0); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.advert-map .map-cluster:focus-visible .map-cluster-disc { stroke: var(--text-primary); stroke-width: 3; }
-.advert-map .map-cluster-count { fill: var(--bg-0); font-family: var(--font-code); font-weight: 700; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
-.advert-map .map-spider { stroke: var(--text-muted); stroke-width: 1; opacity: 0; transition: opacity .3s ease; pointer-events: none; vector-effect: non-scaling-stroke; }
-.advert-map .map-spider.visible { opacity: .7; }
-.advert-map .map-base-line { stroke: var(--success); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: .8; pointer-events: none; vector-effect: non-scaling-stroke; }
 .map-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 4px 2px; }
 .map-chip { display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px; border: 1px solid var(--border-default); border-radius: 6px; background: var(--bg-2); color: var(--text-muted); font: 12px/1 var(--font-body); cursor: pointer; }
 .map-chip:hover { color: var(--text-secondary); background: var(--bg-3); }
@@ -430,4 +394,3 @@ body.login-page { display: block; }
 @media (max-width: 767px) {
   .advert-metrics { grid-template-columns: 1fr 1fr; }
 }
-.advert-map .map-grid { stroke: var(--border-subtle); stroke-width: 1; }
