@@ -151,20 +151,25 @@ func TestWrongPasswordGivesOneGenericMessage(t *testing.T) {
 func TestGuestButtonFollowsGuestAccess(t *testing.T) {
 	off := newGuestHarness(t, false)
 	_, body, _ := get(t, off.client(t), off.ts.URL+"/login")
-	if strings.Contains(body, `action="/login/guest"`) || strings.Contains(body, ">Guest</button>") {
+	if strings.Contains(body, `formaction="/login/guest"`) || strings.Contains(body, ">Guest</button>") {
 		t.Fatalf("guest button shown with guest_access off")
 	}
 
 	on := newGuestHarness(t, true)
 	_, body, _ = get(t, on.client(t), on.ts.URL+"/login")
-	if !strings.Contains(body, `action="/login/guest"`) || !strings.Contains(body, ">Guest</button>") {
+	if !strings.Contains(body, `<div class="login-actions">`) || !strings.Contains(body, `formaction="/login/guest"`) || !strings.Contains(body, ">Guest</button>") {
 		t.Fatalf("guest button missing with guest_access on")
+	}
+	// It rides the sign-in form as a second submit button, so the two sit side by side.
+	signAt, guestAt := strings.Index(body, ">Sign in</button>"), strings.Index(body, `formaction="/login/guest"`)
+	if signAt < 0 || guestAt < signAt || strings.Contains(body[signAt:guestAt], "</form>") {
+		t.Fatalf("guest button is not next to sign in")
 	}
 
 	// Demo mode never reads kammon.yml, so its own config must show the button.
 	demo := newHarness(t)
 	_, body, _ = get(t, demo.client(t), demo.ts.URL+"/login")
-	if !strings.Contains(body, `action="/login/guest"`) {
+	if !strings.Contains(body, `formaction="/login/guest"`) {
 		t.Fatalf("demo mode must show the guest button")
 	}
 }
