@@ -19,7 +19,6 @@
   var CLUSTER_MAX_ZOOM = 14;
   var DOT_PX = 5;
   var GOLDEN_ANGLE = 2.399963229728653;
-  var EARTH_CIRCUMFERENCE = 40075017; // metres at the equator, for the 100 km fit
 
   var SRC_ACTIVE = "adverts-active";
   var SRC_SILENT = "adverts-silent";
@@ -43,8 +42,6 @@
   var lastView = null;   // the last camera, so the live refresh keeps the view
   var lastFilters = null;
   var persistTimer = 0;
-
-  function clamp(value, low, high) { return Math.min(Math.max(value, low), high); }
 
   function reducedMotion() {
     return window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -242,6 +239,8 @@
         "circle-opacity": 0.92,
       },
     });
+    // A blank fallback style has no glyphs: the clusters still draw, just without their count.
+    if (!map.getStyle().glyphs) return;
     map.addLayer({
       id: countId,
       type: "symbol",
@@ -367,21 +366,18 @@
   }
 
   // The opening view covers 200 km across the shorter side of the map, i.e. a 100 km radius.
-  function openingZoom(state) {
-    var el = state.el;
-    var shortSide = Math.max(1, Math.min(el.clientWidth || 600, el.clientHeight || 420));
-    var metres = 2 * state.radiusKm * 1000;
-    var metresPerPixel = metres / shortSide;
-    var zoom = Math.log2(EARTH_CIRCUMFERENCE * Math.cos(state.openingCenter[1] * Math.PI / 180) / metresPerPixel);
-    return clamp(zoom, 0, MAX_ZOOM);
+  // fitBounds lets MapLibre do the projection maths, so the radius stays honest at any latitude.
+  function fitOpening(map, state, animate) {
+    if (!state.hasCenter) return;
+    map.fitBounds(radiusBounds(state.openingCenter[1], state.openingCenter[0], state.radiusKm), {
+      padding: 0,
+      maxZoom: MAX_ZOOM,
+      duration: animate && !reducedMotion() ? 400 : 0,
+    });
   }
 
   function resetView(map, state) {
-    map.easeTo({
-      center: state.openingCenter,
-      zoom: openingZoom(state),
-      duration: reducedMotion() ? 0 : 400,
-    });
+    fitOpening(map, state, true);
   }
 
   function updateZoomButtons(map, box) {
@@ -469,7 +465,7 @@
     map.setFilter(LYR_DOTS, dotFilter(numbers));
     map.setFilter(LYR_DOTS_SILENT, dotFilter(numbers));
     state.pinned = null;
-    emit(state.box, "advertsmapunpin");
+    emit(state.box, "advertsmapclosecards");
   }
 
   function clusterSource(layerId) {
@@ -742,7 +738,7 @@
         container: el,
         style: style || blankStyle(),
         center: state.restore ? state.restore.center : state.center,
-        zoom: state.restore ? state.restore.zoom : (state.hasCenter ? openingZoom(state) : 0),
+        zoom: state.restore ? state.restore.zoom : 0,
         minZoom: 0,
         maxZoom: MAX_ZOOM,
         attributionControl: false,
@@ -756,6 +752,10 @@
 
       map.on("load", function () {
         addSources(map, state, state.split);
+        // The camera is fitted once the canvas has its real size; fitting against a 0×0 transform
+        // would ask MapLibre for an impossible zoom.
+        if (state.restore) map.jumpTo({ center: state.restore.center, zoom: state.restore.zoom });
+        else fitOpening(map, state, false);
         updateZoomButtons(map, state.box);
       });
 

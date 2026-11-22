@@ -88,6 +88,12 @@
     if (box) unpin(box);
   });
 
+  // Spiderfying hides the stacked dots; its cards must close without clearing the spider itself.
+  document.addEventListener("advertsmapclosecards", function (evt) {
+    var box = boxOf(evt.target);
+    if (box) unpin(box);
+  });
+
   // Clicking the page away from a card closes it; a map click is decided by adverts-map.js, which
   // knows whether it hit a dot or empty ground.
   document.addEventListener("click", function (evt) {
