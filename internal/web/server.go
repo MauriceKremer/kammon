@@ -316,7 +316,7 @@ func (s *Server) loginPage(w http.ResponseWriter, r *http.Request) {
 func (s *Server) renderLogin(w http.ResponseWriter, r *http.Request, status int, message string) {
 	data := loginData{Theme: themeOf(r), Error: message, GuestAccess: s.cfg.GuestAccess, StaticVersion: AssetVersion}
 	if s.demo {
-		data.Hint = "Demo mode: admin / admin or viewer / viewer."
+		data.Hint = "Demo mode: admin / admin or viewer / viewer, or continue as Guest."
 	}
 	s.execute(w, status, s.pages["login"], "login", data)
 }

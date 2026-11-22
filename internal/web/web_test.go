@@ -160,6 +160,13 @@ func TestGuestButtonFollowsGuestAccess(t *testing.T) {
 	if !strings.Contains(body, `action="/login/guest"`) || !strings.Contains(body, ">Guest</button>") {
 		t.Fatalf("guest button missing with guest_access on")
 	}
+
+	// Demo mode never reads kammon.yml, so its own config must show the button.
+	demo := newHarness(t)
+	_, body, _ = get(t, demo.client(t), demo.ts.URL+"/login")
+	if !strings.Contains(body, `action="/login/guest"`) {
+		t.Fatalf("demo mode must show the guest button")
+	}
 }
 
 // MON-AX-24: a guest is a viewer session, and the route refuses when the setting is off.
