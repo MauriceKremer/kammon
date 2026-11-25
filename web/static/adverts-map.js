@@ -149,6 +149,19 @@
     return index;
   }
 
+  // routeByNumber maps a dot to the probable hop path the server resolved (D59): the sender, each
+  // located hop station in the advert's order, and the base. Radio text never rides this list.
+  function routeByNumber(features) {
+    var index = {};
+    (features || []).forEach(function (feature) {
+      var n = Number(feature && feature.properties && feature.properties.number);
+      var route = feature && feature.properties && feature.properties.route;
+      if (!n || !Array.isArray(route) || route.length < 2) return;
+      index[n] = route;
+    });
+    return index;
+  }
+
   function addSources(map, state, data) {
     var sources = [
       [SRC_ACTIVE, data.active, true],
@@ -590,12 +603,16 @@
   function toggleLine(map, state, number) {
     var active = String(state.line) === String(number);
     clearLine(map, state);
-    if (active || !state.hasHome) return;
-    var target = state.coords[number];
-    if (!target) return;
+    if (active) return;
+    var route = state.routes[number];
+    if (!route) return;
     map.getSource(SRC_LINE).setData({
       type: "FeatureCollection",
-      features: [legFeature(state.home, target)],
+      features: [{
+        type: "Feature",
+        geometry: { type: "LineString", coordinates: route },
+        properties: {},
+      }],
     });
     state.line = String(number);
     state.box.querySelectorAll('[data-draw-base]').forEach(function (button) {
@@ -704,6 +721,7 @@
       geo: data,
       split: split,
       coords: byNumber(split.active.features.concat(split.silent.features)),
+      routes: routeByNumber(split.active.features.concat(split.silent.features)),
       hasCenter: hasCenter,
       hasHome: hasHome,
       center: hasCenter ? [lon, lat] : [0, 20],
