@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1560 1080" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>KAMmon architecture</title>
+  <desc>Layered architecture of KAMmon: browser, web layer, in-memory store, poller, and the external KAM API.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1d4ed8"/>
+    </marker>
+    <marker id="arrowDash" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1560" height="1080" fill="#f8fafc"/>
+
+  <text x="40" y="46" font-size="26" font-weight="700" fill="#0f172a">KAMmon architecture</text>
+  <text x="40" y="70" font-size="14" fill="#475569">One Go binary monitoring one KAM node — pages read an in-memory store; the poller is the only reader of KAM</text>
+
+  <!-- process boundary -->
+  <rect x="330" y="100" width="880" height="790" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="10 6"/>
+  <text x="352" y="126" font-size="12.5" font-weight="700" letter-spacing="1.5" fill="#64748b">KAMMON PROCESS — ONE GO BINARY (cmd/kammon)</text>
+
+  <!-- left column -->
+  <rect x="20" y="110" width="240" height="84" rx="10" fill="#ecfeff" stroke="#0891b2" stroke-width="2"/>
+  <text x="140" y="140" text-anchor="middle" font-size="15" font-weight="700" fill="#164e63">kammon.yml</text>
+  <text x="140" y="161" text-anchor="middle" font-size="11" fill="#155e75">listen, users, poll, freshness, TLS,</text>
+  <text x="140" y="176" text-anchor="middle" font-size="11" fill="#155e75">text allowlist</text>
+  <text x="140" y="193" text-anchor="middle" font-size="11" fill="#155e75">loaded at startup; users saved back</text>
+
+  <rect x="20" y="210" width="240" height="130" rx="10" fill="#e0e7ff" stroke="#4f46e5" stroke-width="2"/>
+  <text x="140" y="245" text-anchor="middle" font-size="17" font-weight="700" fill="#1e1b4b">Browser</text>
+  <text x="140" y="272" text-anchor="middle" font-size="12" fill="#3730a3">operator, viewer / admin</text>
+  <text x="140" y="292" text-anchor="middle" font-size="12" fill="#3730a3">pages + htmx partials</text>
+  <text x="140" y="312" text-anchor="middle" font-size="12" fill="#3730a3">login / logout</text>
+
+  <rect x="20" y="380" width="240" height="200" rx="10" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text x="38" y="410" font-size="13" font-weight="700" fill="#0f172a">Legend</text>
+  <line x1="38" y1="436" x2="78" y2="436" stroke="#334155" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="88" y="440" font-size="11.5" fill="#334155">data / control flow</text>
+  <line x1="38" y1="462" x2="78" y2="462" stroke="#1d4ed8" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <text x="88" y="466" font-size="11.5" fill="#1d4ed8">admin call (request → KAM)</text>
+  <line x1="38" y1="488" x2="78" y2="488" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowDash)"/>
+  <text x="88" y="492" font-size="11.5" fill="#64748b">startup wiring / optional</text>
+  <line x1="38" y1="514" x2="78" y2="514" stroke="#334155" stroke-width="2.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="88" y="518" font-size="11.5" fill="#334155">request / response</text>
+  <rect x="38" y="530" width="14" height="14" rx="3" fill="#e0e7ff" stroke="#4f46e5" stroke-width="1.5"/>
+  <text x="88" y="542" font-size="11.5" fill="#334155">external actor</text>
+  <rect x="38" y="552" width="14" height="14" rx="3" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="88" y="564" font-size="11.5" fill="#334155">KAMmon process boundary</text>
+
+  <!-- right column -->
+  <rect x="1250" y="110" width="290" height="150" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="2"/>
+  <text x="1395" y="146" text-anchor="middle" font-size="17" font-weight="700" fill="#78350f">KAM</text>
+  <text x="1395" y="172" text-anchor="middle" font-size="12" fill="#92400e">local REST API — monitor listener</text>
+  <text x="1395" y="192" text-anchor="middle" font-size="12" fill="#92400e">/v1/events · /v1/status · /v1/rooms</text>
+  <text x="1395" y="210" text-anchor="middle" font-size="12" fill="#92400e">/v1/channels · /v1/scripts</text>
+  <text x="1395" y="228" text-anchor="middle" font-size="12" fill="#92400e">/v1/scripts/{id} · admin routes</text>
+  <text x="1395" y="250" text-anchor="middle" font-size="11" font-style="italic" fill="#b45309">KAM talks to the KISS modem and radio (its own concern)</text>
+
+  <rect x="1250" y="290" width="290" height="76" rx="10" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="1395" y="318" text-anchor="middle" font-size="13.5" font-weight="600" fill="#14532d">kamfake (demo mode)</text>
+  <text x="1395" y="338" text-anchor="middle" font-size="11.5" fill="#166534">fake KAM with generated data</text>
+  <text x="1395" y="355" text-anchor="middle" font-size="11.5" fill="#166534">internal/kamfake</text>
+  <line x1="1395" y1="290" x2="1395" y2="262" stroke="#16a34a" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowDash)"/>
+  <text x="1403" y="280" font-size="10.5" fill="#16a34a">replaces KAM</text>
+
+  <!-- main box -->
+  <rect x="360" y="140" width="820" height="70" rx="10" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+  <text x="770" y="170" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">cmd/kammon — main.go</text>
+  <text x="770" y="193" text-anchor="middle" font-size="12" fill="#334155">flags, wiring, signals · one kam.HTTP client shared by poller and admin actions</text>
+  <text x="770" y="208" text-anchor="middle" font-size="12" fill="#334155">constructs store → poller → web server</text>
+
+  <!-- web layer -->
+  <rect x="360" y="228" width="820" height="300" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2.5"/>
+  <text x="380" y="258" font-size="15" font-weight="700" fill="#1e3a8a">Web layer — internal/web</text>
+  <text x="380" y="278" font-size="12" fill="#1e40af">routes, handlers, templates, static assets (embedded), htmx partials</text>
+
+  <rect x="380" y="294" width="380" height="74" rx="8" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="570" y="318" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1e3a8a">HTTP server &amp; guard</text>
+  <text x="570" y="338" text-anchor="middle" font-size="11.5" fill="#1e40af">every route has a role (public/viewer/admin)</text>
+  <text x="570" y="356" text-anchor="middle" font-size="11.5" fill="#1e40af">Origin check · HX-Request · security headers</text>
+
+  <rect x="780" y="294" width="380" height="74" rx="8" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="970" y="318" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1e3a8a">Auth — internal/auth</text>
+  <text x="970" y="338" text-anchor="middle" font-size="11.5" fill="#1e40af">sessions (in-memory) · login slowdown</text>
+  <text x="970" y="356" text-anchor="middle" font-size="11.5" fill="#1e40af">PBKDF2 / legacy plain-text users</text>
+
+  <rect x="380" y="380" width="380" height="64" rx="8" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="570" y="404" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1e3a8a">Pages — overview · traffic · channels · rooms</text>
+  <text x="570" y="424" text-anchor="middle" font-size="11.5" fill="#1e40af">automations · web-users (+ placeholders)</text>
+  <text x="570" y="440" text-anchor="middle" font-size="11.5" fill="#1e40af">view rules (internal/view) filter what a role sees</text>
+
+  <rect x="780" y="380" width="380" height="64" rx="8" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="970" y="404" text-anchor="middle" font-size="12.5" font-weight="700" fill="#1e3a8a">userManager → kammon.yml</text>
+  <text x="970" y="424" text-anchor="middle" font-size="11.5" fill="#1e40af">admin web-users save (UpdateUsersFile)</text>
+  <text x="970" y="440" text-anchor="middle" font-size="11.5" fill="#1e40af">hash passwords, preserve file</text>
+
+  <rect x="380" y="456" width="780" height="54" rx="8" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <text x="770" y="479" text-anchor="middle" font-size="12" font-weight="600" fill="#1e40af">Handlers read the store only — never KAM (pages). Admin actions call KAM directly.</text>
+  <text x="770" y="498" text-anchor="middle" font-size="11.5" fill="#3b82f6">Text requests queue in the store and are served by the poller (bounded, on demand)</text>
+
+  <!-- store -->
+  <rect x="360" y="556" width="820" height="160" rx="12" fill="#f0fdf4" stroke="#16a34a" stroke-width="2.5"/>
+  <text x="380" y="586" font-size="15" font-weight="700" fill="#14532d">Store — internal/store (in-memory, bounded)</text>
+  <text x="380" y="606" font-size="12" fill="#166534">event ring (4096) · minute buckets (1440) · marks · snapshots · text cache (10 pages)</text>
+
+  <rect x="380" y="620" width="380" height="56" rx="8" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="570" y="642" text-anchor="middle" font-size="12" font-weight="600" fill="#14532d">Snapshots &amp; freshness</text>
+  <text x="570" y="662" text-anchor="middle" font-size="11.5" fill="#166534">status, channels, rooms, clients, scripts</text>
+  <text x="570" y="678" text-anchor="middle" font-size="11.5" fill="#166534">per-read freshness (fresh/stale/down)</text>
+
+  <rect x="780" y="620" width="380" height="56" rx="8" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="970" y="642" text-anchor="middle" font-size="12" font-weight="600" fill="#14532d">Text request queue</text>
+  <text x="970" y="662" text-anchor="middle" font-size="11.5" fill="#166534">RequestText → TakeTextRequests → CompleteText</text>
+  <text x="970" y="678" text-anchor="middle" font-size="11.5" fill="#166534">bounded 32 requests · 5s TTL cache</text>
+
+  <rect x="380" y="684" width="780" height="24" rx="6" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="770" y="701" text-anchor="middle" font-size="11.5" fill="#166534">Cursor (epoch + seq) · clock offset · history marks · not-served 404 memory</text>
+
+  <!-- poller -->
+  <rect x="360" y="740" width="820" height="106" rx="12" fill="#fefce8" stroke="#ca8a04" stroke-width="2.5"/>
+  <text x="380" y="770" font-size="15" font-weight="700" fill="#713f12">Poller — internal/poll (one goroutine)</text>
+  <text x="380" y="794" font-size="12" fill="#854d0e">the only reader of KAM (MON-DS-1): events 1s · status 2s · rooms 10s · channels 30s · scripts 10s</text>
+  <text x="380" y="814" font-size="12" fill="#854d0e">backoff on failure · 404 → not-served pause · serves queued text requests (≤4 per tick)</text>
+  <text x="380" y="834" font-size="12" fill="#854d0e">Tick 250ms · one backfill of events per run</text>
+
+  <!-- arrows -->
+  <!-- config -> main -->
+  <line x1="260" y1="152" x2="358" y2="152" stroke="#334155" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="309" y="142" text-anchor="middle" font-size="11.5" font-weight="600" fill="#334155">Load</text>
+
+  <!-- browser <-> web -->
+  <line x1="260" y1="275" x2="358" y2="275" stroke="#334155" stroke-width="2.5" marker-start="url(#arrow)" marker-end="url(#arrow)"/>
+  <text x="309" y="262" text-anchor="middle" font-size="11.5" font-weight="600" fill="#334155">HTTP</text>
+
+  <!-- main -> web wiring -->
+  <line x1="770" y1="210" x2="770" y2="226" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrowDash)"/>
+
+  <!-- web -> store -->
+  <line x1="770" y1="528" x2="770" y2="554" stroke="#334155" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="758" y="546" text-anchor="end" font-size="11" font-weight="600" fill="#334155">read + queue text</text>
+
+  <!-- poller -> store -->
+  <line x1="770" y1="740" x2="770" y2="718" stroke="#334155" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="758" y="734" text-anchor="end" font-size="11" font-weight="600" fill="#334155">writes</text>
+
+  <!-- poller -> KAM -->
+  <path d="M 1180 795 L 1230 795 L 1230 180 L 1248 180" fill="none" stroke="#334155" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="1242" y="490" font-size="11.5" font-weight="600" fill="#334155" transform="rotate(-90 1242 490)">GET /v1/* (periodic + queued text)</text>
+
+  <!-- web -> KAM (admin actions) -->
+  <path d="M 1180 330 L 1200 330 L 1200 90 L 1395 90 L 1395 108" fill="none" stroke="#1d4ed8" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <text x="1190" y="240" font-size="11" font-weight="600" fill="#1d4ed8" transform="rotate(-90 1190 240)">admin actions</text>
+
+  <!-- footnote -->
+  <text x="40" y="1010" font-size="12" fill="#64748b">Demo mode replaces KAM with an in-process fake (kamfake, internal/kamfake) — everything else is identical.</text>
+</svg>
