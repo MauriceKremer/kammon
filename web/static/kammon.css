@@ -224,7 +224,6 @@ tr.traffic-detail > td { padding: 2px 12px 12px 0; }
 /* Channels and Rooms use an unframed master-detail layout. */
 .resource-layout { display: grid; grid-template-columns: minmax(190px, 250px) minmax(0, 1fr); gap: 28px; align-items: start; }
 .resource-list { display: grid; align-content: start; border-top: 1px solid var(--border-default); }
-.resource-list[hidden] { display: none; }
 .resource-item { min-width: 0; display: grid; gap: 4px; padding: 12px 10px; color: var(--text-secondary); text-decoration: none; border-bottom: 1px solid var(--border-subtle); }
 .resource-item:hover, .resource-item.selected { background: var(--highlight); color: var(--text-primary); }
 .resource-item.selected { box-shadow: inset 2px 0 var(--signal); }

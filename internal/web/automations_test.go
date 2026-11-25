@@ -514,20 +514,25 @@ func TestFixtureMessageConvertsSNRToQuarterDB(t *testing.T) {
 	}
 }
 
-// An empty, fresh script list has nothing to say, so the nav is hidden; it stays in the page so
-// the 10-second poll and the out-of-band swap after a save can fill it again (MON-AU-1).
-func TestAutomationsEmptyListHidden(t *testing.T) {
+// The first script can be written on an empty list: the add button and the new editor do not
+// hang on the list (MON-AU-8), and saving it puts it in the list out of band (MON-AU-1).
+func TestAutomationsFirstScriptOnEmptyList(t *testing.T) {
 	h := newScriptHarness(t)
 	h.login(t, "admin", "admin")
 	h.st.SetScripts(nil, t0)
-	for _, path := range []string{"/automations", "/ui/script-list"} {
-		_, body := h.get(t, path)
-		if !strings.Contains(body, `hx-trigger="every 10s" hx-swap="outerHTML" hidden>`) {
-			t.Errorf("%s: an empty script list must be hidden but still poll", path)
+	_, body := h.get(t, "/automations?new=1")
+	for _, want := range []string{"Add new script", `id="script-editor"`, "Not on KAM yet"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("new editor on an empty list misses %q", want)
 		}
 	}
-	h.st.SetScripts([]kam.Script{{ID: "echo", Name: "echo.star", Revision: 1}}, t0)
-	if _, body := h.get(t, "/ui/script-list"); strings.Contains(body, " hidden>") {
-		t.Error("a list with a script must show")
+	create := url.Values{
+		"id": {""}, "revision": {"0"}, "enabled": {"false"}, "name": {"first.star"},
+		"source": {kamfake.Starter}, "timeout": {"250"},
+	}
+	_, body, _ = h.formPost(t, http.MethodPost, "/ui/script-save", create)
+	i := strings.Index(body, `id="script-list"`)
+	if i < 0 || !strings.Contains(body[i:], "first.star") {
+		t.Errorf("the saved first script must show in the list: %s", body)
 	}
 }

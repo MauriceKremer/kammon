@@ -22,23 +22,23 @@
 </div>
 {{end}}
 
-{{define "script-list"}}<nav class="resource-list" aria-label="Scripts" id="script-list" hx-get="/ui/script-list" hx-trigger="every 10s" hx-swap="outerHTML"{{if not (or .Scripts .EmptyMessage .TruncatedNote)}} hidden{{end}}>
+{{define "script-list"}}<nav class="resource-list" aria-label="Scripts" id="script-list" hx-get="/ui/script-list" hx-trigger="every 10s" hx-swap="outerHTML">
   {{range .Scripts}}<a class="resource-item{{if .Selected}} selected{{end}}" href="/automations?script={{urlquery .ID}}"{{if .Selected}} aria-current="page"{{end}}>
       <span class="resource-item-top"><strong>{{.Name}}</strong><span class="mono">rev {{.Revision}}</span></span>
       <span class="small muted">{{if .Dot}}<i class="dot {{.Dot}}" aria-hidden="true"></i> {{end}}{{.State}}{{if .RunsNote}} · {{.RunsNote}}{{end}}</span>
       {{if .RunInfo}}<span class="small muted mono">{{.RunInfo}}</span>{{end}}
       {{if .Error}}<span class="small warn">{{.Error}}</span>{{end}}
-    </a>{{else}}{{if .EmptyMessage}}<p class="muted small">{{.EmptyMessage}}</p>{{end}}{{end}}
+    </a>{{else}}<p class="muted small">{{.EmptyMessage}}</p>{{end}}
   {{if .TruncatedNote}}<p class="small muted">{{.TruncatedNote}}</p>{{end}}
 </nav>{{end}}
 
-{{define "script-list-oob"}}<nav class="resource-list" aria-label="Scripts" id="script-list" hx-swap-oob="true" hx-get="/ui/script-list" hx-trigger="every 10s"{{if not (or .Scripts .EmptyMessage .TruncatedNote)}} hidden{{end}}>
+{{define "script-list-oob"}}<nav class="resource-list" aria-label="Scripts" id="script-list" hx-swap-oob="true" hx-get="/ui/script-list" hx-trigger="every 10s">
   {{range .Scripts}}<a class="resource-item{{if .Selected}} selected{{end}}" href="/automations?script={{urlquery .ID}}"{{if .Selected}} aria-current="page"{{end}}>
       <span class="resource-item-top"><strong>{{.Name}}</strong><span class="mono">rev {{.Revision}}</span></span>
       <span class="small muted">{{if .Dot}}<i class="dot {{.Dot}}" aria-hidden="true"></i> {{end}}{{.State}}{{if .RunsNote}} · {{.RunsNote}}{{end}}</span>
       {{if .RunInfo}}<span class="small muted mono">{{.RunInfo}}</span>{{end}}
       {{if .Error}}<span class="small warn">{{.Error}}</span>{{end}}
-    </a>{{else}}{{if .EmptyMessage}}<p class="muted small">{{.EmptyMessage}}</p>{{end}}{{end}}
+    </a>{{else}}<p class="muted small">{{.EmptyMessage}}</p>{{end}}
   {{if .TruncatedNote}}<p class="small muted">{{.TruncatedNote}}</p>{{end}}
 </nav>{{end}}
 
