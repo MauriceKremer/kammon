@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"kammon.bytecoder.nl/internal/audit"
 	"kammon.bytecoder.nl/internal/config"
 	"kammon.bytecoder.nl/internal/kam"
 	"kammon.bytecoder.nl/internal/store"
@@ -54,6 +55,9 @@ type scriptState struct {
 	ID, Revision, Timeout string
 	Enabled               bool
 	Title, Words, Dot     string
+	// SourceHash is the fingerprint of the saved source, carried back out of band after a save so
+	// the next save can tell whether the source changed (MON-AT-6). Empty keeps the loaded value.
+	SourceHash string
 }
 
 // scriptRow is one entry of the script list as a role may see it (MON-AU-2, 3, 4). No source ever.
@@ -65,12 +69,13 @@ type scriptRow struct {
 type editorData struct {
 	Open bool
 	// New is a script that is not on KAM yet: the starter with revision 0 (MON-AU-8).
-	New       bool
-	ID, Name  string
-	Source    string
-	Enabled   bool
-	TimeoutMS string
-	Revision  string
+	New        bool
+	ID, Name   string
+	Source     string
+	SourceHash string
+	Enabled    bool
+	TimeoutMS  string
+	Revision   string
 	// Frozen and Broken carry the state the page answers to (MON-AU-2, 11); StateName is the
 	// list's word for it.
 	Frozen, Broken bool
@@ -282,7 +287,8 @@ func (s *Server) scriptListPartial(w http.ResponseWriter, r *http.Request) {
 func (s *Server) newEditor(r *http.Request) editorData {
 	return editorData{
 		Open: true, New: true, Source: starterSource,
-		Enabled: false, TimeoutMS: "500", Revision: "0",
+		SourceHash: sourceFingerprint(starterSource),
+		Enabled:    false, TimeoutMS: "500", Revision: "0",
 		StateName: "Not on KAM yet", DryRunSupported: s.probeDryRun(r),
 	}
 }
@@ -310,6 +316,7 @@ func (s *Server) openEditor(r *http.Request, id string) editorData {
 	words, _ := scriptStateWords(script)
 	ed.Name = script.Name
 	ed.Source = script.Source
+	ed.SourceHash = sourceFingerprint(script.Source)
 	ed.Enabled = script.Enabled
 	ed.TimeoutMS = strconv.FormatInt(script.TimeoutMS, 10)
 	ed.Revision = strconv.FormatInt(script.Revision, 10)
@@ -680,12 +687,16 @@ func (s *Server) scriptSaveSubmit(w http.ResponseWriter, r *http.Request) {
 		saved, err = s.kam.UpdateScript(ctx, script, rev)
 	}
 	if err != nil {
+		s.recordScriptSave(r, isCreate, form, script, kam.Script{}, err)
 		s.writeScriptReply(w, r, scriptReply{Console: saveErrorConsole(err, isCreate)})
 		return
 	}
+	warn := s.recordScriptSave(r, isCreate, form, script, saved, nil)
+	state := stateFromScript(saved)
+	state.SourceHash = sourceFingerprint(script.Source)
 	reply := scriptReply{
-		Console:    scriptConsole{Lines: []consoleLine{{Text: "Saved revision " + strconv.FormatInt(saved.Revision, 10) + "."}}, Saved: true},
-		State:      stateFromScript(saved),
+		Console:    consoleWithWarn(scriptConsole{Lines: []consoleLine{{Text: "Saved revision " + strconv.FormatInt(saved.Revision, 10) + "."}}, Saved: true}, warn),
+		State:      state,
 		List:       true,
 		SelectedID: saved.ID,
 		Fresh:      &saved,
@@ -753,6 +764,7 @@ func (s *Server) scriptToggleSubmit(w http.ResponseWriter, r *http.Request) {
 		saved, err = s.kam.DisableScript(ctx, loaded.ID, rev)
 	}
 	if err != nil {
+		s.recordScriptToggle(r, loaded.ID, form.Get("name"), enable, 0, err)
 		reply := scriptReply{Console: confirmConsole("", err)}
 		if state := s.stateFromStore(loaded.ID, loaded.Revision, loaded.Timeout, loaded.Enabled); state != nil {
 			reply.State = state
@@ -764,8 +776,9 @@ func (s *Server) scriptToggleSubmit(w http.ResponseWriter, r *http.Request) {
 	if enable {
 		action = "Enabled"
 	}
+	warn := s.recordScriptToggle(r, saved.ID, saved.Name, enable, saved.Revision, nil)
 	s.writeScriptReply(w, r, scriptReply{
-		Console:    scriptConsole{Lines: []consoleLine{{Text: action + ". Revision " + strconv.FormatInt(saved.Revision, 10) + " is current."}}},
+		Console:    consoleWithWarn(scriptConsole{Lines: []consoleLine{{Text: action + ". Revision " + strconv.FormatInt(saved.Revision, 10) + " is current."}}}, warn),
 		State:      stateFromScript(saved),
 		List:       true,
 		SelectedID: saved.ID,
@@ -808,11 +821,13 @@ func (s *Server) scriptRecoverSubmit(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	saved, err := s.kam.RecoverScript(ctx, loaded.ID, newTimeout, rev)
 	if err != nil {
+		s.recordScriptRecover(r, loaded.ID, form.Get("name"), newTimeout, err)
 		s.writeScriptReply(w, r, scriptReply{Console: saveErrorConsole(err, false), List: true, SelectedID: loaded.ID})
 		return
 	}
+	warn := s.recordScriptRecover(r, saved.ID, saved.Name, newTimeout, nil)
 	reply := scriptReply{
-		Console:    scriptConsole{Lines: []consoleLine{{Text: "Recovered. KAM runs this script again. Revision " + strconv.FormatInt(saved.Revision, 10) + " is current."}}},
+		Console:    consoleWithWarn(scriptConsole{Lines: []consoleLine{{Text: "Recovered. KAM runs this script again. Revision " + strconv.FormatInt(saved.Revision, 10) + " is current."}}}, warn),
 		State:      stateFromScript(saved),
 		List:       true,
 		SelectedID: saved.ID,
@@ -862,8 +877,104 @@ func (s *Server) scriptDeleteSubmit(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), kamActionTimeout)
 	defer cancel()
 	if err := s.kam.DeleteScript(ctx, loaded.ID, rev); err != nil {
+		s.recordScriptDelete(r, loaded.ID, form.Get("name"), err)
 		s.writeScriptReply(w, r, scriptReply{Console: saveErrorConsole(err, false), List: true, SelectedID: loaded.ID})
 		return
 	}
+	warn := s.recordScriptDelete(r, loaded.ID, form.Get("name"), nil)
+	if warn != "" {
+		// No redirect on a trail failure, so the warning is visible (MON-AT-19).
+		s.writeScriptReply(w, r, scriptReply{
+			Console: scriptConsole{Lines: []consoleLine{{Text: "Deleted."}, {Text: warn, Class: "warn"}}},
+			List:    true,
+		})
+		return
+	}
 	s.writeScriptReply(w, r, scriptReply{Console: scriptConsole{}, Redirect: "/automations"})
+}
+
+// recordScriptSave writes the audit record of a save (MON-AT-1, 4, 6).
+func (s *Server) recordScriptSave(r *http.Request, isCreate bool, form url.Values, submitted, saved kam.Script, actionErr error) string {
+	action := "script.update"
+	target := &audit.Target{Type: "script", ID: submitted.ID, Name: submitted.Name}
+	if isCreate {
+		action = "script.create"
+	}
+	if saved.ID != "" {
+		target.ID, target.Name = saved.ID, saved.Name
+	}
+	var changes map[string]audit.Change
+	if actionErr == nil {
+		if isCreate {
+			changes = map[string]audit.Change{
+				"name":    {To: submitted.Name},
+				"timeout": {To: strconv.FormatInt(submitted.TimeoutMS, 10)},
+				"enabled": {To: submitted.Enabled},
+				"source":  {To: "<set>"},
+			}
+		} else {
+			changes = map[string]audit.Change{}
+			if orig := form.Get("orig_name"); orig != "" && orig != submitted.Name {
+				changes["name"] = audit.Change{From: orig, To: submitted.Name}
+			}
+			if orig := form.Get("orig_timeout"); orig != "" && orig != strconv.FormatInt(submitted.TimeoutMS, 10) {
+				changes["timeout"] = audit.Change{From: orig, To: strconv.FormatInt(submitted.TimeoutMS, 10)}
+			}
+			if orig := form.Get("orig_source_hash"); orig != "" && orig != sourceFingerprint(submitted.Source) {
+				changes["source"] = audit.Change{From: "fingerprint " + orig, To: "fingerprint " + sourceFingerprint(submitted.Source)}
+			}
+			if len(changes) == 0 {
+				changes = nil
+			}
+		}
+	}
+	outcome, detail := audit.OK, ""
+	if actionErr != nil {
+		outcome, detail = audit.Failed, scriptErrorText(actionErr)
+	} else {
+		detail = "Saved revision " + strconv.FormatInt(saved.Revision, 10) + "."
+	}
+	return s.auditChange(r, action, target, changes, outcome, detail)
+}
+
+// recordScriptToggle writes the audit record of an enable or disable (MON-AT-1).
+func (s *Server) recordScriptToggle(r *http.Request, id, name string, enable bool, revision int64, actionErr error) string {
+	action := "script.disable"
+	if enable {
+		action = "script.enable"
+	}
+	var changes map[string]audit.Change
+	outcome, detail := audit.OK, ""
+	if actionErr != nil {
+		outcome, detail = audit.Failed, scriptErrorText(actionErr)
+	} else {
+		changes = map[string]audit.Change{"enabled": {From: !enable, To: enable}}
+		word := "Disabled"
+		if enable {
+			word = "Enabled"
+		}
+		detail = word + ". Revision " + strconv.FormatInt(revision, 10) + " is current."
+	}
+	return s.auditChange(r, action, &audit.Target{Type: "script", ID: id, Name: name}, changes, outcome, detail)
+}
+
+// recordScriptRecover writes the audit record of a recover (MON-AT-1).
+func (s *Server) recordScriptRecover(r *http.Request, id, name string, newTimeout int64, actionErr error) string {
+	var changes map[string]audit.Change
+	outcome, detail := audit.OK, "Recovered."
+	if actionErr != nil {
+		outcome, detail = audit.Failed, scriptErrorText(actionErr)
+	} else if newTimeout > 0 {
+		changes = map[string]audit.Change{"timeout": {To: strconv.FormatInt(newTimeout, 10)}}
+	}
+	return s.auditChange(r, "script.recover", &audit.Target{Type: "script", ID: id, Name: name}, changes, outcome, detail)
+}
+
+// recordScriptDelete writes the audit record of a delete (MON-AT-1).
+func (s *Server) recordScriptDelete(r *http.Request, id, name string, actionErr error) string {
+	outcome, detail := audit.OK, "Deleted."
+	if actionErr != nil {
+		outcome, detail = audit.Failed, scriptErrorText(actionErr)
+	}
+	return s.auditChange(r, "script.delete", &audit.Target{Type: "script", ID: id, Name: name}, nil, outcome, detail)
 }

@@ -22,6 +22,7 @@ import (
 // actions (MON-AU-1, AGENTS rule 3).
 type scriptHarness struct {
 	ts     *httptest.Server
+	srv    *Server
 	fake   *kamfake.Fake
 	kam    *kam.HTTP
 	st     *store.Store
@@ -58,7 +59,7 @@ func newScriptHarness(t *testing.T) *scriptHarness {
 	t.Cleanup(ts.Close)
 	jar, _ := cookiejar.New(nil)
 	return &scriptHarness{
-		ts: ts, fake: fake, kam: client, st: st, now: &now,
+		ts: ts, srv: srv, fake: fake, kam: client, st: st, now: &now,
 		client: &http.Client{Jar: jar, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
 	}
 }

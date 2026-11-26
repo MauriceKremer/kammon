@@ -47,6 +47,9 @@
   <input type="hidden" name="id" id="script-id" value="{{.ID}}">
   <input type="hidden" name="revision" id="script-revision" value="{{.Revision}}">
   <input type="hidden" name="enabled" id="script-enabled" value="{{if .Enabled}}true{{else}}false{{end}}">
+  <input type="hidden" name="orig_name" id="script-orig-name" value="{{.Name}}">
+  <input type="hidden" name="orig_timeout" id="script-orig-timeout" value="{{.TimeoutMS}}">
+  <input type="hidden" name="orig_source_hash" id="script-orig-source-hash" value="{{.SourceHash}}">
   <div class="section-head">
     <div>
       <h2 id="script-title">{{if .New}}New script{{else}}{{.Name}}{{end}}</h2>
@@ -147,6 +150,9 @@
 <input type="hidden" name="id" value="{{.ID}}" id="script-id" hx-swap-oob="true">
 <input type="hidden" name="revision" value="{{.Revision}}" id="script-revision" hx-swap-oob="true">
 <input type="hidden" name="enabled" value="{{if .Enabled}}true{{else}}false{{end}}" id="script-enabled" hx-swap-oob="true">
+<input type="hidden" name="orig_name" value="{{.Title}}" id="script-orig-name" hx-swap-oob="true">
+<input type="hidden" name="orig_timeout" value="{{.Timeout}}" id="script-orig-timeout" hx-swap-oob="true">
+{{if .SourceHash}}<input type="hidden" name="orig_source_hash" value="{{.SourceHash}}" id="script-orig-source-hash" hx-swap-oob="true">{{end}}
 <h2 id="script-title" hx-swap-oob="true">{{.Title}}</h2>
 <p class="small muted mono" id="script-rev-label" hx-swap-oob="true">Revision {{.Revision}} · {{.Words}}</p>
 <input type="checkbox" id="script-enabled-box" name="enabled-box"{{if .Enabled}} checked{{end}} hx-post="/ui/script-toggle" hx-target="#console" hx-swap="outerHTML" hx-swap-oob="true">
