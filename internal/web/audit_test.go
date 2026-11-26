@@ -114,7 +114,54 @@ func TestAuditRecordsAFailedAction(t *testing.T) {
 	}
 }
 
-// TestAuditRecordsScriptActions checks MON-AT-1, 4 and 6 for the script actions against a fake KAM.
+// TestAuditRecordsSignIns checks MON-AT-21, 22 and 24 for password sign-in, failure and sign-out.
+func TestAuditRecordsSignIns(t *testing.T) {
+	h := newHarness(t)
+
+	// Successful password sign-in.
+	c := h.login(t, "admin", "admin")
+	rec := newestRecord(t, h.s.auditLog)
+	if rec.Action != "login.success" || rec.Actor != "admin" || rec.Role != "admin" || rec.Outcome != audit.OK {
+		t.Fatalf("success record = %+v", rec)
+	}
+
+	// Failed sign-in carries the name that was typed, not the password.
+	resp, err := http.PostForm(h.ts.URL+"/login", url.Values{"name": {"admin"}, "password": {"guess"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	rec = newestRecord(t, h.s.auditLog)
+	if rec.Action != "login.failed" || rec.Actor != "admin" || rec.Role != "" || rec.Outcome != audit.Failed {
+		t.Fatalf("failed record = %+v", rec)
+	}
+	for _, r := range h.s.auditLog.Recent(0) {
+		if strings.Contains(fmt.Sprint(r), "guess") {
+			t.Error("the failed sign-in record leaked the attempted password")
+		}
+	}
+
+	// Sign-out.
+	auditForm(t, h, c, http.MethodPost, "/logout", nil)
+	rec = newestRecord(t, h.s.auditLog)
+	if rec.Action != "logout" || rec.Actor != "admin" {
+		t.Fatalf("logout record = %+v", rec)
+	}
+}
+
+// TestAuditRecordsGuestLogin checks MON-AT-23: a guest sign-in is recorded as Guest, a viewer.
+func TestAuditRecordsGuestLogin(t *testing.T) {
+	h := newGuestHarness(t, true)
+	resp, err := http.PostForm(h.ts.URL+"/login/guest", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	rec := newestRecord(t, h.s.auditLog)
+	if rec.Action != "login.guest" || rec.Actor != "Guest" || rec.Role != "viewer" || rec.Outcome != audit.OK {
+		t.Fatalf("guest record = %+v", rec)
+	}
+}
 func TestAuditRecordsScriptActions(t *testing.T) {
 	h := newScriptHarness(t)
 	h.login(t, "admin", "admin")

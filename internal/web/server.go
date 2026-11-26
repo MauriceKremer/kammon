@@ -346,9 +346,12 @@ func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
 	user, ok := auth.Check(s.userMgr.list(), r.PostForm.Get("name"), r.PostForm.Get("password"))
 	if !ok {
 		s.slowdown.Fail(auth.RemoteHost(r), s.now())
+		// A failed sign-in is recorded with the name that was typed, never the password (MON-AT-22).
+		s.auditSignIn(r, "login.failed", r.PostForm.Get("name"), "", audit.Failed, "Wrong name or password.")
 		s.renderLogin(w, r, http.StatusUnauthorized, "Wrong name or password.")
 		return
 	}
+	s.auditSignIn(r, "login.success", user.Name, string(user.Role), audit.OK, "Signed in.")
 	s.startSession(w, r, user)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -360,6 +363,7 @@ func (s *Server) guestLogin(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	s.auditSignIn(r, "login.guest", guestUser.Name, string(guestUser.Role), audit.OK, "Signed in as Guest.")
 	s.startSession(w, r, guestUser)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -373,6 +377,9 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request, user confi
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookie); err == nil {
+		if u, ok := s.sessions.Get(c.Value); ok {
+			s.auditSignIn(r, "logout", u.Name, string(u.Role), audit.OK, "Signed out.")
+		}
 		s.sessions.Delete(c.Value)
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: secure(r)})
