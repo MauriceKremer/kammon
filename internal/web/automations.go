@@ -921,7 +921,7 @@ func (s *Server) recordScriptSave(r *http.Request, isCreate bool, form url.Value
 				changes["timeout"] = audit.Change{From: orig, To: strconv.FormatInt(submitted.TimeoutMS, 10)}
 			}
 			if orig := form.Get("orig_source_hash"); orig != "" && orig != sourceFingerprint(submitted.Source) {
-				changes["source"] = audit.Change{From: "fingerprint " + orig, To: "fingerprint " + sourceFingerprint(submitted.Source)}
+				changes["source"] = audit.Change{From: orig, To: sourceFingerprint(submitted.Source)}
 			}
 			if len(changes) == 0 {
 				changes = nil

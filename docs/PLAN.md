@@ -69,6 +69,11 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 - [x] Record sign-ins and sign-outs too — password success and failure, guest, and logout (MON-AT-21..25)
 - [x] Admin-only `/audit` page and sidebar entry; read-only, newest first, with honest labels (MON-AT-14..18)
 
+## Slice 10: Audit trail journal links
+
+- [x] Read KAM's script journal (`GET /scripts/{id}/journal`, `GET /scripts/{id}/journal/{fingerprint}`) and match recorded fingerprints to it (MON-AT-26, D63)
+- [x] Link a known fingerprint from the audit trail to a read-only journalled revision, bounded and degrading when KAM is away (MON-AT-27..29)
+
 ## Slice 4b: Manuals
 
 Removed (D23, 2026-10-18): the manuals, their public `/manuals/` route and the sidebar Help section left the interface; the app sidebar carries only its navigation list (one plain list, D26), and the pinned copies of KAM's manuals went with them.

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"kammon.bytecoder.nl/internal/audit"
+	"kammon.bytecoder.nl/internal/kam"
 	"kammon.bytecoder.nl/internal/kamfake"
 )
 
@@ -278,5 +279,69 @@ func TestAuditRecordsScriptActions(t *testing.T) {
 		if strings.Contains(fmt.Sprint(r.Changes), "def on_group_text") {
 			t.Errorf("record %q stored the script source", r.Action)
 		}
+	}
+}
+
+// TestAuditPageLinksKnownJournalFingerprint checks MON-AT-26 and 27: a fingerprint KAM's journal
+// knows becomes a link to the read-only journalled revision; the current source does not.
+func TestAuditPageLinksKnownJournalFingerprint(t *testing.T) {
+	h := newScriptHarness(t)
+	h.login(t, "admin", "admin")
+
+	// Create a script, then replace its source so KAM journals the old revision.
+	if status, body, _ := h.formPost(t, http.MethodPost, "/ui/script-save", url.Values{
+		"id": {""}, "revision": {"0"}, "enabled": {"false"}, "name": {"jour.star"},
+		"source": {kamfake.Starter}, "timeout": {"250"},
+	}); status != http.StatusOK || !strings.Contains(body, "Saved revision 1.") {
+		t.Fatalf("create: %d %s", status, body)
+	}
+	sourceB := "def on_group_text(message):\n    reply(message[\"channel\"], \"second\")\n"
+	fpOld := kam.SourceFingerprint(kamfake.Starter)
+	fpNew := kam.SourceFingerprint(sourceB)
+	if status, body, _ := h.formPost(t, http.MethodPost, "/ui/script-save", url.Values{
+		"id": {"jour.star"}, "revision": {"1"}, "enabled": {"false"}, "name": {"jour.star"},
+		"source": {sourceB}, "timeout": {"250"},
+		"orig_name": {"jour.star"}, "orig_timeout": {"250"}, "orig_source_hash": {fpOld},
+	}); status != http.StatusOK || !strings.Contains(body, "Saved revision 2.") {
+		t.Fatalf("update: %d %s", status, body)
+	}
+
+	// The audit page links the superseded source (fpOld) but not the current one (fpNew).
+	status, page := h.get(t, "/audit")
+	if status != http.StatusOK {
+		t.Fatalf("audit page: %d", status)
+	}
+	if !strings.Contains(page, "href=\"/audit/version?script=jour.star") {
+		t.Fatalf("the journalled fingerprint is not a link: %s", page)
+	}
+	if n := strings.Count(page, "href=\"/audit/version"); n != 1 {
+		t.Errorf("the page links %d revisions, want 1 (only the superseded source)", n)
+	}
+	if !strings.Contains(page, fpOld) || !strings.Contains(page, fpNew) {
+		t.Errorf("the page must show both fingerprints: %s", page)
+	}
+
+	// Opening the link shows the journalled source, read-only.
+	status, version := h.get(t, "/audit/version?script=jour.star&fingerprint="+fpOld)
+	if status != http.StatusOK || !strings.Contains(version, "on_group_text") || !strings.Contains(version, "revision 1") {
+		t.Fatalf("version view: %d %s", status, version)
+	}
+	if !strings.Contains(version, "read-only") {
+		t.Errorf("the version view must say it is read-only: %s", version)
+	}
+
+	// A fingerprint the journal does not hold says so, without failing.
+	_, missing := h.get(t, "/audit/version?script=jour.star&fingerprint=ffffffffffffffff")
+	if !strings.Contains(missing, "no revision with this fingerprint") {
+		t.Errorf("missing fingerprint: %s", missing)
+	}
+}
+
+// TestAuditVersionNeedsAdmin checks MON-AT-14 for the version viewer.
+func TestAuditVersionNeedsAdmin(t *testing.T) {
+	h := newScriptHarness(t)
+	h.login(t, "viewer", "viewer")
+	if status, _ := h.get(t, "/audit/version?script=echo&fingerprint=ab12cd34ef567890"); status != http.StatusForbidden {
+		t.Fatalf("viewer version view: %d, want 403", status)
 	}
 }

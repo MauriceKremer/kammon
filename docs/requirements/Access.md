@@ -52,6 +52,7 @@ KAMmon is written for the enthusiast. It imposes no hosting or transport restric
 | Server statistics block (sidebar, D33) | No | Yes |
 | Web users page and user mutations ([WebAccounts.md](WebAccounts.md)) | No: the route answers `403` | Yes |
 | Audit trail page and records ([AuditTrail.md](AuditTrail.md)) | No: the route answers `403` (D34) | Yes — read only; nothing can change or remove a record |
+| Journalled script revision (`/audit/version`) | No: the route answers `403` (D34) | Yes — read only |
 | Theme switch | Yes | Yes |
 
 Anything marked "No" is not rendered and its routes answer `403`.

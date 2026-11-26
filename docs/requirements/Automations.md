@@ -130,6 +130,7 @@ def on_group_text(message):
 | Validate | `POST /scripts/validate` | API-AU-1 (exists) |
 | Enable, disable, recover | `POST /scripts/{id}/enable|disable|recover` | API-AU-1 (exists) |
 | Run information | `run` object on each script | API-AU-2 |
+| Script version journal | `GET /scripts/{id}/journal` (fingerprints), `GET /scripts/{id}/journal/{fingerprint}` (one superseded revision) | KAM's APIdetails, "The version object" (not pinned here) |
 | Dry run | `POST /scripts/dry-run` | API-AU-3, API-AU-4 |
 | Queue depth and dropped events | `GET /v1/status` (`automation`) | API-AU-5 |
 | Script run events | `script` events | API-EV-6 |

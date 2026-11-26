@@ -322,3 +322,44 @@ func TestFakeScriptBusyAndDisabled(t *testing.T) {
 		t.Fatal("get while disabled must fail")
 	}
 }
+
+// TestFakeJournalFollowsUpdatesAndDeletes checks the fake mirrors KAM's journal: a replaced
+// revision and a deleted script's final revision are archived, keyed by source fingerprint.
+func TestFakeJournalFollowsUpdatesAndDeletes(t *testing.T) {
+	h := newScriptHarness(t)
+	admin := kam.NewHTTP(h.server.URL, time.Second)
+	ctx := context.Background()
+
+	// A fresh script has no superseded revisions.
+	if fps, err := admin.Journal(ctx, "echo"); err != nil || len(fps) != 0 {
+		t.Fatalf("fresh journal = %v, %v", fps, err)
+	}
+
+	oldFP := kam.SourceFingerprint(echoSource)
+	if _, err := admin.UpdateScript(ctx, kam.Script{ID: "echo", Name: "echo.star", Source: Starter, Enabled: true, TimeoutMS: 500}, 4); err != nil {
+		t.Fatal(err)
+	}
+	fps, err := admin.Journal(ctx, "echo")
+	if err != nil || len(fps) != 1 || fps[0] != oldFP {
+		t.Fatalf("journal after update = %v, %v, want [%s]", fps, err, oldFP)
+	}
+	v, err := admin.JournalVersion(ctx, "echo", oldFP)
+	if err != nil || v.Source != echoSource || v.Revision != 4 || v.Name != "echo.star" {
+		t.Fatalf("version = %+v, %v", v, err)
+	}
+
+	// Deleting a script archives its final revision.
+	welcomeFP := kam.SourceFingerprint(welcomeSource)
+	if err := admin.DeleteScript(ctx, "welcome", 2); err != nil {
+		t.Fatal(err)
+	}
+	v, err = admin.JournalVersion(ctx, "welcome", welcomeFP)
+	if err != nil || v.Revision != 2 || v.Source != welcomeSource {
+		t.Fatalf("deleted version = %+v, %v", v, err)
+	}
+
+	// A fingerprint the journal does not hold is a 404.
+	if _, err := admin.JournalVersion(ctx, "echo", "ffffffffffffffff"); !errors.Is(err, kam.ErrNotFound) {
+		t.Fatalf("unknown fingerprint error = %v, want ErrNotFound", err)
+	}
+}

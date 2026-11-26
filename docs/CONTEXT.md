@@ -41,3 +41,5 @@ Use these words in code, tests, docs and screens.
 | **Layer chip** | A toggle under the advert map that shows or hides a layer and carries its count; Advertised, Silent and Base Node (D53, MON-AD-20). |
 | **Audit trail** | KAMmon's append-only record of every state-changing administrator action and of every sign-in and sign-out, written to disk and read-only from the web. It says who changed what and when, and who came and went, never passwords or script source. |
 | **Audit record** | One line of the audit trail: sequence, time, actor, action, and the outcome; a change record also carries the target and the changed fields (before/after), a sign-in record carries neither. |
+| **Script journal** | KAM's version history of superseded automation revisions (`automation_script_journal`), read by source fingerprint. |
+| **Journalled revision** | A superseded script revision in KAM's journal, keyed by source fingerprint; KAMmon opens it read-only from the audit trail. |

@@ -31,6 +31,7 @@ type Fake struct {
 	lastRoom time.Time
 
 	scripts      []fakeScript
+	journal      []fakeVersion
 	automationOn bool
 	dryRunOn     bool
 	runInfoOn    bool
@@ -199,6 +200,8 @@ func (f *Fake) Handler() http.Handler {
 	mux.HandleFunc("POST /scripts/validate", f.handleScriptValidate)
 	mux.HandleFunc("POST /scripts/dry-run", f.handleScriptDryRun)
 	mux.HandleFunc("GET /scripts/{id}", f.handleScriptGet)
+	mux.HandleFunc("GET /scripts/{id}/journal", f.handleScriptJournal)
+	mux.HandleFunc("GET /scripts/{id}/journal/{fingerprint}", f.handleScriptJournalVersion)
 	mux.HandleFunc("PUT /scripts/{id}", f.handleScriptUpdate)
 	mux.HandleFunc("DELETE /scripts/{id}", f.handleScriptDelete)
 	mux.HandleFunc("POST /scripts/{id}/enable", func(w http.ResponseWriter, r *http.Request) { f.handleScriptEnabled(w, r, true) })
