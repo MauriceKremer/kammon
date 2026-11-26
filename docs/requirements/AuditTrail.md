@@ -1,6 +1,6 @@
 # KAMmon Requirements: Audit Trail
 
-**Status:** Built (2026-11-26): `internal/audit` (append-only JSON Lines with a bounded in-memory tail), the record of admin changes and sign-ins, and the admin-only read-only `/audit` page (MON-AT-1..25, D60..D62). Demo mode keeps the trail in memory.
+**Status:** Built (2026-11-26): `internal/audit` (append-only JSON Lines with a bounded in-memory tail), the record of admin changes and sign-ins, and the admin-only read-only `/audit` page (MON-AT-1..25, D60..D62). A source fingerprint known to KAM's script journal opens the superseded revision read-only (MON-AT-26..29, D63). Demo mode keeps the trail in memory.
 **Scope:** A permanent, read-only record of every state-changing administrator action and of every sign-in and sign-out, written to disk, shown on an administrator-only page. It answers "who changed what, and when" and "who came and went". KAM data stays in KAM; this is KAMmon's own record of its own activity. Related rules: [Access.md](Access.md) (who may act and sign in), [WebAccounts.md](WebAccounts.md) and [Automations.md](Automations.md) (the actions themselves).
 
 ## 1. Summary
@@ -8,6 +8,8 @@
 KAMmon's administrator can change things from the browser: add, edit and delete web users, and create, save, enable, disable, recover and delete scripts. Today those changes happen and are then gone from KAMmon's memory when it restarts, because the store is memory-only ([DataStore.md](DataStore.md) §2, D2).
 
 An **audit trail** keeps a permanent record of those changes, and of every sign-in and sign-out — a password login that succeeds or fails, a guest login, and a logout. Each event appends one **audit record** to an append-only file on disk. An administrator can open an **Audit trail** page to read the records, newest first, but nothing on that page — and no route of the server — can change or remove a record. The trail is a log of what was done, not a control surface.
+
+KAM keeps its own journal of superseded script revisions. Where the trail records a script's source fingerprint, and KAM's journal knows that fingerprint, the administrator can open the journalled revision read-only (§3.6, D63). KAMmon still never stores script source.
 
 A change record stores the **date and time**, the **user** who acted, the **action**, the **target**, the **changed values** as before/after pairs, and the **outcome** (success or failure); a sign-in record stores the same minus the target and changed values. The trail never stores passwords, password hashes or script source.
 
@@ -109,8 +111,12 @@ A sign-in record has no `target` and no `changes` (MON-AT-25). The attempted pas
 ### 3.5 What is never stored
 
 - **Passwords and password hashes.** A password set or change is recorded as `<set>` or `<changed>`, never the value; the password typed at a failed sign-in is never recorded at all (MON-AT-5, MON-AT-22, MON-AX-16).
-- **Script source.** A source change is recorded as `<set>` or `changed` with a SHA-256 fingerprint of the source, so the trail ties the change to a specific source without storing the body (MON-AT-6). The editor's own text stays out of the record, exactly as the store keeps script source out of memory ([Automations.md](Automations.md) D29).
+- **Script source.** A source change is recorded as `<set>` or as KAM's source fingerprint (the first 8 bytes of the source's SHA-256, 16 hex characters), so the trail ties the change to a specific source without storing the body (MON-AT-6). The fingerprint is the same id KAM stores in its script journal, so a known one opens the superseded revision (§3.6, MON-AT-26). The editor's own text stays out of the record, exactly as the store keeps script source out of memory ([Automations.md](Automations.md) D29).
 - **Radio text.** The trail stores only administrator-typed values; names and values that come from the radio never enter it, and nothing is ever written to the page with `template.HTML` (rule 5).
+
+### 3.6 Journalled versions
+
+KAM keeps a version journal of superseded script revisions, keyed by the source fingerprint (`GET /scripts/{id}/journal` lists the fingerprints, `GET /scripts/{id}/journal/{fingerprint}` returns one; [Automations.md](Automations.md) §5). When the audit page shows a source change, it asks each visible script's journal which fingerprints it holds. A fingerprint the journal knows becomes a link to `/audit/version`, which loads that revision and shows its source read-only. The current revision is not in the journal until it is replaced, so its fingerprint stays plain text (MON-AT-26..28).
 
 ## 4. What the page shows
 
@@ -118,7 +124,8 @@ A sign-in record has no `target` and no `changes` (MON-AT-25). The attempted pas
 |---|---|
 | **Notice** | One line above the table: "The audit trail is a permanent record. Nothing on this page can change or remove it." |
 | **Table** | Newest first: time, user, action, target (for changes), the changed fields (from → to), and the outcome. A failed action or a failed sign-in is marked; a sign-in row shows its `detail` and no target or changes. |
-| **Redacted values** | A password change reads `password: <changed>`; a source change reads `source: changed (fingerprint …)`. No secret text ever appears. |
+| **Redacted values** | A password change reads `password: <changed>`; a source change reads its two fingerprints (`<old> → <new>`). A fingerprint KAM's journal knows is a link to the journalled revision; no secret text ever appears. |
+| **Journalled source** | `/audit/version` shows one superseded revision read-only: name, revision, archive time, timeout, enabled state and source, with a link back to the trail. |
 | **Empty state** | "No activity recorded yet." when the trail is empty. |
 | **Paging** | The newest records with a "Show more" control; the page says how many records it is showing and how many exist in total. |
 
@@ -178,6 +185,15 @@ The page is a real URL (`/audit`) that renders fully on the server, with a live 
 
 A sign-in record is appended only after the check has decided the answer (accepted or refused), so the trail always tells the truth about the attempt. A session that ends by idle timeout is not recorded, because there is no request to hang a record on.
 
+### 5.6 Journalled versions
+
+| ID | Requirement | Level |
+|---|---|---|
+| MON-AT-26 | For each source change whose value is one of KAM's fingerprints, the page asks that script's journal (`GET /scripts/{id}/journal`) which fingerprints it holds, once per script per page, and renders a known fingerprint as a link to the journalled revision. | MUST |
+| MON-AT-27 | Opening the link loads `GET /scripts/{id}/journal/{fingerprint}` and shows the superseded revision read-only: name, revision, archive time, timeout, enabled state and source, escaped by `html/template`. | MUST |
+| MON-AT-28 | The trail page still renders, without links, when KAM is down, automations are disabled, or a fingerprint is not in the journal; the version view says which of these it is. | MUST |
+| MON-AT-29 | The journal reads are administrator-only, bounded to 16 scripts per page, memoized per request, and skipped after the first failure; a viewer never triggers one. | MUST |
+
 ## 6. Storage and configuration
 
 One data file, not part of `kammon.yml` (which stays configuration and is rewritten in place by the web-users feature). The trail is written beside it:
@@ -194,13 +210,14 @@ The layout gains one package:
 |---|---|
 | `internal/audit` | The audit trail: the record type, the append-only file writer, the bounded in-memory tail, and the reader the page uses. |
 
-The page reads the trail's bounded in-memory tail, never the file directly, so a page view never opens or scans the file (it is already loaded on start). Rule 3 ("pages read the store, never KAM") is untouched: the audit trail is not KAM data, and it has no poller. The trail's writers are the administrator action handlers and the sign-in and sign-out handlers, each appending after its event has finished.
+The page reads the trail's bounded in-memory tail, never the file directly, so a page view never opens or scans the file (it is already loaded on start). It does read KAM in one bounded way: it asks each visible script's journal which fingerprints it holds, so a known source change becomes a link (MON-AT-26, D63). This follows the editor's own precedent (D29: the Automations editor loads a script straight from KAM in the admin's request); the lookups are administrator-only, capped at 16 scripts, memoized per request, and skipped after the first failure, so the trail still renders when KAM is away. The trail's writers are the administrator action handlers and the sign-in and sign-out handlers, each appending after its event has finished.
 
 ## 7. Visibility
 
 | Element | Viewer | Admin |
 |---|---|---|
 | Audit trail page and records | No: the routes answer `403` (D34) | Yes |
+| Journalled revision (`/audit/version`) | No: the route answers `403` (D34) | Yes — read-only |
 | Modify or remove a record | No | No — nothing on the page or any route can |
 
 An administrator can read the whole trail but cannot change or remove any part of it from the web. Removing or editing the file itself remains an operator-with-shell-access act, the same as editing `kammon.yml` by hand; KAMmon adds no file-permission checks unless asked (project rule).
@@ -217,6 +234,8 @@ An administrator can read the whole trail but cannot change or remove any part o
 - A race test that concurrent administrator actions append distinct, ordered records.
 - A test that a successful sign-in, a failed sign-in, a guest sign-in and a sign-out each append one record with the right `action`, `actor` and `outcome`.
 - A test that a failed sign-in records the attempted name and never the attempted password.
+- A test that a fingerprint KAM's journal holds becomes a link and one it does not hold stays plain text, and that opening the link shows the superseded source read-only.
+- A test that a viewer gets `403` on `/audit/version`, and that a missing fingerprint or a down KAM still renders.
 
 ## 9. Open points
 
@@ -224,4 +243,5 @@ An administrator can read the whole trail but cannot change or remove any part o
 - **The remote address.** `remote` records the immediate peer, which may be a reverse proxy. Whether to trust and record `X-Forwarded-For` is left open (it is a transport concern, and KAMmon adds no transport rules of its own, D31).
 - **A separate debug log** for read-only operations (validate, dry run) is out of scope for the audit trail; it would be a different, non-permanent log if it is ever wanted.
 - **Idle session expiry.** A session dropped by the idle timeout has no request, so it is not recorded; only an explicit sign-out is.
+- **Journal breadth.** The page checks only the scripts visible on the current page, capped at 16, and only the fingerprints a source change carries. A fingerprint on older records beyond the cap stays plain text until the page is narrowed.
 - **The planned slices.** When the KISS modem (Slice 5) and room accounts (Slice 6) land, their admin actions append records through the same `internal/audit` writer, using the `modem.*` and `room.client.remove` actions in §3.3.
