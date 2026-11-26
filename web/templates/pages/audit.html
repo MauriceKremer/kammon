@@ -1,0 +1,44 @@
+{{define "content"}}
+<div class="section-head">
+  <div>
+    <h2>Audit trail</h2>
+    <p class="small muted">Administrator changes and sign-in activity, newest first. The trail is append-only.</p>
+  </div>
+</div>
+<p class="notice">The audit trail is a permanent record. Nothing on this page can change or remove it.</p>
+{{if .Content.Note}}<p class="notice">{{.Content.Note}}</p>{{end}}
+{{template "audit-table" .Content}}
+{{end}}
+
+{{define "audit-table"}}
+<div id="audit-table">
+  {{if .Records}}
+    <p class="small muted">Showing {{.Shown}} of {{.Total}} records, newest first.</p>
+    {{if .Capped}}<p class="small muted">Older records are in the file; this page shows the newest {{.Shown}} held in memory.</p>{{end}}
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Time</th><th>User</th><th>Action</th><th>Target</th><th>Changes</th><th>Source</th><th>Outcome</th></tr>
+        </thead>
+        <tbody>
+          {{range .Records}}
+            <tr>
+              <td class="mono">{{.At}}</td>
+              <td><strong>{{.Actor}}</strong>{{if .Role}} <span class="badge">{{.Role}}</span>{{end}}</td>
+              <td class="mono">{{.Action}}</td>
+              <td>{{.Target}}</td>
+              <td>{{if .Changes}}{{range .Changes}}<div><code>{{.Field}}</code>: {{.Text}}</div>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>
+              <td class="mono small">{{.Remote}}</td>
+              <td>{{if .Failed}}<span class="warn">failed</span>{{else}}<span class="success">ok</span>{{end}}</td>
+            </tr>
+            {{if .Failed}}<tr><td colspan="7" class="small warn">{{.Detail}}</td></tr>{{end}}
+          {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{if .NextLimit}}<button type="button" class="text-button" hx-get="/ui/audit?limit={{.NextLimit}}" hx-target="#audit-table" hx-swap="outerHTML">Show more</button>{{end}}
+  {{else}}
+    <p class="muted">No activity recorded yet.</p>
+  {{end}}
+</div>
+{{end}}

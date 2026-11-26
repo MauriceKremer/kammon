@@ -63,6 +63,7 @@
 {{end}}
 
 {{define "users-table"}}
+{{if .Warn}}<p class="small warn" role="alert">{{.Warn}}</p>{{end}}
 <div class="table-scroll">
   <table>
     <thead>

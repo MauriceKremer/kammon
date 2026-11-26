@@ -55,6 +55,7 @@ diff ../kam/docs/FeatureKamApi.md docs/kam-api/FeatureKamApi.md   # contract dri
 | `internal/store` | In-memory history: event ring, minute buckets, snapshots, marks |
 | `internal/poll` | The poller: the only reader of KAM |
 | `internal/auth` | Users, sessions, login slowdown |
+| `internal/audit` | Append-only audit trail of admin changes and sign-ins |
 | `internal/view` | Visibility rules (what a role may see) |
 | `internal/web` | Routes, handlers, templates, chart |
 | `web/` | Embedded templates and static files (htmx is vendored, no CDN) |

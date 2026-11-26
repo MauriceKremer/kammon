@@ -2,6 +2,10 @@ listen: ":8080"
 kam_monitor_url: "http://127.0.0.1:8766"
 session_idle_hours: 8
 
+# Where the audit trail is written: an append-only record of administrator changes and
+# sign-ins. Default is kammon.audit.jsonl next to this file. The page can only read it.
+# audit_file: kammon.audit.jsonl
+
 # Let visitors sign in without a name and password: the login page shows a Guest button
 # and each guest is a viewer. Leave it out or set false to require a login.
 guest_access: false

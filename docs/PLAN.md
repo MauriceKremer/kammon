@@ -62,6 +62,13 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 - [x] Copyable descriptive plan and viewer access (MON-AD-9, 11)
 - [x] OpenFreeMap Positron basemap: replace the generated SVG with MapLibre GL JS + OpenFreeMap Positron tiles, attribution and an honest offline note; drop the vendored city tiers (D57, MON-AD-6/8)
 
+## Slice 9: Audit trail
+
+- [x] Append-only `internal/audit` writer, `kammon.audit.jsonl` (default) and the bounded in-memory tail (MON-AT-8..13, 20)
+- [x] Record every state-changing admin action (web users and scripts today; modem and room clients when their slices land) with secrets and source kept out (MON-AT-1..7, 19)
+- [x] Record sign-ins and sign-outs too — password success and failure, guest, and logout (MON-AT-21..25)
+- [x] Admin-only `/audit` page and sidebar entry; read-only, newest first, with honest labels (MON-AT-14..18)
+
 ## Slice 4b: Manuals
 
 Removed (D23, 2026-10-18): the manuals, their public `/manuals/` route and the sidebar Help section left the interface; the app sidebar carries only its navigation list (one plain list, D26), and the pinned copies of KAM's manuals went with them.

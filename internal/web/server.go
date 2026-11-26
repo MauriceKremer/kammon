@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"kammon.bytecoder.nl/internal/audit"
 	"kammon.bytecoder.nl/internal/auth"
 	"kammon.bytecoder.nl/internal/config"
 	"kammon.bytecoder.nl/internal/kam"
@@ -28,7 +29,7 @@ const (
 // AssetVersion is the cache-buster of the shared static assets (kammon.css, the static scripts
 // and the vendored MapLibre files the adverts map uses). Bump it when one of those files changes,
 // so browsers drop their cached copy instead of running or styling the pages with the old rules.
-const AssetVersion = "kammon-31"
+const AssetVersion = "kammon-32"
 
 type Deps struct {
 	Config     config.Config
@@ -39,6 +40,9 @@ type Deps struct {
 	// KAM is the client for the admin's script calls; nil keeps the pages reading the store
 	// and the editor saying it is not connected (AGENTS rule 3).
 	KAM kam.Admin
+	// Audit is the trail of admin changes and sign-ins; a nil keeps a memory-only trail
+	// (tests that do not care) instead of a panic (MON-AT-1..25).
+	Audit *audit.Log
 	// Sleep is the pause login slowdowns impose (MON-AX-6); tests substitute it.
 	Sleep func(time.Duration)
 }
@@ -57,6 +61,8 @@ type Server struct {
 	// kam is the client of the script calls; pages never use it, only the automations admin
 	// actions do (AGENTS rule 3).
 	kam kam.Admin
+	// auditLog is the append-only trail the admin actions and sign-ins write to.
+	auditLog *audit.Log
 }
 
 // access is the role a route needs. There is no zero value, so a route cannot forget to say (MON-AX-11).
@@ -81,8 +87,11 @@ func New(d Deps) (*Server, error) {
 	if d.Sleep == nil {
 		d.Sleep = time.Sleep
 	}
+	if d.Audit == nil {
+		d.Audit = audit.NewMemory("")
+	}
 	s := &Server{
-		cfg: d.Config, store: d.Store, now: d.Now, demo: d.Demo, kam: d.KAM,
+		cfg: d.Config, store: d.Store, now: d.Now, demo: d.Demo, kam: d.KAM, auditLog: d.Audit,
 		userMgr:  newUserManager(d.ConfigPath, d.Demo, d.Config.Users),
 		sessions: auth.NewSessions(d.Config.SessionIdle(), d.Now),
 		slowdown: auth.NewSlowdown(),
@@ -93,7 +102,7 @@ func New(d Deps) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, name := range []string{"overview", "placeholder", "login", "traffic", "channels", "rooms", "automations", "web-users", "adverts"} {
+	for _, name := range []string{"overview", "placeholder", "login", "traffic", "channels", "rooms", "automations", "web-users", "adverts", "audit"} {
 		clone, err := base.Clone()
 		if err != nil {
 			return nil, err
@@ -140,6 +149,8 @@ func (s *Server) routes() []route {
 		{"GET /web-users", admin, s.webUsersPage},
 		{"POST /ui/web-users/save", admin, s.webUsersSave},
 		{"DELETE /ui/web-users", admin, s.webUsersDelete},
+		{"GET /audit", admin, s.auditPage},
+		{"GET /ui/audit", admin, s.auditPartial},
 		{"GET /ui/script-list", admin, s.scriptListPartial},
 		{"POST /ui/script-validate", admin, s.scriptValidateSubmit},
 		{"POST /ui/script-dry-run", admin, s.scriptDryRunSubmit},
@@ -151,7 +162,7 @@ func (s *Server) routes() []route {
 	// Placeholder routes for the pages that are not built yet. Built pages register their own
 	// routes above; the overview and traffic pages take themselves out of this loop.
 	for _, p := range view.Pages(config.RoleAdmin) {
-		if p.Key == "overview" || p.Key == "traffic" || p.Key == "adverts" || p.Key == "channels" || p.Key == "rooms" || p.Key == "automations" || p.Key == "web-users" {
+		if p.Key == "overview" || p.Key == "traffic" || p.Key == "adverts" || p.Key == "channels" || p.Key == "rooms" || p.Key == "automations" || p.Key == "web-users" || p.Key == "audit" {
 			continue
 		}
 		if p.External {
@@ -337,9 +348,12 @@ func (s *Server) loginSubmit(w http.ResponseWriter, r *http.Request) {
 	user, ok := auth.Check(s.userMgr.list(), r.PostForm.Get("name"), r.PostForm.Get("password"))
 	if !ok {
 		s.slowdown.Fail(auth.RemoteHost(r), s.now())
+		// A failed sign-in is recorded with the name that was typed, never the password (MON-AT-22).
+		s.auditSignIn(r, "login.failed", r.PostForm.Get("name"), "", audit.Failed, "Wrong name or password.")
 		s.renderLogin(w, r, http.StatusUnauthorized, "Wrong name or password.")
 		return
 	}
+	s.auditSignIn(r, "login.success", user.Name, string(user.Role), audit.OK, "Signed in.")
 	s.startSession(w, r, user)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -351,6 +365,7 @@ func (s *Server) guestLogin(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	s.auditSignIn(r, "login.guest", guestUser.Name, string(guestUser.Role), audit.OK, "Signed in as Guest.")
 	s.startSession(w, r, guestUser)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -364,6 +379,9 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request, user confi
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookie); err == nil {
+		if u, ok := s.sessions.Get(c.Value); ok {
+			s.auditSignIn(r, "logout", u.Name, string(u.Role), audit.OK, "Signed out.")
+		}
 		s.sessions.Delete(c.Value)
 	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: secure(r)})

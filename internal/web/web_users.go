@@ -5,6 +5,7 @@ import (
 	"slices"
 	"sync"
 
+	"kammon.bytecoder.nl/internal/audit"
 	"kammon.bytecoder.nl/internal/auth"
 	"kammon.bytecoder.nl/internal/config"
 )
@@ -113,6 +114,7 @@ type webUsersData struct {
 	Demo    bool
 	Error   string
 	Notice  string
+	Warn    string
 }
 
 type userForm struct {
@@ -153,8 +155,10 @@ func (s *Server) webUsersSave(w http.ResponseWriter, r *http.Request) {
 	role := config.Role(r.PostForm.Get("role"))
 	password := r.PostForm.Get("password")
 
+	before := s.findUser(origName)
 	err := s.userMgr.save(origName, name, role, password)
 	if err != nil {
+		s.recordUserChange(r, origName, name, role, before, password, err)
 		users := s.userMgr.list()
 		data := webUsersData{
 			Users:   users,
@@ -166,6 +170,7 @@ func (s *Server) webUsersSave(w http.ResponseWriter, r *http.Request) {
 		s.render(w, r, http.StatusUnprocessableEntity, "web-users", s.pageFor(r, "web-users", "Web users", "Manage KAMmon logins", data))
 		return
 	}
+	warn := s.recordUserChange(r, origName, name, role, before, password, nil)
 
 	// Invalidate modified user's sessions (MON-WA-11).
 	// Skip if the acting admin edited their own account; they keep their session active.
@@ -181,6 +186,13 @@ func (s *Server) webUsersSave(w http.ResponseWriter, r *http.Request) {
 		s.sessions.RevokeUser(name)
 	}
 
+	if warn != "" {
+		// Show the warning in place instead of redirecting, so the admin sees it (MON-AT-19).
+		data := webUsersData{Users: s.userMgr.list(), Demo: s.demo, Warn: warn}
+		s.render(w, r, http.StatusOK, "web-users", s.pageFor(r, "web-users", "Web users", "Manage KAMmon logins", data))
+		return
+	}
+
 	if r.Header.Get("HX-Request") != "" {
 		w.Header().Set("HX-Redirect", "/web-users")
 		w.WriteHeader(http.StatusOK)
@@ -192,9 +204,11 @@ func (s *Server) webUsersSave(w http.ResponseWriter, r *http.Request) {
 func (s *Server) webUsersDelete(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Query().Get("name")
 	if err := s.userMgr.delete(name); err != nil {
+		s.recordUserDelete(r, name, err)
 		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 		return
 	}
+	warn := s.recordUserDelete(r, name, nil)
 
 	// Invalidate deleted user's sessions (MON-WA-11).
 	// Skip if the acting admin deleted their own account; shouldn't happen (validation prevents zero admins),
@@ -207,6 +221,70 @@ func (s *Server) webUsersDelete(w http.ResponseWriter, r *http.Request) {
 	data := webUsersData{
 		Users: s.userMgr.list(),
 		Demo:  s.demo,
+		Warn:  warn,
 	}
 	s.execute(w, http.StatusOK, s.pages["web-users"], "users-table", data)
+}
+
+// findUser returns a copy of the named user, or nil when there is none (for the audit record's
+// before values).
+func (s *Server) findUser(name string) *config.User {
+	if name == "" {
+		return nil
+	}
+	for _, u := range s.userMgr.list() {
+		if u.Name == name {
+			uu := u
+			return &uu
+		}
+	}
+	return nil
+}
+
+// recordUserChange writes the audit record of an add or edit (MON-AT-1, 4, 5). It never stores
+// the password, only that one was set or changed.
+func (s *Server) recordUserChange(r *http.Request, origName, name string, role config.Role, before *config.User, password string, actionErr error) string {
+	action := "user.update"
+	target := &audit.Target{Type: "user", Name: name}
+	changes := map[string]audit.Change{}
+	if origName == "" {
+		action = "user.create"
+		changes["name"] = audit.Change{To: name}
+		changes["role"] = audit.Change{To: string(role)}
+		changes["password"] = audit.Change{To: "<set>"}
+	} else {
+		if before != nil {
+			if before.Name != name {
+				changes["name"] = audit.Change{From: before.Name, To: name}
+			}
+			if before.Role != role {
+				changes["role"] = audit.Change{From: string(before.Role), To: string(role)}
+			}
+		}
+		if password != "" {
+			changes["password"] = audit.Change{To: "<changed>"}
+		}
+	}
+	outcome, detail := audit.OK, ""
+	switch {
+	case actionErr != nil:
+		outcome, detail = audit.Failed, actionErr.Error()
+		changes = nil
+	case action == "user.create":
+		detail = "Created " + name + "."
+	case len(changes) == 0:
+		detail = "Saved " + name + " with no changes."
+	default:
+		detail = "Updated " + name + "."
+	}
+	return s.auditChange(r, action, target, changes, outcome, detail)
+}
+
+// recordUserDelete writes the audit record of a delete (MON-AT-1).
+func (s *Server) recordUserDelete(r *http.Request, name string, actionErr error) string {
+	outcome, detail := audit.OK, "Deleted "+name+"."
+	if actionErr != nil {
+		outcome, detail = audit.Failed, actionErr.Error()
+	}
+	return s.auditChange(r, "user.delete", &audit.Target{Type: "user", Name: name}, nil, outcome, detail)
 }

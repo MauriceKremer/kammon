@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -81,6 +82,7 @@ type Config struct {
 	Freshness          Freshness `yaml:"freshness"`
 	SessionIdleHours   int       `yaml:"session_idle_hours"`
 	GuestAccess        bool      `yaml:"guest_access"` // anonymous viewer login; missing means false (MON-AX-24)
+	AuditFile          string    `yaml:"audit_file"`   // append-only trail; default next to kammon.yml (MON-AT-12)
 	ViewerTextChannels []string  `yaml:"viewer_text_channels"`
 	Users              []User    `yaml:"users"`
 	Location           *Location `yaml:"location"`
@@ -126,6 +128,10 @@ func Load(path string) (Config, error) {
 	cfg := defaults()
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return Config{}, fmt.Errorf("parse %s: %w", path, err)
+	}
+	// The audit trail lives beside the configuration unless the operator says otherwise.
+	if cfg.AuditFile == "" {
+		cfg.AuditFile = filepath.Join(filepath.Dir(path), "kammon.audit.jsonl")
 	}
 	if err := cfg.normalize(); err != nil {
 		return Config{}, fmt.Errorf("%s: %w", path, err)

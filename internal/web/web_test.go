@@ -307,11 +307,11 @@ func TestViewerCannotPerformAdminActions(t *testing.T) {
 func TestAdminOnlyNavItemsShowALock(t *testing.T) {
 	h := newHarness(t)
 	_, admin, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
-	if n := strings.Count(admin, "nav-lock"); n != 4 {
-		t.Errorf("the admin sees %d locked menu items, want 4 (rooms, web-users, automations, modem)", n)
+	if n := strings.Count(admin, "nav-lock"); n != 5 {
+		t.Errorf("the admin sees %d locked menu items, want 5 (rooms, web-users, audit, automations, modem)", n)
 	}
-	if n := strings.Count(admin, `class="admin-only"`); n != 4 {
-		t.Errorf("%d menu items carry the admin-only class, want 4", n)
+	if n := strings.Count(admin, `class="admin-only"`); n != 5 {
+		t.Errorf("%d menu items carry the admin-only class, want 5", n)
 	}
 	_, viewer, _ := get(t, h.login(t, "viewer", "viewer"), h.ts.URL+"/")
 	if strings.Contains(viewer, "nav-lock") || strings.Contains(viewer, `class="admin-only"`) {
@@ -340,7 +340,7 @@ func TestManualsLinkOpensInANewTab(t *testing.T) {
 func TestNavItemsCarryTheirIcon(t *testing.T) {
 	h := newHarness(t)
 	_, admin, _ := get(t, h.login(t, "admin", "admin"), h.ts.URL+"/")
-	for _, icon := range []string{"activity", "radio-tower", "hash", "messages-square", "shield-check", "workflow", "cpu"} {
+	for _, icon := range []string{"activity", "radio-tower", "hash", "messages-square", "shield-check", "scroll-text", "workflow", "cpu"} {
 		if n := strings.Count(admin, "icons.svg#"+icon+"\""); n != 1 {
 			t.Errorf("icon %s appears %d times in the admin sidebar, want 1", icon, n)
 		}

@@ -198,3 +198,26 @@ func TestTLSConfigPairs(t *testing.T) {
 		})
 	}
 }
+
+// The audit trail lives beside the configuration unless the operator says otherwise (MON-AT-12).
+func TestAuditFileDefaultsNextToConfig(t *testing.T) {
+	path := write(t, "users:\n  - {name: a, password: p, role: admin}\n")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := filepath.Join(filepath.Dir(path), "kammon.audit.jsonl"); cfg.AuditFile != want {
+		t.Fatalf("audit_file = %q, want %q", cfg.AuditFile, want)
+	}
+}
+
+func TestAuditFileOverride(t *testing.T) {
+	path := write(t, "audit_file: /var/log/kammon-audit.jsonl\nusers:\n  - {name: a, password: p, role: admin}\n")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.AuditFile != "/var/log/kammon-audit.jsonl" {
+		t.Fatalf("audit_file = %q, want the override", cfg.AuditFile)
+	}
+}

@@ -39,3 +39,5 @@ Use these words in code, tests, docs and screens.
 | **Cluster** | A numbered badge on the advert map for nearby dots. Activating it zooms into the group's bounds; at the deepest zoom overlapping dots spiderfy along a spiral (D49, D52, MON-AD-17). |
 | **Base node** | The node at `location` in kammon.yml, drawn as a neutral non-status anchor (no state colour, no radar pulse). The map opens and resets on it, and its layer chip can hide the marker (D50, D53, MON-AD-19). |
 | **Layer chip** | A toggle under the advert map that shows or hides a layer and carries its count; Advertised, Silent and Base Node (D53, MON-AD-20). |
+| **Audit trail** | KAMmon's append-only record of every state-changing administrator action and of every sign-in and sign-out, written to disk and read-only from the web. It says who changed what and when, and who came and went, never passwords or script source. |
+| **Audit record** | One line of the audit trail: sequence, time, actor, action, and the outcome; a change record also carries the target and the changed fields (before/after), a sign-in record carries neither. |
