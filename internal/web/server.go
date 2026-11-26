@@ -102,7 +102,7 @@ func New(d Deps) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, name := range []string{"overview", "placeholder", "login", "traffic", "channels", "rooms", "automations", "web-users", "adverts", "audit"} {
+	for _, name := range []string{"overview", "placeholder", "login", "traffic", "channels", "rooms", "automations", "web-users", "adverts", "audit", "audit-version"} {
 		clone, err := base.Clone()
 		if err != nil {
 			return nil, err
@@ -151,6 +151,7 @@ func (s *Server) routes() []route {
 		{"DELETE /ui/web-users", admin, s.webUsersDelete},
 		{"GET /audit", admin, s.auditPage},
 		{"GET /ui/audit", admin, s.auditPartial},
+		{"GET /audit/version", admin, s.auditVersionPage},
 		{"GET /ui/script-list", admin, s.scriptListPartial},
 		{"POST /ui/script-validate", admin, s.scriptValidateSubmit},
 		{"POST /ui/script-dry-run", admin, s.scriptDryRunSubmit},

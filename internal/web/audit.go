@@ -1,13 +1,12 @@
 package web
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"log/slog"
 	"net/http"
 
 	"kammon.bytecoder.nl/internal/audit"
 	"kammon.bytecoder.nl/internal/auth"
+	"kammon.bytecoder.nl/internal/kam"
 )
 
 // auditChange records an administrator change against the signed-in admin (MON-AT-1..7). It
@@ -45,12 +44,9 @@ func scriptErrorText(err error) string {
 	return text
 }
 
-// sourceFingerprint is the shortened SHA-256 of a script's source. The trail stores this, never
-// the source itself (MON-AT-6).
-func sourceFingerprint(source string) string {
-	sum := sha256.Sum256([]byte(source))
-	return hex.EncodeToString(sum[:8])
-}
+// sourceFingerprint is the id KAM stores with a journal row. Using KAM's own definition lets a
+// recorded source change be matched to a journalled revision (MON-AT-6, 26).
+func sourceFingerprint(source string) string { return kam.SourceFingerprint(source) }
 
 // consoleWithWarn appends a warning line to a console when the trail could not be written.
 func consoleWithWarn(c scriptConsole, warn string) scriptConsole {

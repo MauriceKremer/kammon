@@ -27,7 +27,7 @@
               <td><strong>{{.Actor}}</strong>{{if .Role}} <span class="badge">{{.Role}}</span>{{end}}</td>
               <td class="mono">{{.Action}}</td>
               <td>{{.Target}}</td>
-              <td>{{if .Changes}}{{range .Changes}}<div><code>{{.Field}}</code>: {{.Text}}</div>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>
+              <td>{{if .Changes}}{{range .Changes}}<div><code>{{.Field}}</code>: {{range .Parts}}{{if .Link}}<a href="{{.Link}}">{{.Text}}</a>{{else}}{{.Text}}{{end}}{{end}}</div>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>
               <td class="mono small">{{.Remote}}</td>
               <td>{{if .Failed}}<span class="warn">failed</span>{{else}}<span class="success">ok</span>{{end}}</td>
             </tr>

@@ -1,0 +1,16 @@
+{{define "content"}}
+<div class="section-head">
+  <div>
+    <h2>{{if .Content.Found}}{{.Content.Name}}{{else}}Journalled revision{{end}}</h2>
+    <p class="small muted">A superseded revision from KAM's journal. It is read-only; KAMmon cannot restore it.</p>
+  </div>
+  <a class="text-button" href="/audit">Back to the audit trail</a>
+</div>
+{{if .Content.Error}}
+  <p class="notice">{{.Content.Error}}</p>
+{{else}}
+  <p class="small muted mono">script {{.Content.ScriptID}} · revision {{.Content.Revision}} · archived {{.Content.ArchivedAt}} · fingerprint {{.Content.Fingerprint}}</p>
+  <p class="small muted">Timeout {{.Content.TimeoutMS}} ms · {{if .Content.Enabled}}enabled{{else}}disabled{{end}}.</p>
+  <div class="editor"><textarea id="journal-source" readonly aria-label="Superseded script source">{{.Content.Source}}</textarea></div>
+{{end}}
+{{end}}
