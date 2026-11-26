@@ -1,6 +1,6 @@
 # KAMmon Requirements: Audit Trail
 
-**Status:** Requirements defined (not yet built). Planned as Slice 9 in [../PLAN.md](../PLAN.md).
+**Status:** Built (2026-11-26): `internal/audit` (append-only JSON Lines with a bounded in-memory tail), the record of admin changes and sign-ins, and the admin-only read-only `/audit` page (MON-AT-1..25, D60..D62). Demo mode keeps the trail in memory.
 **Scope:** A permanent, read-only record of every state-changing administrator action and of every sign-in and sign-out, written to disk, shown on an administrator-only page. It answers "who changed what, and when" and "who came and went". KAM data stays in KAM; this is KAMmon's own record of its own activity. Related rules: [Access.md](Access.md) (who may act and sign in), [WebAccounts.md](WebAccounts.md) and [Automations.md](Automations.md) (the actions themselves).
 
 ## 1. Summary

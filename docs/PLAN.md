@@ -64,10 +64,10 @@ Status legend: `[x]` done in this scaffold, `[ ]` open.
 
 ## Slice 9: Audit trail
 
-- [ ] Append-only `internal/audit` writer, `kammon.audit.jsonl` (default) and the bounded in-memory tail (MON-AT-8..13, 20)
-- [ ] Record every state-changing admin action (web users and scripts today; modem and room clients when their slices land) with secrets and source kept out (MON-AT-1..7, 19)
-- [ ] Record sign-ins and sign-outs too — password success and failure, guest, and logout (MON-AT-21..25)
-- [ ] Admin-only `/audit` page and sidebar entry; read-only, newest first, with honest labels (MON-AT-14..18)
+- [x] Append-only `internal/audit` writer, `kammon.audit.jsonl` (default) and the bounded in-memory tail (MON-AT-8..13, 20)
+- [x] Record every state-changing admin action (web users and scripts today; modem and room clients when their slices land) with secrets and source kept out (MON-AT-1..7, 19)
+- [x] Record sign-ins and sign-outs too — password success and failure, guest, and logout (MON-AT-21..25)
+- [x] Admin-only `/audit` page and sidebar entry; read-only, newest first, with honest labels (MON-AT-14..18)
 
 ## Slice 4b: Manuals
 
