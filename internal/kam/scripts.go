@@ -7,6 +7,8 @@ package kam
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -47,6 +49,32 @@ type ScriptRun struct {
 	LastRunAt      *time.Time `json:"last_run_at,omitempty"`
 	LastDurationMS int64      `json:"last_duration_ms"`
 	LastReplies    int        `json:"last_replies"`
+}
+
+// ScriptVersion is one superseded script revision from KAM's version journal (its
+// `automation_script_journal`, APIdetails "The version object"). The live revision is not in the
+// journal until it is replaced or deleted. Fingerprint identifies the source content, so
+// revisions with identical source share it.
+type ScriptVersion struct {
+	Fingerprint   string `json:"fingerprint"`
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Source        string `json:"source"`
+	Enabled       bool   `json:"enabled"`
+	TimeoutMS     int64  `json:"timeout_ms"`
+	RuntimeStatus string `json:"runtime_status"`
+	LastError     string `json:"last_error,omitempty"`
+	Revision      int64  `json:"revision"`
+	CreatedAt     int64  `json:"created_at"`
+	UpdatedAt     int64  `json:"updated_at"`
+	ArchivedAt    int64  `json:"archived_at"`
+}
+
+// SourceFingerprint is the id KAM stores with a journal row and the one KAMmon records with a
+// source change: the first 8 bytes of the source's SHA-256, hex-encoded (16 characters).
+func SourceFingerprint(source string) string {
+	sum := sha256.Sum256([]byte(source))
+	return hex.EncodeToString(sum[:8])
 }
 
 // The runtime states KAM reports (the words the pages show, MON-AU-2).
@@ -118,6 +146,10 @@ type Admin interface {
 	DisableScript(ctx context.Context, id string, expectedRevision int64) (Script, error)
 	RecoverScript(ctx context.Context, id string, timeoutMS, expectedRevision int64) (Script, error)
 	DryRun(ctx context.Context, test DryRunRequest) (DryRunResponse, error)
+	// Journal lists the source fingerprints of a script's superseded revisions, newest first.
+	Journal(ctx context.Context, id string) ([]string, error)
+	// JournalVersion reads one superseded revision by source fingerprint.
+	JournalVersion(ctx context.Context, id, fingerprint string) (ScriptVersion, error)
 	// ProbeDryRun reports whether KAM offers POST /scripts/dry-run. It sends an empty object:
 	// a KAM with the route answers 400 or 422 (nothing is executed); an older one answers 404,
 	// or 405 when its /scripts/{id} routes cover the path (MON-AU-20).
@@ -136,6 +168,25 @@ func (h *HTTP) Scripts(ctx context.Context) ([]Script, error) {
 func (h *HTTP) Script(ctx context.Context, id string) (Script, error) {
 	var out Script
 	err := h.get(ctx, "/scripts/"+url.PathEscape(id), nil, &out)
+	return out, err
+}
+
+// Journal lists the source fingerprints of a script's superseded revisions, newest first, as KAM
+// keeps them (identical sources are listed once). An unknown script answers an empty list, not
+// an error, because the journal query simply matches no rows.
+func (h *HTTP) Journal(ctx context.Context, id string) ([]string, error) {
+	var out []string
+	if err := h.get(ctx, "/scripts/"+url.PathEscape(id)+"/journal", nil, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// JournalVersion reads one superseded revision by source fingerprint. KAM answers 404 when the
+// script has no revoked revision with that fingerprint (it may be the current revision).
+func (h *HTTP) JournalVersion(ctx context.Context, id, fingerprint string) (ScriptVersion, error) {
+	var out ScriptVersion
+	err := h.get(ctx, "/scripts/"+url.PathEscape(id)+"/journal/"+url.PathEscape(fingerprint), nil, &out)
 	return out, err
 }
 

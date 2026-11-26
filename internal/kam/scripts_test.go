@@ -221,3 +221,39 @@ func TestProbeDryRunDetectsAnOlderKAM(t *testing.T) {
 		t.Fatal("probe reports support when KAM answers 405: the button would lie (MON-AU-20)")
 	}
 }
+
+// SourceFingerprint must match KAM's journal id: the first 8 bytes of the source's SHA-256.
+func TestSourceFingerprint(t *testing.T) {
+	if got := SourceFingerprint(""); len(got) != 16 {
+		t.Fatalf("fingerprint %q is not 16 hex characters", got)
+	}
+	if SourceFingerprint("a") != SourceFingerprint("a") || SourceFingerprint("a") == SourceFingerprint("b") {
+		t.Fatal("fingerprint is not a stable content id")
+	}
+}
+
+// The journal routes: a list of fingerprints and one version with its source.
+func TestHTTPJournalReads(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /scripts/echo/journal", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`["ab12cd34ef567890","0123456789abcdef"]`))
+	})
+	mux.HandleFunc("GET /scripts/echo/journal/ab12cd34ef567890", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"fingerprint":"ab12cd34ef567890","id":"echo","name":"echo.star","source":"def on_group_text(message):\n    pass\n","enabled":true,"timeout_ms":500,"runtime_status":"READY","revision":2,"created_at":1,"updated_at":2,"archived_at":3}`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	h := NewHTTP(srv.URL, time.Second)
+
+	fps, err := h.Journal(context.Background(), "echo")
+	if err != nil || len(fps) != 2 || fps[0] != "ab12cd34ef567890" {
+		t.Fatalf("journal = %+v, %v", fps, err)
+	}
+	v, err := h.JournalVersion(context.Background(), "echo", "ab12cd34ef567890")
+	if err != nil || v.Fingerprint != "ab12cd34ef567890" || v.Revision != 2 || v.ArchivedAt != 3 {
+		t.Fatalf("version = %+v, %v", v, err)
+	}
+	if _, err := h.JournalVersion(context.Background(), "echo", "ffffffffffffffff"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("missing version error = %v, want ErrNotFound", err)
+	}
+}
