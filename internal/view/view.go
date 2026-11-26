@@ -86,6 +86,7 @@ var pages = []Page{
 	{Key: "channels", Title: "Channels", Path: "/channels", Icon: "hash"},
 	{Key: "rooms", Title: "Rooms", Path: "/rooms", Icon: "messages-square", Admin: true},
 	{Key: "web-users", Title: "Web users", Path: "/web-users", Icon: "shield-check", Admin: true},
+	{Key: "audit", Title: "Audit trail", Path: "/audit", Icon: "scroll-text", Admin: true},
 	{Key: "automations", Title: "Automations", Path: "/automations", Icon: "workflow", Admin: true},
 	{Key: "modem", Title: "KISS modem", Path: "/modem", Icon: "cpu", Admin: true},
 	{Key: "manuals", Title: "Manuals", Path: "https://mauricekremer.github.io/kammon/", Icon: "arrow-up-right", External: true},

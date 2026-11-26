@@ -29,7 +29,7 @@ const (
 // AssetVersion is the cache-buster of the shared static assets (kammon.css, the static scripts
 // and the vendored MapLibre files the adverts map uses). Bump it when one of those files changes,
 // so browsers drop their cached copy instead of running or styling the pages with the old rules.
-const AssetVersion = "kammon-31"
+const AssetVersion = "kammon-32"
 
 type Deps struct {
 	Config     config.Config
@@ -102,7 +102,7 @@ func New(d Deps) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, name := range []string{"overview", "placeholder", "login", "traffic", "channels", "rooms", "automations", "web-users", "adverts"} {
+	for _, name := range []string{"overview", "placeholder", "login", "traffic", "channels", "rooms", "automations", "web-users", "adverts", "audit"} {
 		clone, err := base.Clone()
 		if err != nil {
 			return nil, err
@@ -149,6 +149,8 @@ func (s *Server) routes() []route {
 		{"GET /web-users", admin, s.webUsersPage},
 		{"POST /ui/web-users/save", admin, s.webUsersSave},
 		{"DELETE /ui/web-users", admin, s.webUsersDelete},
+		{"GET /audit", admin, s.auditPage},
+		{"GET /ui/audit", admin, s.auditPartial},
 		{"GET /ui/script-list", admin, s.scriptListPartial},
 		{"POST /ui/script-validate", admin, s.scriptValidateSubmit},
 		{"POST /ui/script-dry-run", admin, s.scriptDryRunSubmit},
@@ -160,7 +162,7 @@ func (s *Server) routes() []route {
 	// Placeholder routes for the pages that are not built yet. Built pages register their own
 	// routes above; the overview and traffic pages take themselves out of this loop.
 	for _, p := range view.Pages(config.RoleAdmin) {
-		if p.Key == "overview" || p.Key == "traffic" || p.Key == "adverts" || p.Key == "channels" || p.Key == "rooms" || p.Key == "automations" || p.Key == "web-users" {
+		if p.Key == "overview" || p.Key == "traffic" || p.Key == "adverts" || p.Key == "channels" || p.Key == "rooms" || p.Key == "automations" || p.Key == "web-users" || p.Key == "audit" {
 			continue
 		}
 		if p.External {

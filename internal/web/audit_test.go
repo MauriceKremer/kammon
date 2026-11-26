@@ -162,6 +162,57 @@ func TestAuditRecordsGuestLogin(t *testing.T) {
 		t.Fatalf("guest record = %+v", rec)
 	}
 }
+
+// TestAuditPageNeedsAdmin checks MON-AT-14 and 17: the page is admin-only and says it is permanent.
+func TestAuditPageNeedsAdmin(t *testing.T) {
+	h := newHarness(t)
+	v := h.login(t, "viewer", "viewer")
+	if status, _, _ := get(t, v, h.ts.URL+"/audit"); status != http.StatusForbidden {
+		t.Fatalf("viewer /audit: %d, want 403", status)
+	}
+	if status, _, _ := get(t, v, h.ts.URL+"/ui/audit"); status != http.StatusForbidden {
+		t.Fatalf("viewer /ui/audit: %d, want 403", status)
+	}
+
+	a := h.login(t, "admin", "admin")
+	status, body, _ := get(t, a, h.ts.URL+"/audit")
+	if status != http.StatusOK {
+		t.Fatalf("admin /audit: %d, want 200", status)
+	}
+	if !strings.Contains(body, "permanent record") {
+		t.Error("the page must say the trail is a permanent record (MON-AT-17)")
+	}
+}
+
+// TestAuditPageShowsRecords checks MON-AT-15 and MON-AT-5 on the page and its partial.
+func TestAuditPageShowsRecords(t *testing.T) {
+	h := newHarness(t)
+	c := h.login(t, "admin", "admin")
+	auditForm(t, h, c, http.MethodPost, "/ui/web-users/save", url.Values{
+		"name": {"carol"}, "role": {"viewer"}, "password": {"z9-topsecret"},
+	})
+
+	status, body, _ := get(t, c, h.ts.URL+"/audit")
+	if status != http.StatusOK {
+		t.Fatalf("admin /audit: %d, want 200", status)
+	}
+	for _, want := range []string{"user.create", "carol", "login.success", "Showing"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("the page misses %q", want)
+		}
+	}
+	if strings.Contains(body, "z9-topsecret") {
+		t.Error("the page leaked a password (MON-AT-5)")
+	}
+
+	// The partial answers "Show more" with the same rows.
+	status, partial, _ := get(t, c, h.ts.URL+"/ui/audit?limit=1")
+	if status != http.StatusOK || !strings.Contains(partial, `id="audit-table"`) || !strings.Contains(partial, "user.create") {
+		t.Fatalf("partial: %d %s", status, partial)
+	}
+}
+
+// TestAuditRecordsScriptActions checks MON-AT-1, 4 and 6 for the script actions against a fake KAM.
 func TestAuditRecordsScriptActions(t *testing.T) {
 	h := newScriptHarness(t)
 	h.login(t, "admin", "admin")

@@ -69,7 +69,7 @@ func TestManualsLinkOpenToEveryRole(t *testing.T) {
 			t.Errorf("%s is not offered the manuals entry", role)
 		}
 	}
-	if len(Pages(config.RoleAdmin)) != len(Pages(config.RoleViewer))+4 {
+	if len(Pages(config.RoleAdmin)) != len(Pages(config.RoleViewer))+5 {
 		t.Errorf("the manuals entry must not change the admin-only split")
 	}
 }
