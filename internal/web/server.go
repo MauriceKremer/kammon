@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"kammon.bytecoder.nl/internal/audit"
 	"kammon.bytecoder.nl/internal/auth"
 	"kammon.bytecoder.nl/internal/config"
 	"kammon.bytecoder.nl/internal/kam"
@@ -39,6 +40,9 @@ type Deps struct {
 	// KAM is the client for the admin's script calls; nil keeps the pages reading the store
 	// and the editor saying it is not connected (AGENTS rule 3).
 	KAM kam.Admin
+	// Audit is the trail of admin changes and sign-ins; a nil keeps a memory-only trail
+	// (tests that do not care) instead of a panic (MON-AT-1..25).
+	Audit *audit.Log
 	// Sleep is the pause login slowdowns impose (MON-AX-6); tests substitute it.
 	Sleep func(time.Duration)
 }
@@ -57,6 +61,8 @@ type Server struct {
 	// kam is the client of the script calls; pages never use it, only the automations admin
 	// actions do (AGENTS rule 3).
 	kam kam.Admin
+	// auditLog is the append-only trail the admin actions and sign-ins write to.
+	auditLog *audit.Log
 }
 
 // access is the role a route needs. There is no zero value, so a route cannot forget to say (MON-AX-11).
@@ -81,8 +87,11 @@ func New(d Deps) (*Server, error) {
 	if d.Sleep == nil {
 		d.Sleep = time.Sleep
 	}
+	if d.Audit == nil {
+		d.Audit = audit.NewMemory("")
+	}
 	s := &Server{
-		cfg: d.Config, store: d.Store, now: d.Now, demo: d.Demo, kam: d.KAM,
+		cfg: d.Config, store: d.Store, now: d.Now, demo: d.Demo, kam: d.KAM, auditLog: d.Audit,
 		userMgr:  newUserManager(d.ConfigPath, d.Demo, d.Config.Users),
 		sessions: auth.NewSessions(d.Config.SessionIdle(), d.Now),
 		slowdown: auth.NewSlowdown(),

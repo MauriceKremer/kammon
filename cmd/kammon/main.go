@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"kammon.bytecoder.nl/internal/audit"
 	"kammon.bytecoder.nl/internal/config"
 	"kammon.bytecoder.nl/internal/kam"
 	"kammon.bytecoder.nl/internal/kamfake"
@@ -37,6 +38,20 @@ func main() {
 		slog.Error("kammon stopped", "error", err)
 		os.Exit(1)
 	}
+}
+
+// openAudit opens the persistent trail, or a memory trail in demo mode or when the file
+// cannot be opened (MON-AT-12, MON-AT-19).
+func openAudit(cfg config.Config, demo bool) *audit.Log {
+	if demo {
+		return audit.NewMemory(audit.DemoNote)
+	}
+	l, err := audit.Open(cfg.AuditFile)
+	if err != nil {
+		slog.Error("audit trail is not persistent", "path", cfg.AuditFile, "error", err)
+		return audit.NewMemory(audit.UnopenedNote)
+	}
+	return l
 }
 
 func run(configPath string, demo bool) error {
@@ -78,7 +93,12 @@ func run(configPath string, demo bool) error {
 	}
 	go poller.Run(ctx)
 
-	srv, err := web.New(web.Deps{Config: cfg, ConfigPath: configPath, Store: st, Demo: demo, KAM: kamClient})
+	// The audit trail records admin changes and sign-ins (docs/requirements/AuditTrail.md).
+	// A trail that cannot be opened on disk still runs, in memory, and the page says so.
+	auditLog := openAudit(cfg, demo)
+	defer auditLog.Close()
+
+	srv, err := web.New(web.Deps{Config: cfg, ConfigPath: configPath, Store: st, Demo: demo, KAM: kamClient, Audit: auditLog})
 	if err != nil {
 		return err
 	}
