@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -43,6 +44,14 @@ type fakeScript struct {
 	lastRunAt      time.Time
 	lastDurationMS int64
 	lastReplies    int
+}
+
+// fakeVersion is one superseded revision in the fake's journal: the script row plus its source
+// fingerprint and when it was archived. KAM keeps these in automation_script_journal.
+type fakeVersion struct {
+	fakeScript
+	fingerprint string
+	archivedAt  int64
 }
 
 func seedScripts(now time.Time) []fakeScript {
@@ -104,6 +113,27 @@ func (f *Fake) wireScript(s fakeScript) kam.Script {
 		}
 	}
 	return out
+}
+
+// wireVersion is the journal row as KAM serves it.
+func (f *Fake) wireVersion(v fakeVersion) kam.ScriptVersion {
+	s := v.fakeScript
+	return kam.ScriptVersion{
+		Fingerprint: v.fingerprint, ID: s.id, Name: s.name, Source: s.source, Enabled: s.enabled,
+		TimeoutMS: s.timeoutMS, RuntimeStatus: s.status, LastError: s.lastError, Revision: s.revision,
+		CreatedAt: s.createdAt, UpdatedAt: s.updatedAt, ArchivedAt: v.archivedAt,
+	}
+}
+
+// archiveScript copies a revision into the journal, as KAM does when it replaces or deletes one.
+// The caller holds f.mu. A revision is archived at most once (KAM's UNIQUE (script_id, revision)).
+func (f *Fake) archiveScript(s fakeScript) {
+	for _, v := range f.journal {
+		if v.id == s.id && v.revision == s.revision {
+			return
+		}
+	}
+	f.journal = append(f.journal, fakeVersion{fakeScript: s, fingerprint: kam.SourceFingerprint(s.source), archivedAt: f.now().Unix()})
 }
 
 func (f *Fake) findScript(id string) (int, bool) {
@@ -289,6 +319,7 @@ func (f *Fake) fakeSave(w http.ResponseWriter, id string, incoming kam.Script, e
 		writeFakeError(w, http.StatusConflict, "revision "+strconv.FormatInt(expectedRevision, 10)+" is stale, current is "+strconv.FormatInt(saved.revision, 10))
 		return
 	}
+	f.archiveScript(*saved)
 	saved.name, saved.source, saved.enabled, saved.timeoutMS = incoming.Name, incoming.Source, incoming.Enabled, incoming.TimeoutMS
 	saved.revision++
 	saved.updatedAt = f.now().Unix()
@@ -377,8 +408,58 @@ func (f *Fake) handleScriptDelete(w http.ResponseWriter, r *http.Request) {
 		writeFakeError(w, http.StatusConflict, "revision "+strconv.FormatInt(revision, 10)+" is stale")
 		return
 	}
+	f.archiveScript(f.scripts[idx])
 	f.scripts = append(f.scripts[:idx], f.scripts[idx+1:]...)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleScriptJournal lists the source fingerprints of superseded revisions, newest first.
+func (f *Fake) handleScriptJournal(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.scriptsDisabled(w) {
+		return
+	}
+	id := r.PathValue("id")
+	versions := make([]fakeVersion, 0, len(f.journal))
+	for _, v := range f.journal {
+		if v.id == id {
+			versions = append(versions, v)
+		}
+	}
+	sort.Slice(versions, func(i, j int) bool { return versions[i].revision > versions[j].revision })
+	fingerprints := make([]string, 0, len(versions))
+	seen := map[string]bool{}
+	for _, v := range versions {
+		if seen[v.fingerprint] {
+			continue
+		}
+		seen[v.fingerprint] = true
+		fingerprints = append(fingerprints, v.fingerprint)
+	}
+	writeFakeJSON(w, http.StatusOK, fingerprints)
+}
+
+// handleScriptJournalVersion returns one superseded revision by source fingerprint.
+func (f *Fake) handleScriptJournalVersion(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.scriptsDisabled(w) {
+		return
+	}
+	id, fingerprint := r.PathValue("id"), r.PathValue("fingerprint")
+	var best *fakeVersion
+	for i := range f.journal {
+		v := &f.journal[i]
+		if v.id == id && v.fingerprint == fingerprint && (best == nil || v.revision > best.revision) {
+			best = v
+		}
+	}
+	if best == nil {
+		writeFakeError(w, http.StatusNotFound, "no such script version")
+		return
+	}
+	writeFakeJSON(w, http.StatusOK, f.wireVersion(*best))
 }
 
 func (f *Fake) handleScriptValidate(w http.ResponseWriter, r *http.Request) {
