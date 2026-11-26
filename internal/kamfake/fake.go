@@ -413,12 +413,30 @@ func (f *Fake) adverts(w http.ResponseWriter, r *http.Request) {
 	at := func(ago time.Duration) time.Time { return now.Add(-ago) }
 	first := func(ago time.Duration) *time.Time { value := now.Add(-ago); return &value }
 	lat := func(value float64) *float64 { return &value }
+	// hopPaths gives each demo advert a plausible relay path through the demo's located nodes,
+	// nearest the sender first, so Draw Line to Base shows a real hop path (D59). Each entry is a
+	// public-key prefix: the demo keys are "01", "02", ... followed by 62 "a" hex digits.
+	hopPaths := map[int][]string{
+		2:  {"03", "01"},
+		3:  {"02", "05", "01"},
+		4:  {"02"},
+		5:  {"01"},
+		6:  {"07"},
+		7:  {"03", "01"},
+		8:  {"02", "01"},
+		9:  {"01"},
+		10: {"03"},
+	}
 	node := func(index int, nickname string, hops int, last, seen time.Duration, located bool, latitude, longitude float64, drift int64, repeater, room, chat, sensor bool) kam.Advert {
+		stations := hopPaths[index]
+		if len(stations) > hops {
+			stations = stations[:hops]
+		}
 		advert := kam.Advert{
 			PublicKey: fmt.Sprintf("%02x", index) + strings.Repeat("a", 62),
 			NodeHash:  fmt.Sprintf("%02x", index), Nickname: name(nickname),
 			IsRepeater: repeater, IsRoomServer: room, IsChatNode: chat, IsSensor: sensor,
-			SignatureValid: true, HopCount: hops, HopStations: []string{fmt.Sprintf("%02x", index+16)},
+			SignatureValid: true, HopCount: hops, HopStations: stations,
 			TimeDriftSeconds: drift, AdvertTimestamp: at(last + time.Minute),
 			FirstReceivedAt: first(seen), LastReceivedAt: at(last),
 		}

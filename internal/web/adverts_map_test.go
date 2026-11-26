@@ -180,6 +180,47 @@ func TestAdvertsMapWholeWorldWithoutLocationOrPosition(t *testing.T) {
 	}
 }
 
+// TestAdvertsMapDrawsHopPathToBase checks the Draw Line to Base route (D59): the line starts at the
+// sender, follows each hop that matches a located node in the advert's order, skips empty and
+// unlocated hops, and ends at the configured base.
+func TestAdvertsMapDrawsHopPathToBase(t *testing.T) {
+	h := newHarness(t)
+	located := func(key string, lat, lon float64, hops []string) kam.Advert {
+		return kam.Advert{
+			PublicKey: key + strings.Repeat("a", 62-len(key)), NodeHash: key[:2],
+			HasLocation: true, Latitude: ptr(lat), Longitude: ptr(lon),
+			HopCount: len(hops), HopStations: hops,
+			LastReceivedAt: t0.Add(-time.Second), FirstReceivedAt: ptr(t0.Add(-time.Hour)),
+		}
+	}
+	sender := located("a1", 52.0, 6.0, []string{"b2", "", "c3"})
+	hop := located("b2", 52.1, 6.1, nil)
+	unlocated := kam.Advert{
+		PublicKey: "c3" + strings.Repeat("a", 62), NodeHash: "c3",
+		HopCount: 1, HopStations: []string{}, LastReceivedAt: t0.Add(-time.Second),
+	}
+	h.st.SetAdverts([]kam.Advert{sender, hop, unlocated}, false, t0)
+	c := h.login(t, "viewer", "viewer")
+	_, body, _ := get(t, c, h.ts.URL+"/adverts")
+
+	collection := mapGeoJSON(t, body)
+	var route [][2]float64
+	for _, feature := range collection.Features {
+		if feature.Properties.Number == 1 {
+			route = feature.Properties.Route
+		}
+	}
+	want := [][2]float64{{6.0, 52.0}, {6.1, 52.1}, {6.9069, 52.7792}}
+	if len(route) != len(want) {
+		t.Fatalf("route = %v, want the sender, the located hop and the base", route)
+	}
+	for i := range want {
+		if route[i] != want[i] {
+			t.Errorf("route[%d] = %v, want %v", i, route[i], want[i])
+		}
+	}
+}
+
 // advertsServer builds a server with a substituted config and signs a viewer in.
 func advertsServer(t *testing.T, h *harness, cfg config.Config) (*httptest.Server, *http.Client) {
 	t.Helper()

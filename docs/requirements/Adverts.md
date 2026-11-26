@@ -53,7 +53,7 @@ Plain words: **advert** means a node announcing itself. **Hop count** is how man
 - Dots carry the table's last-heard colour (fresh, recent, older, stale). A scale bar, exact at the home latitude, is shown; its figures are said in words below the map.
 - Dots nearer than about 42 screen pixels group into a numbered cluster badge (MapLibre's cluster source). Activating a badge glides the view into the group's bounds, and at the deepest zoom dots that still overlap spiderfy apart with a short animation and a leg back to the common spot, so every node stays an ordinary clickable dot. Markers keep one screen size (D49, D52, MON-AD-17).
 - The configured base node (`location` in kammon.yml; Emmen in the demo) draws as a bold neutral anchor — a distinct, non-status marker with no state colour and no radar pulse. It keeps one screen size, sits above the cluster layer, and can be hidden by its own layer chip (MON-AD-19, D55).
-- Hovering a dot opens a flat inspector card with the node name, public-key prefix, role, hops from base, colour-coded last heard and the base radio frequency; clicking pins it and reveals the position, first heard, clock, `Copy Public Key` and `Draw Line to Base`. One base line is drawn at a time (D53, MON-AD-16).
+- Hovering a dot opens a flat inspector card with the node name, public-key prefix, role, hops from base, colour-coded last heard and the base radio frequency; clicking pins it and reveals the position, first heard, clock, `Copy Public Key` and `Draw Line to Base`. The line follows the advert's stored hop hashes: it starts at the sender, passes through each hop that matches a located node's public-key prefix in the advert's order (empty hops and hops with no advertised position are skipped) and ends at the configured base. One base line is drawn at a time. Node hashes collide, so the line is a probable path, not a proven one (D59, MON-AD-16).
 - The map controls are flat buttons — 1 px border, 6 px radius, no shadow or blur. The legend is a set of accessible flat toggle chips — Advertised (N), Silent (N) and Base Node — with counts; Silent starts off, so stale nodes are hidden until the operator asks for them (D53, MON-AD-20).
 - Radio text never enters `template.HTML` (the chart rule, rule 5): node names ride as GeoJSON properties and are written to the DOM as text, never as inner HTML. The only `template.HTML` stays the numbers-only SVG in `chart.go`. Hover and click cards are escaped HTML beside the map (`web/static/map.js`, D46).
 
@@ -111,17 +111,18 @@ Advert names are public over the air and already visible to viewers on the Traff
 - Dots carry no printed labels, announce their row number, and the per-advert card exists beside the map with the advert's details.
 - Place labels come from the Positron style itself; the vendored Natural Earth local/Dutch city tiers and their `data-rank` markup are removed.
 - Clustering: nearby dots become a numbered badge, a badge activation zooms into its members' bounds, badges/hit areas sit behind the dots, and at maximum zoom overlapping dots glide out into a spider with legs; markers stay one screen size. Checked in the browser in demo mode (the Go tests pin the legend and note; the grouping itself is camera state).
-- Base marker, inspector fields/actions and layer chips: checked in the browser in demo mode (base anchor present with no state colour or pulse, card shows role/hops/last heard/frequency, Copy and Draw Line work, chips hide their layers, and no card or control casts a shadow or uses blur).
+- Base marker, inspector fields/actions and layer chips: checked in the browser in demo mode (base anchor present with no state colour or pulse, card shows role/hops/last heard/frequency, Copy works, Draw Line to Base follows the advert's located hop hashes from sender to base, chips hide their layers, and no card or control casts a shadow or uses blur).
 - Only located nodes become dots; nodes without a valid advertised position stay in the table, are counted in the notes and never appear as a guessed placement, with or without `location` configured.
 - The map plots only valid advertised positions; a no-fix or absent position is skipped and counted.
 - Radio text in a nickname is escaped.
 - The partial answers htmx and a plain request redirects to `/adverts`.
 - Empty state, missing snapshot and store freshness.
 - Store cap and truncation reporting.
+- Draw Line to Base resolves the advert's hop hashes to located nodes by public-key prefix, in the advert's order, skips empty and unlocated hops, and ends at the base; a hop hash is ambiguous and the line is labelled probable (D59).
 - Strict fixture decode and the HTTP reader for `GET /v1/adverts`.
 
 ## 8. Open points
 
 - Whether to add a per-node advert frequency view. It needs a reception-history table in KAM, which is deliberately not in the current contract.
-- Whether to draw relay edges from `hop_stations`. One-byte node hashes collide, so edges would be "probable" and often ambiguous.
+- Relay edges from `hop_stations` — closed 2026-11-25: Draw Line to Base joins the sender, the located hop nodes and the base through the stored hop hashes, labelled probable because node hashes collide (D59).
 - Whether the map should use Web Mercator instead of equirectangular — closed 2026-02-14: the map now projects Web Mercator, and the frame defaults to the operator's country (D42, D43).
